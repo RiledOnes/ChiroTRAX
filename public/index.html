@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ChiroTrax</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0e1117;
+      --surface: #161b27;
+      --surface2: #1e2535;
+      --surface3: #252d40;
+      --border: #2a3348;
+      --ink: #e8eaf2;
+      --ink2: #7a8aaa;
+      --ink3: #4a5570;
+      --accent: #4f8ef7;
+      --accent-dim: rgba(79,142,247,0.12);
+      --accent2: #38d9a9;
+      --accent2-dim: rgba(56,217,169,0.12);
+      --warn: #f7934f;
+      --warn-dim: rgba(247,147,79,0.12);
+      --danger: #f75f5f;
+      --danger-dim: rgba(247,95,95,0.12);
+      --radius: 10px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* ---- SCROLLBAR ---- */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ---- LAYOUT ---- */
+    .app { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 220px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      height: 100vh;
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    .logo {
+      padding: 24px 20px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--ink);
+    }
+    .logo h1 span { color: var(--accent); }
+    .logo sub { color: var(--ink3); font-size: 11px; font-weight: 400; display: block; margin-top: 2px; }
+
+    .nav { padding: 12px 10px; flex: 1; }
+    .nav-section { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--ink3); padding: 10px 10px 6px; }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13.5px;
+      font-weight: 400;
+      color: var(--ink2);
+      transition: all 0.15s;
+      margin-bottom: 1px;
+    }
+    .nav-item:hover { background: var(--surface2); color: var(--ink); }
+    .nav-item.active { background: var(--accent-dim); color: var(--accent); font-weight: 500; }
+    .nav-item .icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+
+    .sidebar-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      color: var(--ink3);
+      font-size: 11px;
+    }
+
+    .main {
+      flex: 1;
+      margin-left: 220px;
+      padding: 28px 32px;
+      max-width: calc(100vw - 220px);
+      min-height: 100vh;
+    }
+
+    .page { display: none; }
+    .page.active { display: block; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ---- PAGE HEADER ---- */
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .page-header h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+    .page-header p { color: var(--ink2); font-size: 13px; margin-top: 3px; }
+
+    /* ---- STATS ROW ---- */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+    }
+    .stat-card .s-label { font-size: 11px; color: var(--ink3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.8px; }
+    .stat-card .s-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 34px;
+      font-weight: 700;
+      margin-top: 6px;
+      line-height: 1;
+    }
+    .stat-card .s-sub { font-size: 12px; color: var(--ink2); margin-top: 5px; }
+    .stat-card.accent .s-value { color: var(--accent); }
+    .stat-card.green .s-value { color: var(--accent2); }
+    .stat-card.warn .s-value { color: var(--warn); }
+
+    /* ---- CARD ---- */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 18px;
+      overflow: hidden;
+    }
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--ink2);
+    }
+    .card-body { padding: 20px; }
+
+    /* ---- TABLE ---- */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      text-align: left;
+      padding: 10px 16px;
+      background: var(--surface2);
+      color: var(--ink3);
+      font-size: 10.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    td {
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      color: var(--ink);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+    td.muted { color: var(--ink3); }
+
+    /* ---- BADGES ---- */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+    .badge-new { background: rgba(79,142,247,0.15); color: #7ab3ff; }
+    .badge-existing { background: rgba(56,217,169,0.15); color: #38d9a9; }
+    .badge-e1 { background: rgba(247,147,79,0.15); color: #f7934f; }
+    .badge-e2 { background: rgba(175,107,247,0.15); color: #c07fff; }
+    .badge-pending { background: rgba(247,147,79,0.15); color: #f7934f; }
+    .badge-submitted { background: rgba(79,142,247,0.15); color: #7ab3ff; }
+    .badge-approved { background: rgba(56,217,169,0.15); color: #38d9a9; }
+    .badge-paid { background: rgba(56,217,169,0.2); color: #38d9a9; }
+    .badge-denied { background: rgba(247,95,95,0.15); color: #f75f5f; }
+    .badge-insurance { background: rgba(79,142,247,0.15); color: #7ab3ff; }
+    .badge-cash { background: rgba(56,217,169,0.15); color: #38d9a9; }
+    .badge-active { background: rgba(56,217,169,0.15); color: #38d9a9; }
+    .badge-inactive { background: var(--surface3); color: var(--ink3); }
+
+    /* ---- BUTTONS ---- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+      font-family: 'DM Sans', sans-serif;
+      white-space: nowrap;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #3a7ae8; }
+    .btn-secondary { background: var(--surface2); color: var(--ink); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--surface3); }
+    .btn-ghost { background: transparent; color: var(--ink2); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--ink); background: var(--surface2); }
+    .btn-danger { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(247,95,95,0.2); }
+    .btn-danger:hover { background: var(--danger); color: white; }
+    .btn-sm { padding: 4px 10px; font-size: 11.5px; border-radius: 6px; }
+    .btn-xs { padding: 3px 8px; font-size: 11px; border-radius: 5px; }
+
+    /* ---- FORMS ---- */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-group.third { grid-column: span 1; }
+    label { font-size: 12px; font-weight: 500; color: var(--ink2); }
+
+    input, select, textarea {
+      padding: 8px 11px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 13.5px;
+      font-family: 'DM Sans', sans-serif;
+      background: var(--surface2);
+      color: var(--ink);
+      transition: border 0.15s, background 0.15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: var(--surface3);
+    }
+    input::placeholder, textarea::placeholder { color: var(--ink3); }
+    select option { background: var(--surface2); }
+    textarea { resize: vertical; min-height: 72px; }
+
+    /* ---- MODAL ---- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 26px;
+      width: 560px;
+      max-width: 96vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow);
+      animation: slideUp 0.2s ease;
+    }
+    @keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .modal-header h3 { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 600; }
+    .modal-close {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--ink2);
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .modal-close:hover { color: var(--ink); }
+    .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+    /* ---- TOOLBAR ---- */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .toolbar input, .toolbar select { max-width: 220px; }
+    .toolbar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+    /* ---- DATE NAV ---- */
+    .date-nav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .date-nav input[type="date"] { max-width: 180px; }
+    .visit-count {
+      background: var(--accent-dim);
+      color: var(--accent);
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* ---- EMPTY STATE ---- */
+    .empty-state {
+      text-align: center;
+      padding: 52px 20px;
+      color: var(--ink3);
+    }
+    .empty-state .icon { font-size: 36px; margin-bottom: 10px; }
+    .empty-state p { font-size: 14px; color: var(--ink2); }
+    .empty-state small { font-size: 12px; color: var(--ink3); display: block; margin-top: 4px; }
+
+    /* ---- TOAST ---- */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--ink);
+      padding: 11px 18px;
+      border-radius: 9px;
+      font-size: 13.5px;
+      z-index: 200;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: all 0.25s;
+      pointer-events: none;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { border-color: var(--accent2); color: var(--accent2); }
+    .toast.error { border-color: var(--danger); color: var(--danger); }
+
+    /* ---- PATIENT CARD IN DETAIL ---- */
+    .patient-meta {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .meta-item { }
+    .meta-item .m-label { font-size: 11px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 3px; }
+    .meta-item .m-value { font-size: 14px; color: var(--ink); font-weight: 500; }
+
+    /* ---- DIVIDER ---- */
+    .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+    /* ---- INLINE ACTIONS ---- */
+    .actions { display: flex; gap: 6px; }
+
+    /* ---- CLAIM STATUS PILL ---- */
+    .status-select {
+      background: transparent;
+      border: none;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      cursor: pointer;
+      color: inherit;
+      padding: 0;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo">
+      <h1>Chiro<span>Trax</span></h1>
+      <sub>Office Manager</sub>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Overview</div>
+      <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard', this)">
+        <span class="icon">⬛</span> Dashboard
+      </div>
+      <div class="nav-section">Records</div>
+      <div class="nav-item" data-page="daily" onclick="showPage('daily', this)">
+        <span class="icon">📋</span> Daily Intake
+      </div>
+      <div class="nav-item" data-page="patients" onclick="showPage('patients', this)">
+        <span class="icon">👤</span> Patients
+      </div>
+      <div class="nav-item" data-page="diagnoses" onclick="showPage('diagnoses', this)">
+        <span class="icon">🩺</span> Diagnoses
+      </div>
+      <div class="nav-section">Billing</div>
+      <div class="nav-item" data-page="claims" onclick="showPage('claims', this)">
+        <span class="icon">💳</span> Claims
+      </div>
+    </nav>
+    <div class="sidebar-footer">ChiroTrax v2.0</div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- ══════════════════════════════════ -->
+    <!-- DASHBOARD                          -->
+    <!-- ══════════════════════════════════ -->
+    <section class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <h2 id="greeting">Good morning 👋</h2>
+          <p id="today-label">Loading...</p>
+        </div>
+        <button class="btn btn-primary" onclick="showPage('daily', document.querySelector('[data-page=daily]')); openVisitModal()">+ Log Visit</button>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card accent">
+          <div class="s-label">Visits Today</div>
+          <div class="s-value" id="stat-today">—</div>
+          <div class="s-sub">patients seen</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-label">Total Patients</div>
+          <div class="s-value" id="stat-patients">—</div>
+          <div class="s-sub">in directory</div>
+        </div>
+        <div class="stat-card warn">
+          <div class="s-label">Pending Claims</div>
+          <div class="s-value" id="stat-claims">—</div>
+          <div class="s-sub">awaiting action</div>
+        </div>
+        <div class="stat-card green">
+          <div class="s-label">New This Month</div>
+          <div class="s-value" id="stat-new">—</div>
+          <div class="s-sub">new patients</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Today's Visits</div>
+          <button class="btn btn-ghost btn-sm" onclick="showPage('daily', document.querySelector('[data-page=daily]'))">View All →</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Patient ID</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Manipulation</th>
+                <th>Exercises</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="dashboard-tbody">
+              <tr><td colspan="6"><div class="empty-state"><div class="icon">📋</div><p>No visits logged today yet.</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════ -->
+    <!-- DAILY INTAKE                       -->
+    <!-- ══════════════════════════════════ -->
+    <section class="page" id="page-daily">
+      <div class="page-header">
+        <div>
+          <h2>Daily Intake</h2>
+          <p>Log and manage patient visits by date</p>
+        </div>
+        <button class="btn btn-primary" onclick="openVisitModal()">+ Log Visit</button>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="date-nav">
+            <label style="color:var(--ink2);font-size:12px;font-weight:500">Date</label>
+            <input type="date" id="intake-date" onchange="loadVisits()"/>
+            <span class="visit-count" id="visit-count-label" style="display:none"></span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Patient ID</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Manipulation</th>
+                <th>Exercises</th>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="visits-tbody">
+              <tr><td colspan="7"><div class="empty-state"><div class="icon">📅</div><p>Select a date to load visits.</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════ -->
+    <!-- PATIENTS                           -->
+    <!-- ══════════════════════════════════ -->
+    <section class="page" id="page-patients">
+      <div class="page-header">
+        <div>
+          <h2>Patient Directory</h2>
+          <p>Manage all patient records</p>
+        </div>
+        <button class="btn btn-primary" onclick="openPatientModal()">+ Add Patient</button>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <input type="text" id="patient-search" placeholder="Search by name or ID..." oninput="filterPatients()" style="max-width:280px"/>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Patient ID</th>
+                <th>Name</th>
+                <th>DOB</th>
+                <th>Phone</th>
+                <th>Insurance</th>
+                <th>Payment</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="patients-tbody">
+              <tr><td colspan="7"><div class="empty-state"><div class="icon">👤</div><p>No patients yet.</p><small>Add one to get started.</small></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════ -->
+    <!-- DIAGNOSES                          -->
+    <!-- ══════════════════════════════════ -->
+    <section class="page" id="page-diagnoses">
+      <div class="page-header">
+        <div>
+          <h2>Diagnosis Log</h2>
+          <p>Track and update patient diagnoses</p>
+        </div>
+        <button class="btn btn-primary" onclick="openDiagnosisModal()">+ Add Diagnosis</button>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <select id="dx-filter" onchange="loadDiagnoses()" style="max-width:180px">
+            <option value="">All Patients</option>
+          </select>
+          <select id="dx-active-filter" onchange="loadDiagnoses()" style="max-width:160px">
+            <option value="">Active & Inactive</option>
+            <option value="true">Active Only</option>
+            <option value="false">Inactive Only</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>ICD Code</th>
+                <th>Description</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="diagnoses-tbody">
+              <tr><td colspan="6"><div class="empty-state"><div class="icon">🩺</div><p>No diagnoses logged yet.</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════ -->
+    <!-- CLAIMS                             -->
+    <!-- ══════════════════════════════════ -->
+    <section class="page" id="page-claims">
+      <div class="page-header">
+        <div>
+          <h2>Claims</h2>
+          <p>Billing and insurance tracking</p>
+        </div>
+        <button class="btn btn-primary" onclick="openClaimModal()">+ New Claim</button>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <select id="claims-filter" onchange="loadClaims()" style="max-width:180px">
+            <option value="">All Claims</option>
+            <option value="pending">Pending</option>
+            <option value="submitted">Submitted</option>
+            <option value="approved">Approved</option>
+            <option value="paid">Paid</option>
+            <option value="denied">Denied</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>Visit Date</th>
+                <th>Payment Type</th>
+                <th>Billed</th>
+                <th>Paid</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="claims-tbody">
+              <tr><td colspan="7"><div class="empty-state"><div class="icon">💳</div><p>No claims yet.</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- MODALS                                       -->
+<!-- ════════════════════════════════════════════ -->
+
+<!-- VISIT MODAL -->
+<div class="modal-overlay" id="visit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="visit-modal-title">Log Visit</h3>
+      <button class="modal-close" onclick="closeModal('visit-modal')">✕</button>
+    </div>
+    <input type="hidden" id="visit-edit-id"/>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Patient *</label>
+        <select id="visit-patient-id">
+          <option value="">— Select Patient —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Visit Date *</label>
+        <input type="date" id="visit-date"/>
+      </div>
+      <div class="form-group">
+        <label>Patient Status</label>
+        <select id="visit-status">
+          <option value="">— None —</option>
+          <option value="new">New Patient</option>
+          <option value="existing">Existing Patient</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Manipulation Type</label>
+        <select id="visit-manip">
+          <option value="">— None —</option>
+          <option value="E1">E1 — Spinal Manipulation</option>
+          <option value="E2">E2 — Complex Manipulation</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Therapeutic Exercises (0–10)</label>
+        <input type="number" id="visit-exercises" min="0" max="10" placeholder="0"/>
+      </div>
+      <div class="form-group full">
+        <label>Notes</label>
+        <textarea id="visit-notes" placeholder="Any additional notes for this visit..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('visit-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveVisit()">Save Visit</button>
+    </div>
+  </div>
+</div>
+
+<!-- PATIENT MODAL -->
+<div class="modal-overlay" id="patient-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="patient-modal-title">Add Patient</h3>
+      <button class="modal-close" onclick="closeModal('patient-modal')">✕</button>
+    </div>
+    <input type="hidden" id="patient-edit-id"/>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Patient Code * (e.g. 001-01)</label>
+        <input type="text" id="p-code" placeholder="001-01"/>
+      </div>
+      <div class="form-group">
+        <label>Date of Birth</label>
+        <input type="date" id="p-dob"/>
+      </div>
+      <div class="form-group">
+        <label>First Name *</label>
+        <input type="text" id="p-first" placeholder="John"/>
+      </div>
+      <div class="form-group">
+        <label>Last Name *</label>
+        <input type="text" id="p-last" placeholder="Doe"/>
+      </div>
+      <div class="form-group">
+        <label>Phone</label>
+        <input type="text" id="p-phone" placeholder="(555) 000-0000"/>
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="p-email" placeholder="john@example.com"/>
+      </div>
+      <div class="form-group">
+        <label>Payment Type</label>
+        <select id="p-payment">
+          <option value="">— Select —</option>
+          <option value="insurance">Insurance</option>
+          <option value="cash">Cash</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Insurance Provider</label>
+        <input type="text" id="p-insurance" placeholder="BlueCross, Aetna, etc."/>
+      </div>
+      <div class="form-group full">
+        <label>Insurance Member ID</label>
+        <input type="text" id="p-insurance-id" placeholder="Member ID number"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('patient-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="savePatient()">Save Patient</button>
+    </div>
+  </div>
+</div>
+
+<!-- DIAGNOSIS MODAL -->
+<div class="modal-overlay" id="diagnosis-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="dx-modal-title">Add Diagnosis</h3>
+      <button class="modal-close" onclick="closeModal('diagnosis-modal')">✕</button>
+    </div>
+    <input type="hidden" id="dx-edit-id"/>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Patient *</label>
+        <select id="dx-patient-id">
+          <option value="">— Select Patient —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>ICD-10 Code</label>
+        <input type="text" id="dx-code" placeholder="e.g. M54.5"/>
+      </div>
+      <div class="form-group full">
+        <label>Diagnosis Description *</label>
+        <input type="text" id="dx-desc" placeholder="e.g. Low back pain, cervical subluxation..."/>
+      </div>
+      <div class="form-group">
+        <label>Date Diagnosed</label>
+        <input type="date" id="dx-date"/>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="dx-active">
+          <option value="true">Active</option>
+          <option value="false">Resolved / Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('diagnosis-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveDiagnosis()">Save Diagnosis</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLAIM MODAL -->
+<div class="modal-overlay" id="claim-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="claim-modal-title">New Claim</h3>
+      <button class="modal-close" onclick="closeModal('claim-modal')">✕</button>
+    </div>
+    <input type="hidden" id="cl-edit-id"/>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Patient *</label>
+        <select id="cl-patient-id">
+          <option value="">— Select Patient —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Claim Date</label>
+        <input type="date" id="cl-date"/>
+      </div>
+      <div class="form-group">
+        <label>Payment Type</label>
+        <select id="cl-payment">
+          <option value="insurance">Insurance</option>
+          <option value="cash">Cash</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Insurance Provider</label>
+        <input type="text" id="cl-insurance" placeholder="BlueCross, etc."/>
+      </div>
+      <div class="form-group">
+        <label>Amount Billed ($)</label>
+        <input type="number" id="cl-billed" placeholder="0.00" step="0.01" min="0"/>
+      </div>
+      <div class="form-group">
+        <label>Amount Paid ($)</label>
+        <input type="number" id="cl-paid" placeholder="0.00" step="0.01" min="0"/>
+      </div>
+      <div class="form-group">
+        <label>Claim Status</label>
+        <select id="cl-status">
+          <option value="pending">Pending</option>
+          <option value="submitted">Submitted</option>
+          <option value="approved">Approved</option>
+          <option value="paid">Paid</option>
+          <option value="denied">Denied</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label>Notes</label>
+        <textarea id="cl-notes" placeholder="Any notes about this claim..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('claim-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveClaim()">Save Claim</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════
+// STATE
+// ════════════════════════════════════
+let allPatients = [];
+let allDiagnoses = [];
+
+// ════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════
+function showPage(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  if (el) el.classList.add('active');
+
+  if (page === 'dashboard') loadDashboard();
+  if (page === 'daily') { setTodayDate(); loadVisits(); }
+  if (page === 'patients') loadPatients();
+  if (page === 'diagnoses') loadDiagnoses();
+  if (page === 'claims') loadClaims();
+}
+
+// ════════════════════════════════════
+// TOAST
+// ════════════════════════════════════
+function toast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// ════════════════════════════════════
+// MODAL HELPERS
+// ════════════════════════════════════
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function openVisitModal(visit = null) {
+  populatePatientSelects();
+  clearForm(['visit-edit-id','visit-patient-id','visit-status','visit-manip','visit-notes']);
+  document.getElementById('visit-exercises').value = '';
+  document.getElementById('visit-date').value = today();
+  document.getElementById('visit-modal-title').textContent = visit ? 'Edit Visit' : 'Log Visit';
+  if (visit) {
+    document.getElementById('visit-edit-id').value = visit.id;
+    document.getElementById('visit-patient-id').value = visit.patient_id || '';
+    document.getElementById('visit-date').value = visit.visit_date || '';
+    document.getElementById('visit-status').value = visit.patient_status || '';
+    document.getElementById('visit-manip').value = visit.manipulation_type || '';
+    document.getElementById('visit-exercises').value = visit.therapeutic_exercises ?? '';
+    document.getElementById('visit-notes').value = visit.notes || '';
+  }
+  document.getElementById('visit-modal').classList.add('open');
+}
+
+function openPatientModal(patient = null) {
+  clearForm(['patient-edit-id','p-code','p-first','p-last','p-phone','p-email','p-insurance','p-insurance-id']);
+  document.getElementById('p-dob').value = '';
+  document.getElementById('p-payment').value = '';
+  document.getElementById('patient-modal-title').textContent = patient ? 'Edit Patient' : 'Add Patient';
+  if (patient) {
+    document.getElementById('patient-edit-id').value = patient.id;
+    document.getElementById('p-code').value = patient.patient_code || '';
+    document.getElementById('p-first').value = patient.first_name || '';
+    document.getElementById('p-last').value = patient.last_name || '';
+    document.getElementById('p-dob').value = patient.date_of_birth || '';
+    document.getElementById('p-phone').value = patient.phone || '';
+    document.getElementById('p-email').value = patient.email || '';
+    document.getElementById('p-payment').value = patient.payment_type || '';
+    document.getElementById('p-insurance').value = patient.insurance_provider || '';
+    document.getElementById('p-insurance-id').value = patient.insurance_id || '';
+  }
+  document.getElementById('patient-modal').classList.add('open');
+}
+
+function openDiagnosisModal(dx = null) {
+  populatePatientSelects();
+  clearForm(['dx-edit-id','dx-code','dx-desc']);
+  document.getElementById('dx-date').value = today();
+  document.getElementById('dx-active').value = 'true';
+  document.getElementById('dx-modal-title').textContent = dx ? 'Edit Diagnosis' : 'Add Diagnosis';
+  if (dx) {
+    document.getElementById('dx-edit-id').value = dx.id;
+    document.getElementById('dx-patient-id').value = dx.patient_id || '';
+    document.getElementById('dx-code').value = dx.diagnosis_code || '';
+    document.getElementById('dx-desc').value = dx.diagnosis_description || '';
+    document.getElementById('dx-date').value = dx.diagnosed_date || '';
+    document.getElementById('dx-active').value = dx.is_active ? 'true' : 'false';
+  }
+  document.getElementById('diagnosis-modal').classList.add('open');
+}
+
+function openClaimModal(claim = null) {
+  populatePatientSelects();
+  clearForm(['cl-edit-id','cl-insurance','cl-notes']);
+  document.getElementById('cl-date').value = today();
+  document.getElementById('cl-billed').value = '';
+  document.getElementById('cl-paid').value = '';
+  document.getElementById('cl-payment').value = 'insurance';
+  document.getElementById('cl-status').value = 'pending';
+  document.getElementById('claim-modal-title').textContent = claim ? 'Edit Claim' : 'New Claim';
+  if (claim) {
+    document.getElementById('cl-edit-id').value = claim.id;
+    document.getElementById('cl-patient-id').value = claim.patient_id || '';
+    document.getElementById('cl-date').value = claim.claim_date || '';
+    document.getElementById('cl-payment').value = claim.payment_type || 'insurance';
+    document.getElementById('cl-insurance').value = claim.insurance_provider || '';
+    document.getElementById('cl-billed').value = claim.amount_billed || '';
+    document.getElementById('cl-paid').value = claim.amount_paid || '';
+    document.getElementById('cl-status').value = claim.claim_status || 'pending';
+    document.getElementById('cl-notes').value = claim.notes || '';
+  }
+  document.getElementById('claim-modal').classList.add('open');
+}
+
+function clearForm(ids) {
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+}
+
+// ════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════
+function today() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function setTodayDate() {
+  const d = document.getElementById('intake-date');
+  if (!d.value) d.value = today();
+}
+
+function badge(val, type) {
+  if (!val) return '<span class="muted">—</span>';
+  const classMap = {
+    new:'badge-new', existing:'badge-existing',
+    E1:'badge-e1', E2:'badge-e2',
+    pending:'badge-pending', submitted:'badge-submitted',
+    approved:'badge-approved', paid:'badge-paid', denied:'badge-denied',
+    insurance:'badge-insurance', cash:'badge-cash'
+  };
+  return `<span class="badge ${classMap[val] || ''}">${val}</span>`;
+}
+
+async function populatePatientSelects() {
+  if (allPatients.length === 0) await loadPatientsData();
+  ['visit-patient-id','dx-patient-id','cl-patient-id'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Select Patient —</option>';
+    allPatients.forEach(p => {
+      sel.innerHTML += `<option value="${p.id}">${p.patient_code} — ${p.last_name}, ${p.first_name}</option>`;
+    });
+    if (cur) sel.value = cur;
+  });
+}
+
+// ════════════════════════════════════
+// API
+// ════════════════════════════════════
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+// ════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════
+async function loadDashboard() {
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('greeting').textContent = greet + ' 👋';
+  document.getElementById('today-label').textContent = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  try {
+    const [visits, patients, claims] = await Promise.all([
+      api('GET', `/api/visits?date=${today()}`),
+      api('GET', '/api/patients'),
+      api('GET', '/api/claims?status=pending')
+    ]);
+    allPatients = patients;
+    document.getElementById('stat-today').textContent = visits.length;
+    document.getElementById('stat-patients').textContent = patients.length;
+    document.getElementById('stat-claims').textContent = claims.length;
+    const mo = today().substring(0,7);
+    document.getElementById('stat-new').textContent = patients.filter(p => p.created_at?.startsWith(mo)).length;
+    renderVisitRows('dashboard-tbody', visits, true);
+  } catch(e) { toast('Failed to load dashboard: ' + e.message, 'error'); }
+}
+
+// ════════════════════════════════════
+// VISITS
+// ════════════════════════════════════
+async function loadVisits() {
+  const date = document.getElementById('intake-date').value;
+  if (!date) return;
+  try {
+    const visits = await api('GET', `/api/visits?date=${date}`);
+    const lbl = document.getElementById('visit-count-label');
+    lbl.textContent = `${visits.length} visit${visits.length !== 1 ? 's' : ''}`;
+    lbl.style.display = 'inline-flex';
+    renderVisitRows('visits-tbody', visits, false);
+  } catch(e) { toast('Failed to load visits: ' + e.message, 'error'); }
+}
+
+function renderVisitRows(tbodyId, visits, compact) {
+  const tbody = document.getElementById(tbodyId);
+  const cols = compact ? 6 : 7;
+  if (!visits.length) {
+    tbody.innerHTML = `<tr><td colspan="${cols}"><div class="empty-state"><div class="icon">📋</div><p>No visits found for this date.</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = visits.map(v => `
+    <tr>
+      <td><strong>${v.patients?.patient_code || '—'}</strong></td>
+      <td>${v.patients?.last_name || ''}, ${v.patients?.first_name || ''}</td>
+      <td>${badge(v.patient_status)}</td>
+      <td>${badge(v.manipulation_type)}</td>
+      <td>${v.therapeutic_exercises != null ? v.therapeutic_exercises : '<span class="muted">—</span>'}</td>
+      <td class="muted">${v.notes || '—'}</td>
+      ${compact ? '' : `<td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openVisitModal(${JSON.stringify(v)})'>Edit</button></div></td>`}
+    </tr>
+  `).join('');
+}
+
+async function saveVisit() {
+  const editId = document.getElementById('visit-edit-id').value;
+  const body = {
+    patient_id: document.getElementById('visit-patient-id').value,
+    visit_date: document.getElementById('visit-date').value,
+    patient_status: document.getElementById('visit-status').value || null,
+    manipulation_type: document.getElementById('visit-manip').value || null,
+    therapeutic_exercises: parseInt(document.getElementById('visit-exercises').value) || 0,
+    notes: document.getElementById('visit-notes').value || null
+  };
+  if (!body.patient_id || !body.visit_date) { toast('Patient and date are required.', 'error'); return; }
+  try {
+    if (editId) {
+      await api('PUT', `/api/visits/${editId}`, body);
+      toast('Visit updated!', 'success');
+    } else {
+      await api('POST', '/api/visits', body);
+      toast('Visit logged!', 'success');
+    }
+    closeModal('visit-modal');
+    loadVisits();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ════════════════════════════════════
+// PATIENTS
+// ════════════════════════════════════
+async function loadPatientsData() {
+  allPatients = await api('GET', '/api/patients');
+  return allPatients;
+}
+
+async function loadPatients() {
+  try {
+    await loadPatientsData();
+    renderPatientRows(allPatients);
+    // populate filter dropdown in diagnoses
+    const dxFilter = document.getElementById('dx-filter');
+    if (dxFilter) {
+      dxFilter.innerHTML = '<option value="">All Patients</option>';
+      allPatients.forEach(p => {
+        dxFilter.innerHTML += `<option value="${p.id}">${p.patient_code} — ${p.last_name}, ${p.first_name}</option>`;
+      });
+    }
+  } catch(e) { toast('Failed to load patients: ' + e.message, 'error'); }
+}
+
+function renderPatientRows(patients) {
+  const tbody = document.getElementById('patients-tbody');
+  if (!patients.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">👤</div><p>No patients found.</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = patients.map(p => `
+    <tr>
+      <td><strong>${p.patient_code}</strong></td>
+      <td>${p.last_name}, ${p.first_name}</td>
+      <td class="muted">${p.date_of_birth || '—'}</td>
+      <td class="muted">${p.phone || '—'}</td>
+      <td class="muted">${p.insurance_provider || '—'}</td>
+      <td>${badge(p.payment_type)}</td>
+      <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openPatientModal(${JSON.stringify(p)})'>Edit</button></div></td>
+    </tr>
+  `).join('');
+}
+
+function filterPatients() {
+  const q = document.getElementById('patient-search').value.toLowerCase();
+  const filtered = allPatients.filter(p =>
+    p.first_name.toLowerCase().includes(q) ||
+    p.last_name.toLowerCase().includes(q) ||
+    p.patient_code.toLowerCase().includes(q) ||
+    (p.phone || '').includes(q)
+  );
+  renderPatientRows(filtered);
+}
+
+async function savePatient() {
+  const editId = document.getElementById('patient-edit-id').value;
+  const body = {
+    patient_code: document.getElementById('p-code').value.trim(),
+    first_name: document.getElementById('p-first').value.trim(),
+    last_name: document.getElementById('p-last').value.trim(),
+    date_of_birth: document.getElementById('p-dob').value || null,
+    phone: document.getElementById('p-phone').value.trim(),
+    email: document.getElementById('p-email').value.trim(),
+    payment_type: document.getElementById('p-payment').value || null,
+    insurance_provider: document.getElementById('p-insurance').value.trim(),
+    insurance_id: document.getElementById('p-insurance-id').value.trim()
+  };
+  if (!body.patient_code || !body.first_name || !body.last_name) {
+    toast('Patient code, first and last name are required.', 'error'); return;
+  }
+  try {
+    if (editId) {
+      await api('PUT', `/api/patients/${editId}`, body);
+      toast('Patient updated!', 'success');
+    } else {
+      await api('POST', '/api/patients', body);
+      toast('Patient added!', 'success');
+    }
+    closeModal('patient-modal');
+    await loadPatients();
+    allPatients = [];
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ════════════════════════════════════
+// DIAGNOSES
+// ════════════════════════════════════
+async function loadDiagnoses() {
+  const patientFilter = document.getElementById('dx-filter')?.value || '';
+  const activeFilter = document.getElementById('dx-active-filter')?.value || '';
+
+  try {
+    if (allPatients.length === 0) await loadPatientsData();
+
+    // populate the filter dropdown
+    const dxFilter = document.getElementById('dx-filter');
+    if (dxFilter && dxFilter.options.length <= 1) {
+      allPatients.forEach(p => {
+        dxFilter.innerHTML += `<option value="${p.id}">${p.patient_code} — ${p.last_name}, ${p.first_name}</option>`;
+      });
+    }
+
+    const patientsToQuery = patientFilter
+      ? allPatients.filter(p => p.id === patientFilter)
+      : allPatients;
+
+    const allDx = [];
+    for (const p of patientsToQuery) {
+      const dx = await api('GET', `/api/diagnoses/${p.id}`);
+      dx.forEach(d => d._patient = p);
+      allDx.push(...dx);
+    }
+
+    const filtered = activeFilter
+      ? allDx.filter(d => String(d.is_active) === activeFilter)
+      : allDx;
+
+    const tbody = document.getElementById('diagnoses-tbody');
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="icon">🩺</div><p>No diagnoses found.</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = filtered.map(d => `
+      <tr>
+        <td><strong>${d._patient?.patient_code}</strong> — ${d._patient?.last_name}, ${d._patient?.first_name}</td>
+        <td class="muted">${d.diagnosis_code || '—'}</td>
+        <td>${d.diagnosis_description}</td>
+        <td class="muted">${d.diagnosed_date || '—'}</td>
+        <td>${d.is_active ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-inactive">Resolved</span>'}</td>
+        <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openDiagnosisModal(${JSON.stringify(d)})'>Edit</button></div></td>
+      </tr>
+    `).join('');
+  } catch(e) { toast('Failed to load diagnoses: ' + e.message, 'error'); }
+}
+
+async function saveDiagnosis() {
+  const editId = document.getElementById('dx-edit-id').value;
+  const body = {
+    patient_id: document.getElementById('dx-patient-id').value,
+    diagnosis_code: document.getElementById('dx-code').value.trim() || null,
+    diagnosis_description: document.getElementById('dx-desc').value.trim(),
+    diagnosed_date: document.getElementById('dx-date').value || null,
+    is_active: document.getElementById('dx-active').value === 'true'
+  };
+  if (!body.patient_id || !body.diagnosis_description) {
+    toast('Patient and description are required.', 'error'); return;
+  }
+  try {
+    if (editId) {
+      await api('PUT', `/api/diagnoses/${editId}`, body);
+      toast('Diagnosis updated!', 'success');
+    } else {
+      await api('POST', '/api/diagnoses', body);
+      toast('Diagnosis saved!', 'success');
+    }
+    closeModal('diagnosis-modal');
+    loadDiagnoses();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ════════════════════════════════════
+// CLAIMS
+// ════════════════════════════════════
+async function loadClaims() {
+  const status = document.getElementById('claims-filter')?.value || '';
+  try {
+    const claims = await api('GET', `/api/claims${status ? '?status=' + status : ''}`);
+    const tbody = document.getElementById('claims-tbody');
+    if (!claims.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">💳</div><p>No claims found.</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = claims.map(c => `
+      <tr>
+        <td><strong>${c.patients?.patient_code || '—'}</strong> — ${c.patients?.last_name || ''}, ${c.patients?.first_name || ''}</td>
+        <td class="muted">${c.visits?.visit_date || '—'}</td>
+        <td>${badge(c.payment_type)}</td>
+        <td>$${c.amount_billed != null ? Number(c.amount_billed).toFixed(2) : '—'}</td>
+        <td>$${c.amount_paid != null ? Number(c.amount_paid).toFixed(2) : '—'}</td>
+        <td>${badge(c.claim_status)}</td>
+        <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openClaimModal(${JSON.stringify(c)})'>Edit</button></div></td>
+      </tr>
+    `).join('');
+  } catch(e) { toast('Failed to load claims: ' + e.message, 'error'); }
+}
+
+async function saveClaim() {
+  const editId = document.getElementById('cl-edit-id').value;
+  const body = {
+    patient_id: document.getElementById('cl-patient-id').value,
+    claim_date: document.getElementById('cl-date').value,
+    payment_type: document.getElementById('cl-payment').value,
+    insurance_provider: document.getElementById('cl-insurance').value.trim() || null,
+    amount_billed: parseFloat(document.getElementById('cl-billed').value) || null,
+    amount_paid: parseFloat(document.getElementById('cl-paid').value) || null,
+    claim_status: document.getElementById('cl-status').value,
+    notes: document.getElementById('cl-notes').value.trim() || null
+  };
+  if (!body.patient_id) { toast('Patient is required.', 'error'); return; }
+  try {
+    if (editId) {
+      await api('PUT', `/api/claims/${editId}`, body);
+      toast('Claim updated!', 'success');
+    } else {
+      await api('POST', '/api/claims', body);
+      toast('Claim created!', 'success');
+    }
+    closeModal('claim-modal');
+    loadClaims();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ════════════════════════════════════
+// INIT
+// ════════════════════════════════════
+loadDashboard();
+</script>
+</body>
+</html>

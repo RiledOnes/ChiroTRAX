@@ -57,6 +57,33 @@ create table claims (
   created_at timestamp with time zone default now()
 );
 
+-- INTAKE RECORDS TABLE (Bulk Upload + Workflow)
+create table intake_records (
+  id uuid default gen_random_uuid() primary key,
+  intake_id text unique not null,           -- unique ID from uploaded data (prevents duplicates)
+  patient_code text,                        -- maps to patients.patient_code
+  patient_id uuid references patients(id) on delete set null,
+  patient_name text,                        -- denormalized name from upload
+  service_date date,
+  manipulation_type text,
+  therapeutic_exercises int,
+  diagnosis_codes text,                     -- comma-separated ICD-10 codes
+  insurance_provider text,
+  amount_billed numeric(10,2),
+  notes text,
+  workflow_status text default 'intake' check (workflow_status in ('intake', 'entered_ebs', 'claim_created', 'submitted', 'processed')),
+  batch_id text,                            -- groups records from same upload
+  created_at timestamp with time zone default now()
+);
+
+-- APPROVED USERS TABLE (Auth)
+create table approved_users (
+  id uuid default gen_random_uuid() primary key,
+  email text unique not null,
+  role text default 'staff',
+  created_at timestamp with time zone default now()
+);
+
 -- ============================================
 -- INDEXES for performance
 -- ============================================
@@ -65,6 +92,10 @@ create index on visits(patient_id);
 create index on diagnoses(patient_id);
 create index on claims(patient_id);
 create index on claims(claim_status);
+create index on intake_records(workflow_status);
+create index on intake_records(batch_id);
+create index on intake_records(patient_code);
+create index on intake_records(service_date);
 
 -- ============================================
 -- ROW LEVEL SECURITY (enable when ready)

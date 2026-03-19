@@ -7,7 +7,7 @@ const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Supabase client
 const supabase = createClient(
@@ -330,6 +330,11 @@ app.post('/api/auth/check-approved', async (req, res) => {
     .single();
   if (error || !data) return res.json({ approved: false });
   res.json({ approved: true, user: data });
+});
+
+// SPA fallback — serve index.html for non-API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ============================================

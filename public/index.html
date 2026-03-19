@@ -418,6 +418,123 @@
       color: inherit;
       padding: 0;
     }
+
+    /* ---- WORKFLOW PIPELINE ---- */
+    .workflow-pipeline {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 22px;
+      overflow-x: auto;
+    }
+    .wf-stage {
+      flex: 1;
+      min-width: 120px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 14px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+    }
+    .wf-stage:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+    .wf-stage:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+    .wf-stage:not(:last-child) { border-right: none; }
+    .wf-stage:hover { background: var(--surface2); }
+    .wf-stage.active { background: var(--accent-dim); border-color: var(--accent); z-index: 1; }
+    .wf-stage .wf-count {
+      font-family: 'Syne', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .wf-stage .wf-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--ink2);
+    }
+    .wf-stage.active .wf-count { color: var(--accent); }
+    .wf-stage.active .wf-label { color: var(--accent); }
+    .wf-arrow {
+      color: var(--ink3);
+      font-size: 16px;
+      flex-shrink: 0;
+      margin: 0 -1px;
+      z-index: 2;
+    }
+
+    /* ---- UPLOAD ZONE ---- */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--surface);
+      margin-bottom: 18px;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+    .upload-zone .uz-icon { font-size: 32px; margin-bottom: 8px; }
+    .upload-zone .uz-title { font-size: 15px; font-weight: 500; color: var(--ink); margin-bottom: 4px; }
+    .upload-zone .uz-sub { font-size: 12px; color: var(--ink3); }
+    .upload-zone input[type="file"] { display: none; }
+
+    /* ---- UPLOAD RESULT ---- */
+    .upload-result {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 18px;
+      display: none;
+    }
+    .upload-result.show { display: flex; align-items: center; gap: 14px; }
+    .upload-result .ur-stat {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .upload-result .ur-label { font-size: 12px; color: var(--ink2); }
+
+    /* ---- CHECKBOX IN TABLE ---- */
+    .row-check {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* ---- BATCH ACTION BAR ---- */
+    .batch-bar {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 20px;
+      background: var(--accent-dim);
+      border-bottom: 1px solid var(--accent);
+    }
+    .batch-bar.show { display: flex; }
+    .batch-bar .bb-count {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .batch-bar .bb-actions { margin-left: auto; display: flex; gap: 8px; }
+
+    /* Workflow badge colors */
+    .badge-intake { background: rgba(247,147,79,0.15); color: #f7934f; }
+    .badge-entered_ebs { background: rgba(79,142,247,0.15); color: #7ab3ff; }
+    .badge-claim_created { background: rgba(175,107,247,0.15); color: #c07fff; }
+    .badge-submitted { background: rgba(56,217,169,0.15); color: #38d9a9; }
+    .badge-processed { background: rgba(56,217,169,0.25); color: #2bc9a0; }
   </style>
 </head>
 <body>
@@ -447,6 +564,9 @@
       <div class="nav-section">Billing</div>
       <div class="nav-item" data-page="claims" onclick="showPage('claims', this)">
         <span class="icon">💳</span> Claims
+      </div>
+      <div class="nav-item" data-page="bulk" onclick="showPage('bulk', this)">
+        <span class="icon">📤</span> Bulk Upload
       </div>
     </nav>
     <div class="sidebar-footer">ChiroTrax v2.0</div>
@@ -680,6 +800,108 @@
       </div>
     </section>
 
+    <!-- ══════════════════════════════════ -->
+    <!-- BULK UPLOAD + WORKFLOW             -->
+    <!-- ══════════════════════════════════ -->
+    <section class="page" id="page-bulk">
+      <div class="page-header">
+        <div>
+          <h2>Bulk Upload & Workflow</h2>
+          <p>Import intake records and track them through the billing pipeline</p>
+        </div>
+      </div>
+
+      <!-- Workflow Pipeline -->
+      <div class="workflow-pipeline" id="wf-pipeline">
+        <div class="wf-stage active" data-stage="" onclick="filterByStage('', this)">
+          <div class="wf-count" id="wf-all">—</div>
+          <div class="wf-label">All</div>
+        </div>
+        <div class="wf-stage" data-stage="intake" onclick="filterByStage('intake', this)">
+          <div class="wf-count" id="wf-intake">—</div>
+          <div class="wf-label">Intake</div>
+        </div>
+        <div class="wf-arrow">→</div>
+        <div class="wf-stage" data-stage="entered_ebs" onclick="filterByStage('entered_ebs', this)">
+          <div class="wf-count" id="wf-entered_ebs">—</div>
+          <div class="wf-label">Entered EBS</div>
+        </div>
+        <div class="wf-arrow">→</div>
+        <div class="wf-stage" data-stage="claim_created" onclick="filterByStage('claim_created', this)">
+          <div class="wf-count" id="wf-claim_created">—</div>
+          <div class="wf-label">Claim Created</div>
+        </div>
+        <div class="wf-arrow">→</div>
+        <div class="wf-stage" data-stage="submitted" onclick="filterByStage('submitted', this)">
+          <div class="wf-count" id="wf-submitted">—</div>
+          <div class="wf-label">Submitted</div>
+        </div>
+        <div class="wf-arrow">→</div>
+        <div class="wf-stage" data-stage="processed" onclick="filterByStage('processed', this)">
+          <div class="wf-count" id="wf-processed">—</div>
+          <div class="wf-label">Processed</div>
+        </div>
+      </div>
+
+      <!-- Upload Zone -->
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('csv-file').click()">
+        <div class="uz-icon">📄</div>
+        <div class="uz-title">Drop a CSV file here or click to browse</div>
+        <div class="uz-sub">Expected columns: intake_id, patient_code, patient_name, service_date, manipulation_type, therapeutic_exercises, diagnosis_codes, insurance_provider, amount_billed, notes</div>
+        <input type="file" id="csv-file" accept=".csv" onchange="handleCSVUpload(event)"/>
+      </div>
+
+      <!-- Upload Result Banner -->
+      <div class="upload-result" id="upload-result">
+        <div>
+          <div class="ur-stat" id="ur-inserted" style="color:var(--accent2)">0</div>
+          <div class="ur-label">Inserted</div>
+        </div>
+        <div>
+          <div class="ur-stat" id="ur-duplicates" style="color:var(--warn)">0</div>
+          <div class="ur-label">Duplicates</div>
+        </div>
+        <div style="margin-left:auto">
+          <button class="btn btn-ghost btn-sm" onclick="hideUploadResult()">Dismiss</button>
+        </div>
+      </div>
+
+      <!-- Intake Records Table -->
+      <div class="card">
+        <div class="batch-bar" id="batch-bar">
+          <span class="bb-count" id="bb-count">0 selected</span>
+          <div class="bb-actions">
+            <button class="btn btn-secondary btn-sm" onclick="batchAdvance('entered_ebs')">→ Entered EBS</button>
+            <button class="btn btn-secondary btn-sm" onclick="batchAdvance('claim_created')">→ Claim Created</button>
+            <button class="btn btn-secondary btn-sm" onclick="batchAdvance('submitted')">→ Submitted</button>
+            <button class="btn btn-primary btn-sm" onclick="batchAdvance('processed')">→ Processed</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearSelection()">Clear</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th><input type="checkbox" class="row-check" id="check-all" onchange="toggleAllChecks(this)"/></th>
+                <th>Intake ID</th>
+                <th>Patient</th>
+                <th>Service Date</th>
+                <th>Manip</th>
+                <th>Exercises</th>
+                <th>Dx Codes</th>
+                <th>Billed</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="intake-tbody">
+              <tr><td colspan="10"><div class="empty-state"><div class="icon">📤</div><p>No intake records yet.</p><small>Upload a CSV to get started.</small></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 
@@ -897,6 +1119,77 @@
   </div>
 </div>
 
+<!-- INTAKE RECORD MODAL -->
+<div class="modal-overlay" id="intake-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="intake-modal-title">Edit Intake Record</h3>
+      <button class="modal-close" onclick="closeModal('intake-modal')">✕</button>
+    </div>
+    <input type="hidden" id="ir-edit-id"/>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Intake ID</label>
+        <input type="text" id="ir-intake-id" readonly style="opacity:0.6"/>
+      </div>
+      <div class="form-group">
+        <label>Patient Code</label>
+        <input type="text" id="ir-patient-code" placeholder="001-01"/>
+      </div>
+      <div class="form-group">
+        <label>Patient Name</label>
+        <input type="text" id="ir-patient-name" placeholder="Last, First"/>
+      </div>
+      <div class="form-group">
+        <label>Service Date</label>
+        <input type="date" id="ir-service-date"/>
+      </div>
+      <div class="form-group">
+        <label>Manipulation Type</label>
+        <select id="ir-manip">
+          <option value="">— None —</option>
+          <option value="E1">E1 — Spinal</option>
+          <option value="E2">E2 — Complex</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Therapeutic Exercises</label>
+        <input type="number" id="ir-exercises" min="0" max="10" placeholder="0"/>
+      </div>
+      <div class="form-group">
+        <label>Diagnosis Codes</label>
+        <input type="text" id="ir-dx-codes" placeholder="M54.5, M99.1"/>
+      </div>
+      <div class="form-group">
+        <label>Insurance Provider</label>
+        <input type="text" id="ir-insurance" placeholder="BlueCross"/>
+      </div>
+      <div class="form-group">
+        <label>Amount Billed ($)</label>
+        <input type="number" id="ir-billed" step="0.01" min="0" placeholder="0.00"/>
+      </div>
+      <div class="form-group">
+        <label>Workflow Status</label>
+        <select id="ir-status">
+          <option value="intake">Intake</option>
+          <option value="entered_ebs">Entered EBS</option>
+          <option value="claim_created">Claim Created</option>
+          <option value="submitted">Submitted</option>
+          <option value="processed">Processed</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label>Notes</label>
+        <textarea id="ir-notes" placeholder="Notes..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('intake-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveIntakeRecord()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -921,6 +1214,7 @@ function showPage(page, el) {
   if (page === 'patients') loadPatients();
   if (page === 'diagnoses') loadDiagnoses();
   if (page === 'claims') loadClaims();
+  if (page === 'bulk') loadBulkPage();
 }
 
 // ════════════════════════════════════
@@ -1373,8 +1667,274 @@ async function saveClaim() {
 }
 
 // ════════════════════════════════════
+// BULK UPLOAD & WORKFLOW
+// ════════════════════════════════════
+let intakeRecords = [];
+let selectedIntakeIds = new Set();
+let currentStageFilter = '';
+
+async function loadBulkPage() {
+  await Promise.all([loadWorkflowCounts(), loadIntakeRecords()]);
+}
+
+async function loadWorkflowCounts() {
+  try {
+    const counts = await api('GET', '/api/intake/workflow-counts');
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    document.getElementById('wf-all').textContent = total;
+    document.getElementById('wf-intake').textContent = counts.intake || 0;
+    document.getElementById('wf-entered_ebs').textContent = counts.entered_ebs || 0;
+    document.getElementById('wf-claim_created').textContent = counts.claim_created || 0;
+    document.getElementById('wf-submitted').textContent = counts.submitted || 0;
+    document.getElementById('wf-processed').textContent = counts.processed || 0;
+  } catch(e) { /* counts may fail if table doesn't exist yet */ }
+}
+
+async function loadIntakeRecords() {
+  try {
+    const url = currentStageFilter
+      ? `/api/intake?workflow_status=${currentStageFilter}`
+      : '/api/intake';
+    intakeRecords = await api('GET', url);
+    renderIntakeTable();
+  } catch(e) {
+    document.getElementById('intake-tbody').innerHTML =
+      `<tr><td colspan="10"><div class="empty-state"><div class="icon">📤</div><p>No intake records yet.</p><small>Upload a CSV to get started.</small></div></td></tr>`;
+  }
+}
+
+function renderIntakeTable() {
+  const tbody = document.getElementById('intake-tbody');
+  if (!intakeRecords.length) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="icon">📤</div><p>No records found.</p><small>${currentStageFilter ? 'No records at this stage.' : 'Upload a CSV to get started.'}</small></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = intakeRecords.map(r => `
+    <tr>
+      <td><input type="checkbox" class="row-check" data-id="${r.id}" ${selectedIntakeIds.has(r.id) ? 'checked' : ''} onchange="toggleCheck('${r.id}', this.checked)"/></td>
+      <td><strong>${esc(r.intake_id)}</strong></td>
+      <td>${esc(r.patient_name || r.patient_code || '—')}</td>
+      <td class="muted">${r.service_date || '—'}</td>
+      <td>${r.manipulation_type ? badge(r.manipulation_type) : '<span class="muted">—</span>'}</td>
+      <td>${r.therapeutic_exercises != null ? r.therapeutic_exercises : '<span class="muted">—</span>'}</td>
+      <td class="muted">${esc(r.diagnosis_codes || '—')}</td>
+      <td>${r.amount_billed != null ? '$' + Number(r.amount_billed).toFixed(2) : '<span class="muted">—</span>'}</td>
+      <td><span class="badge badge-${r.workflow_status}">${formatStage(r.workflow_status)}</span></td>
+      <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openIntakeModal(${JSON.stringify(r).replace(/'/g, "&#39;")})'>Edit</button></div></td>
+    </tr>
+  `).join('');
+}
+
+function esc(str) {
+  if (!str) return '';
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function formatStage(s) {
+  const map = { intake: 'Intake', entered_ebs: 'Entered EBS', claim_created: 'Claim Created', submitted: 'Submitted', processed: 'Processed' };
+  return map[s] || s;
+}
+
+function filterByStage(stage, el) {
+  currentStageFilter = stage;
+  document.querySelectorAll('.wf-stage').forEach(s => s.classList.remove('active'));
+  if (el) el.classList.add('active');
+  clearSelection();
+  loadIntakeRecords();
+}
+
+// ---- CSV Upload ----
+function setupDragDrop() {
+  const zone = document.getElementById('upload-zone');
+  if (!zone) return;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith('.csv')) processCSVFile(file);
+    else toast('Please upload a .csv file', 'error');
+  });
+}
+
+function handleCSVUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  processCSVFile(file);
+  event.target.value = '';
+}
+
+function processCSVFile(file) {
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const records = parseCSV(e.target.result);
+      if (!records.length) { toast('No valid records found in CSV', 'error'); return; }
+
+      const batchId = 'batch_' + Date.now();
+      toast(`Uploading ${records.length} records...`);
+
+      const result = await api('POST', '/api/intake/bulk', { records, batch_id: batchId });
+
+      document.getElementById('ur-inserted').textContent = result.inserted || 0;
+      document.getElementById('ur-duplicates').textContent = result.duplicates || 0;
+      document.getElementById('upload-result').classList.add('show');
+
+      toast(`Imported ${result.inserted} records` + (result.duplicates ? `, ${result.duplicates} duplicates skipped` : ''), 'success');
+      await loadBulkPage();
+    } catch(err) {
+      toast('Upload failed: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function parseCSV(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  if (lines.length < 2) return [];
+
+  const headers = parseCSVRow(lines[0]).map(h => h.trim().toLowerCase().replace(/\s+/g, '_'));
+  const records = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const vals = parseCSVRow(lines[i]);
+    if (vals.length < 2) continue;
+    const row = {};
+    headers.forEach((h, idx) => { row[h] = vals[idx]?.trim() || null; });
+
+    // Map to expected fields
+    const rec = {
+      intake_id: row.intake_id || `auto_${Date.now()}_${i}`,
+      patient_code: row.patient_code || null,
+      patient_name: row.patient_name || null,
+      service_date: row.service_date || null,
+      manipulation_type: row.manipulation_type || null,
+      therapeutic_exercises: row.therapeutic_exercises ? parseInt(row.therapeutic_exercises) : null,
+      diagnosis_codes: row.diagnosis_codes || null,
+      insurance_provider: row.insurance_provider || null,
+      amount_billed: row.amount_billed ? parseFloat(row.amount_billed) : null,
+      notes: row.notes || null,
+      workflow_status: 'intake'
+    };
+    records.push(rec);
+  }
+  return records;
+}
+
+function parseCSVRow(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { current += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { result.push(current); current = ''; }
+      else { current += ch; }
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function hideUploadResult() {
+  document.getElementById('upload-result').classList.remove('show');
+}
+
+// ---- Checkbox / Batch ----
+function toggleCheck(id, checked) {
+  if (checked) selectedIntakeIds.add(id);
+  else selectedIntakeIds.delete(id);
+  updateBatchBar();
+}
+
+function toggleAllChecks(el) {
+  const checkboxes = document.querySelectorAll('#intake-tbody .row-check');
+  checkboxes.forEach(cb => {
+    cb.checked = el.checked;
+    const id = cb.dataset.id;
+    if (el.checked) selectedIntakeIds.add(id);
+    else selectedIntakeIds.delete(id);
+  });
+  updateBatchBar();
+}
+
+function updateBatchBar() {
+  const bar = document.getElementById('batch-bar');
+  const count = selectedIntakeIds.size;
+  document.getElementById('bb-count').textContent = `${count} selected`;
+  if (count > 0) bar.classList.add('show');
+  else bar.classList.remove('show');
+}
+
+function clearSelection() {
+  selectedIntakeIds.clear();
+  document.querySelectorAll('#intake-tbody .row-check, #check-all').forEach(cb => cb.checked = false);
+  updateBatchBar();
+}
+
+async function batchAdvance(newStatus) {
+  if (selectedIntakeIds.size === 0) return;
+  try {
+    const ids = Array.from(selectedIntakeIds);
+    const result = await api('PUT', '/api/intake/batch-advance', { ids, new_status: newStatus });
+    toast(`${result.updated} records moved to "${formatStage(newStatus)}"`, 'success');
+    clearSelection();
+    await loadBulkPage();
+  } catch(e) { toast('Batch update failed: ' + e.message, 'error'); }
+}
+
+// ---- Intake Modal ----
+function openIntakeModal(rec) {
+  document.getElementById('ir-edit-id').value = rec.id;
+  document.getElementById('ir-intake-id').value = rec.intake_id || '';
+  document.getElementById('ir-patient-code').value = rec.patient_code || '';
+  document.getElementById('ir-patient-name').value = rec.patient_name || '';
+  document.getElementById('ir-service-date').value = rec.service_date || '';
+  document.getElementById('ir-manip').value = rec.manipulation_type || '';
+  document.getElementById('ir-exercises').value = rec.therapeutic_exercises ?? '';
+  document.getElementById('ir-dx-codes').value = rec.diagnosis_codes || '';
+  document.getElementById('ir-insurance').value = rec.insurance_provider || '';
+  document.getElementById('ir-billed').value = rec.amount_billed || '';
+  document.getElementById('ir-status').value = rec.workflow_status || 'intake';
+  document.getElementById('ir-notes').value = rec.notes || '';
+  document.getElementById('intake-modal').classList.add('open');
+}
+
+async function saveIntakeRecord() {
+  const id = document.getElementById('ir-edit-id').value;
+  if (!id) return;
+  const body = {
+    patient_code: document.getElementById('ir-patient-code').value.trim() || null,
+    patient_name: document.getElementById('ir-patient-name').value.trim() || null,
+    service_date: document.getElementById('ir-service-date').value || null,
+    manipulation_type: document.getElementById('ir-manip').value || null,
+    therapeutic_exercises: parseInt(document.getElementById('ir-exercises').value) || null,
+    diagnosis_codes: document.getElementById('ir-dx-codes').value.trim() || null,
+    insurance_provider: document.getElementById('ir-insurance').value.trim() || null,
+    amount_billed: parseFloat(document.getElementById('ir-billed').value) || null,
+    workflow_status: document.getElementById('ir-status').value,
+    notes: document.getElementById('ir-notes').value.trim() || null
+  };
+  try {
+    await api('PUT', `/api/intake/${id}`, body);
+    toast('Record updated!', 'success');
+    closeModal('intake-modal');
+    await loadBulkPage();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ════════════════════════════════════
 // INIT
 // ════════════════════════════════════
+setupDragDrop();
 loadDashboard();
 </script>
 </body>

@@ -535,10 +535,77 @@
     .badge-claim_created { background: rgba(175,107,247,0.15); color: #c07fff; }
     .badge-submitted { background: rgba(56,217,169,0.15); color: #38d9a9; }
     .badge-processed { background: rgba(56,217,169,0.25); color: #2bc9a0; }
+
+    /* ---- LOGIN SCREEN ---- */
+    .login-screen {
+      position: fixed; inset: 0; z-index: 1000;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-screen.hidden { display: none; }
+    .login-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 48px 40px 40px;
+      width: 380px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .login-box h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 28px; font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .login-box h1 span { color: var(--accent); }
+    .login-box .login-sub { color: var(--ink2); font-size: 13px; margin-bottom: 28px; }
+    .login-box input {
+      width: 100%; padding: 12px 14px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--ink); font-size: 14px;
+      outline: none; margin-bottom: 14px;
+    }
+    .login-box input:focus { border-color: var(--accent); }
+    .login-box .login-btn {
+      width: 100%; padding: 12px;
+      background: var(--accent); color: #fff; border: none;
+      border-radius: 8px; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    .login-box .login-btn:hover { opacity: 0.9; }
+    .login-box .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .login-error {
+      color: var(--danger); font-size: 13px;
+      margin-top: 12px; min-height: 18px;
+    }
+    .user-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 20px; border-top: 1px solid var(--border);
+      font-size: 12px; color: var(--ink2);
+    }
+    .user-bar .user-email { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .user-bar .logout-btn {
+      background: none; border: none; color: var(--danger);
+      cursor: pointer; font-size: 11px; font-weight: 600;
+    }
   </style>
 </head>
 <body>
-<div class="app">
+
+<!-- LOGIN SCREEN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <h1>Chiro<span>Trax</span></h1>
+    <p class="login-sub">Sign in with your approved email</p>
+    <form id="login-form" onsubmit="handleLogin(event)">
+      <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="email"/>
+      <button type="submit" class="login-btn" id="login-btn">Sign In</button>
+    </form>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="app" id="app-shell" style="display:none">
 
   <!-- SIDEBAR -->
   <aside class="sidebar">
@@ -569,6 +636,10 @@
         <span class="icon">📤</span> Bulk Upload
       </div>
     </nav>
+    <div class="user-bar" id="user-bar">
+      <span class="user-email" id="user-email"></span>
+      <button class="logout-btn" onclick="handleLogout()">Logout</button>
+    </div>
     <div class="sidebar-footer">ChiroTrax v2.0</div>
   </aside>
 
@@ -1195,6 +1266,89 @@
 
 <script>
 // ════════════════════════════════════
+// AUTH STATE
+// ════════════════════════════════════
+let authToken = sessionStorage.getItem('chirotrax_token');
+let authEmail = sessionStorage.getItem('chirotrax_email');
+
+// ════════════════════════════════════
+// LOGIN / LOGOUT
+// ════════════════════════════════════
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  const email = document.getElementById('login-email').value.trim();
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Signing in...';
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+
+    authToken = data.token;
+    authEmail = data.email;
+    sessionStorage.setItem('chirotrax_token', authToken);
+    sessionStorage.setItem('chirotrax_email', authEmail);
+    showApp();
+  } catch (err) {
+    errEl.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  }
+}
+
+function handleLogout() {
+  fetch('/api/auth/logout', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + authToken }
+  }).catch(() => {});
+  authToken = null;
+  authEmail = null;
+  sessionStorage.removeItem('chirotrax_token');
+  sessionStorage.removeItem('chirotrax_email');
+  document.getElementById('app-shell').style.display = 'none';
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-error').textContent = '';
+}
+
+function showApp() {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app-shell').style.display = 'flex';
+  document.getElementById('user-email').textContent = authEmail;
+  loadDashboard();
+}
+
+// Check existing session on page load
+async function checkSession() {
+  if (!authToken) return;
+  try {
+    const res = await fetch('/api/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + authToken }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      authEmail = data.email;
+      showApp();
+    } else {
+      sessionStorage.removeItem('chirotrax_token');
+      sessionStorage.removeItem('chirotrax_email');
+      authToken = null;
+    }
+  } catch {
+    // network error — stay on login
+  }
+}
+
+// ════════════════════════════════════
 // STATE
 // ════════════════════════════════════
 let allPatients = [];
@@ -1361,11 +1515,20 @@ async function populatePatientSelects() {
 // API
 // ════════════════════════════════════
 async function api(method, path, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+
   const res = await fetch(path, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: body ? JSON.stringify(body) : undefined
   });
+
+  if (res.status === 401) {
+    handleLogout();
+    throw new Error('Session expired — please sign in again');
+  }
+
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
@@ -1935,7 +2098,7 @@ async function saveIntakeRecord() {
 // INIT
 // ════════════════════════════════════
 setupDragDrop();
-loadDashboard();
+checkSession();
 </script>
 </body>
 </html>

@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const bcrypt = require('bcryptjs');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 
@@ -98,7 +99,7 @@ function requireAuth(req, res, next) {
 // AUTH ROUTES (public)
 // ============================================
 app.post('/api/auth/login', async (req, res) => {
-  const { email } = req.body;
+  const { email, password } = req.body;
   if (!email || typeof email !== 'string') {
     return res.status(400).json({ error: 'Valid email required' });
   }
@@ -110,18 +111,139 @@ app.post('/api/auth/login', async (req, res) => {
 
   const { data, error } = await supabase
     .from('approved_users')
-    .select('email, role')
+    .select('email, role, password_hash')
     .eq('email', trimmed)
     .single();
 
   if (error || !data) {
-    return res.status(403).json({ error: 'Access denied — not an approved user' });
+    return res.status(403).json({ error: 'Invalid email or password' });
+  }
+
+  // First-time user — no password set yet
+  if (!data.password_hash) {
+    return res.status(200).json({ needsPassword: true, email: data.email });
+  }
+
+  if (!password) {
+    return res.status(400).json({ error: 'Password required' });
+  }
+
+  const valid = await bcrypt.compare(password, data.password_hash);
+  if (!valid) {
+    return res.status(403).json({ error: 'Invalid email or password' });
   }
 
   const token = crypto.randomBytes(32).toString('hex');
   sessions.set(token, { email: data.email, role: data.role, createdAt: Date.now() });
 
   res.json({ token, email: data.email, role: data.role });
+});
+
+// Set password (first-time setup)
+app.post('/api/auth/set-password', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password required' });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
+  const trimmed = email.trim().toLowerCase();
+  const { data, error } = await supabase
+    .from('approved_users')
+    .select('email, role, password_hash')
+    .eq('email', trimmed)
+    .single();
+
+  if (error || !data) {
+    return res.status(403).json({ error: 'Not an approved user' });
+  }
+  if (data.password_hash) {
+    return res.status(400).json({ error: 'Password already set. Use forgot password to reset.' });
+  }
+
+  const hash = await bcrypt.hash(password, 12);
+  const { error: updateErr } = await supabase
+    .from('approved_users')
+    .update({ password_hash: hash })
+    .eq('email', trimmed);
+
+  if (updateErr) return res.status(500).json({ error: 'Failed to set password' });
+
+  const token = crypto.randomBytes(32).toString('hex');
+  sessions.set(token, { email: data.email, role: data.role, createdAt: Date.now() });
+
+  res.json({ token, email: data.email, role: data.role });
+});
+
+// Request password reset (generates a token)
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required' });
+
+  const trimmed = email.trim().toLowerCase();
+  const { data } = await supabase
+    .from('approved_users')
+    .select('email')
+    .eq('email', trimmed)
+    .single();
+
+  // Always return success to avoid email enumeration
+  if (!data) return res.json({ ok: true });
+
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await supabase.from('password_resets').insert([{
+    email: trimmed,
+    token: resetToken,
+    expires_at: expiresAt.toISOString()
+  }]);
+
+  // Log the reset token (in production, you'd email this)
+  console.log(`Password reset token for ${trimmed}: ${resetToken}`);
+
+  res.json({ ok: true });
+});
+
+// Reset password with token
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) {
+    return res.status(400).json({ error: 'Token and new password required' });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
+  const { data: reset, error } = await supabase
+    .from('password_resets')
+    .select('*')
+    .eq('token', token)
+    .eq('used', false)
+    .single();
+
+  if (error || !reset) {
+    return res.status(400).json({ error: 'Invalid or expired reset link' });
+  }
+
+  if (new Date(reset.expires_at) < new Date()) {
+    return res.status(400).json({ error: 'Reset link has expired' });
+  }
+
+  const hash = await bcrypt.hash(password, 12);
+  const { error: updateErr } = await supabase
+    .from('approved_users')
+    .update({ password_hash: hash })
+    .eq('email', reset.email);
+
+  if (updateErr) return res.status(500).json({ error: 'Failed to reset password' });
+
+  // Mark token as used
+  await supabase.from('password_resets').update({ used: true }).eq('id', reset.id);
+
+  res.json({ ok: true });
 });
 
 app.post('/api/auth/logout', (req, res) => {

@@ -63,33 +63,43 @@ const supabase = createClient(
 );
 
 // ============================================
-// SESSION MANAGEMENT
+// SESSION MANAGEMENT (DB-backed for serverless)
 // ============================================
-const sessions = new Map(); // token -> { email, role, createdAt }
 const SESSION_TTL = 8 * 60 * 60 * 1000; // 8 hours
 
-function cleanExpiredSessions() {
-  const now = Date.now();
-  for (const [token, session] of sessions) {
-    if (now - session.createdAt > SESSION_TTL) sessions.delete(token);
-  }
+async function createSession(email, role) {
+  const token = crypto.randomBytes(32).toString('hex');
+  await supabase.from('sessions').insert([{ token, email, role }]);
+  return token;
 }
-setInterval(cleanExpiredSessions, 60 * 60 * 1000); // cleanup every hour
+
+async function getSession(token) {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('*')
+    .eq('token', token)
+    .single();
+  if (error || !data) return null;
+  if (Date.now() - new Date(data.created_at).getTime() > SESSION_TTL) {
+    await supabase.from('sessions').delete().eq('token', token);
+    return null;
+  }
+  return data;
+}
+
+async function deleteSession(token) {
+  await supabase.from('sessions').delete().eq('token', token);
+}
 
 // ============================================
 // AUTH MIDDLEWARE
 // ============================================
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'Authentication required' });
 
-  const session = sessions.get(token);
+  const session = await getSession(token);
   if (!session) return res.status(401).json({ error: 'Invalid or expired session' });
-
-  if (Date.now() - session.createdAt > SESSION_TTL) {
-    sessions.delete(token);
-    return res.status(401).json({ error: 'Session expired' });
-  }
 
   req.user = session;
   next();
@@ -133,8 +143,7 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(403).json({ error: 'Invalid email or password' });
   }
 
-  const token = crypto.randomBytes(32).toString('hex');
-  sessions.set(token, { email: data.email, role: data.role, createdAt: Date.now() });
+  const token = await createSession(data.email, data.role);
 
   res.json({ token, email: data.email, role: data.role });
 });
@@ -171,8 +180,7 @@ app.post('/api/auth/set-password', async (req, res) => {
 
   if (updateErr) return res.status(500).json({ error: 'Failed to set password' });
 
-  const token = crypto.randomBytes(32).toString('hex');
-  sessions.set(token, { email: data.email, role: data.role, createdAt: Date.now() });
+  const token = await createSession(data.email, data.role);
 
   res.json({ token, email: data.email, role: data.role });
 });
@@ -246,9 +254,9 @@ app.post('/api/auth/reset-password', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/auth/logout', (req, res) => {
+app.post('/api/auth/logout', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ', '');
-  if (token) sessions.delete(token);
+  if (token) await deleteSession(token);
   res.json({ ok: true });
 });
 

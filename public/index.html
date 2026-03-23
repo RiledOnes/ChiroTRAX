@@ -578,6 +578,16 @@
       color: var(--danger); font-size: 13px;
       margin-top: 12px; min-height: 18px;
     }
+    .login-link {
+      color: var(--accent); font-size: 13px; cursor: pointer;
+      background: none; border: none; margin-top: 8px;
+      text-decoration: underline;
+    }
+    .login-link:hover { opacity: 0.8; }
+    .login-success {
+      color: var(--accent); font-size: 13px;
+      margin-top: 12px; min-height: 18px;
+    }
     .user-bar {
       display: flex; align-items: center; gap: 8px;
       padding: 12px 20px; border-top: 1px solid var(--border);
@@ -596,12 +606,54 @@
 <div class="login-screen" id="login-screen">
   <div class="login-box">
     <h1>Chiro<span>Trax</span></h1>
-    <p class="login-sub">Sign in with your approved email</p>
-    <form id="login-form" onsubmit="handleLogin(event)">
-      <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="email"/>
-      <button type="submit" class="login-btn" id="login-btn">Sign In</button>
-    </form>
-    <div class="login-error" id="login-error"></div>
+
+    <!-- Sign In Form -->
+    <div id="login-view">
+      <p class="login-sub">Sign in with your approved email</p>
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="email"/>
+        <input type="password" id="login-password" placeholder="Password" required autocomplete="current-password"/>
+        <button type="submit" class="login-btn" id="login-btn">Sign In</button>
+      </form>
+      <div class="login-error" id="login-error"></div>
+      <button class="login-link" onclick="showForgotPassword()">Forgot password?</button>
+    </div>
+
+    <!-- Set Password (first-time) -->
+    <div id="setup-view" style="display:none">
+      <p class="login-sub">Create your password</p>
+      <form id="setup-form" onsubmit="handleSetPassword(event)">
+        <input type="password" id="setup-password" placeholder="New password (min 8 chars)" required minlength="8" autocomplete="new-password"/>
+        <input type="password" id="setup-confirm" placeholder="Confirm password" required minlength="8" autocomplete="new-password"/>
+        <button type="submit" class="login-btn" id="setup-btn">Set Password</button>
+      </form>
+      <div class="login-error" id="setup-error"></div>
+    </div>
+
+    <!-- Forgot Password -->
+    <div id="forgot-view" style="display:none">
+      <p class="login-sub">Enter your email to reset your password</p>
+      <form id="forgot-form" onsubmit="handleForgotPassword(event)">
+        <input type="email" id="forgot-email" placeholder="you@example.com" required autocomplete="email"/>
+        <button type="submit" class="login-btn" id="forgot-btn">Send Reset Link</button>
+      </form>
+      <div class="login-error" id="forgot-error"></div>
+      <div class="login-success" id="forgot-success"></div>
+      <button class="login-link" onclick="showLoginView()">Back to sign in</button>
+    </div>
+
+    <!-- Reset Password (with token) -->
+    <div id="reset-view" style="display:none">
+      <p class="login-sub">Enter your new password</p>
+      <form id="reset-form" onsubmit="handleResetPassword(event)">
+        <input type="password" id="reset-password" placeholder="New password (min 8 chars)" required minlength="8" autocomplete="new-password"/>
+        <input type="password" id="reset-confirm" placeholder="Confirm password" required minlength="8" autocomplete="new-password"/>
+        <button type="submit" class="login-btn" id="reset-btn">Reset Password</button>
+      </form>
+      <div class="login-error" id="reset-error"></div>
+      <div class="login-success" id="reset-success"></div>
+      <button class="login-link" onclick="showLoginView()">Back to sign in</button>
+    </div>
   </div>
 </div>
 
@@ -1274,11 +1326,50 @@ let authEmail = sessionStorage.getItem('chirotrax_email');
 // ════════════════════════════════════
 // LOGIN / LOGOUT
 // ════════════════════════════════════
+let setupEmail = null; // email for first-time password setup
+let resetToken = null; // token from URL for password reset
+
+// Check URL for reset token on load
+(function checkResetToken() {
+  const params = new URLSearchParams(window.location.search);
+  const t = params.get('reset');
+  if (t) {
+    resetToken = t;
+    showResetView();
+  }
+})();
+
+function showLoginView() {
+  document.getElementById('login-view').style.display = '';
+  document.getElementById('setup-view').style.display = 'none';
+  document.getElementById('forgot-view').style.display = 'none';
+  document.getElementById('reset-view').style.display = 'none';
+}
+function showForgotPassword() {
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('forgot-view').style.display = '';
+  document.getElementById('forgot-error').textContent = '';
+  document.getElementById('forgot-success').textContent = '';
+}
+function showSetupView(email) {
+  setupEmail = email;
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('setup-view').style.display = '';
+  document.getElementById('setup-error').textContent = '';
+}
+function showResetView() {
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('reset-view').style.display = '';
+  document.getElementById('reset-error').textContent = '';
+  document.getElementById('reset-success').textContent = '';
+}
+
 async function handleLogin(e) {
   e.preventDefault();
   const btn = document.getElementById('login-btn');
   const errEl = document.getElementById('login-error');
   const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
   errEl.textContent = '';
   btn.disabled = true;
   btn.textContent = 'Signing in...';
@@ -1287,9 +1378,16 @@ async function handleLogin(e) {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email, password })
     });
     const data = await res.json();
+
+    // First-time user needs to set password
+    if (data.needsPassword) {
+      showSetupView(data.email);
+      return;
+    }
+
     if (!res.ok) throw new Error(data.error || 'Login failed');
 
     authToken = data.token;
@@ -1302,6 +1400,102 @@ async function handleLogin(e) {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Sign In';
+  }
+}
+
+async function handleSetPassword(e) {
+  e.preventDefault();
+  const btn = document.getElementById('setup-btn');
+  const errEl = document.getElementById('setup-error');
+  const password = document.getElementById('setup-password').value;
+  const confirm = document.getElementById('setup-confirm').value;
+  errEl.textContent = '';
+
+  if (password !== confirm) { errEl.textContent = 'Passwords do not match'; return; }
+  if (password.length < 8) { errEl.textContent = 'Password must be at least 8 characters'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Setting password...';
+
+  try {
+    const res = await fetch('/api/auth/set-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: setupEmail, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to set password');
+
+    authToken = data.token;
+    authEmail = data.email;
+    sessionStorage.setItem('chirotrax_token', authToken);
+    sessionStorage.setItem('chirotrax_email', authEmail);
+    showApp();
+  } catch (err) {
+    errEl.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Set Password';
+  }
+}
+
+async function handleForgotPassword(e) {
+  e.preventDefault();
+  const btn = document.getElementById('forgot-btn');
+  const errEl = document.getElementById('forgot-error');
+  const successEl = document.getElementById('forgot-success');
+  const email = document.getElementById('forgot-email').value.trim();
+  errEl.textContent = '';
+  successEl.textContent = '';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    successEl.textContent = 'If that email is registered, a reset link has been sent. Check your server logs.';
+  } catch (err) {
+    errEl.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function handleResetPassword(e) {
+  e.preventDefault();
+  const btn = document.getElementById('reset-btn');
+  const errEl = document.getElementById('reset-error');
+  const successEl = document.getElementById('reset-success');
+  const password = document.getElementById('reset-password').value;
+  const confirm = document.getElementById('reset-confirm').value;
+  errEl.textContent = '';
+  successEl.textContent = '';
+
+  if (password !== confirm) { errEl.textContent = 'Passwords do not match'; return; }
+  if (password.length < 8) { errEl.textContent = 'Password must be at least 8 characters'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Resetting...';
+
+  try {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: resetToken, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Reset failed');
+    successEl.textContent = 'Password reset! Redirecting to login...';
+    setTimeout(() => { window.location.href = '/'; }, 2000);
+  } catch (err) {
+    errEl.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Reset Password';
   }
 }
 

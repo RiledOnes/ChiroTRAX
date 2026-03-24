@@ -97,6 +97,19 @@ create index on intake_records(batch_id);
 create index on intake_records(patient_code);
 create index on intake_records(service_date);
 
+-- DAILY INTAKE IMAGES TABLE
+create table daily_intake_images (
+  id uuid default gen_random_uuid() primary key,
+  business_date date not null,
+  file_name text not null,
+  image_data text not null,              -- base64 data URL
+  notes text,
+  uploaded_by text,
+  created_at timestamptz default now()
+);
+
+create index on daily_intake_images(business_date);
+
 -- ============================================
 -- ROW LEVEL SECURITY (enable when ready)
 -- ============================================

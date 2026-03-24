@@ -22,7 +22,7 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:"],
+      imgSrc: ["'self'", "data:", "blob:"],
       connectSrc: ["'self'"],
       scriptSrcAttr: null  // allow inline event handlers (onclick, onsubmit, etc.)
     }
@@ -53,7 +53,7 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth/', authLimiter);
 
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Supabase client
@@ -581,6 +581,172 @@ app.put('/api/intake/batch-advance', async (req, res) => {
     .select();
   if (error) return dbError(res, error);
   res.json({ updated: data.length, data });
+});
+
+// ============================================
+// DAILY INTAKE IMAGES
+// ============================================
+
+// Get images for a business date
+app.get('/api/intake-images', async (req, res) => {
+  let query = supabase
+    .from('daily_intake_images')
+    .select('id, business_date, file_name, notes, uploaded_by, created_at')
+    .order('business_date', { ascending: false })
+    .order('created_at', { ascending: true });
+
+  if (req.query.date) {
+    query = query.eq('business_date', req.query.date);
+  }
+  if (req.query.from && req.query.to) {
+    query = query.gte('business_date', req.query.from).lte('business_date', req.query.to);
+  }
+
+  const { data, error } = await query;
+  if (error) return dbError(res, error);
+  res.json(data);
+});
+
+// Get dates that have images (must be before :id route)
+app.get('/api/intake-images/dates/list', async (req, res) => {
+  const { data, error } = await supabase
+    .from('daily_intake_images')
+    .select('business_date');
+  if (error) return dbError(res, error);
+  const dates = [...new Set(data.map(d => d.business_date))].sort().reverse();
+  res.json(dates);
+});
+
+// Get single image with data
+app.get('/api/intake-images/:id', async (req, res) => {
+  const { data, error } = await supabase
+    .from('daily_intake_images')
+    .select('*')
+    .eq('id', req.params.id)
+    .single();
+  if (error) return dbError(res, error);
+  res.json(data);
+});
+
+// Upload images for a business date
+app.post('/api/intake-images', async (req, res) => {
+  const { business_date, images } = req.body;
+  if (!business_date || !images || !Array.isArray(images) || images.length === 0) {
+    return res.status(400).json({ error: 'business_date and images array required' });
+  }
+  if (images.length > 20) {
+    return res.status(400).json({ error: 'Maximum 20 images per upload' });
+  }
+
+  const records = images.map(img => ({
+    business_date,
+    file_name: img.file_name || 'intake.jpg',
+    image_data: img.image_data,
+    notes: img.notes || null,
+    uploaded_by: req.user.email
+  }));
+
+  const { data, error } = await supabase
+    .from('daily_intake_images')
+    .insert(records)
+    .select('id, business_date, file_name, notes, uploaded_by, created_at');
+  if (error) return dbError(res, error);
+  res.json({ inserted: data.length, data });
+});
+
+// Delete an image
+app.delete('/api/intake-images/:id', async (req, res) => {
+  const { error } = await supabase
+    .from('daily_intake_images')
+    .delete()
+    .eq('id', req.params.id);
+  if (error) return dbError(res, error);
+  res.json({ ok: true });
+});
+
+
+// ============================================
+// REPORTS
+// ============================================
+
+app.get('/api/reports/summary', async (req, res) => {
+  const from = req.query.from || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+  const to = req.query.to || new Date().toISOString().split('T')[0];
+
+  try {
+    const [visits, patients, claims, intakeImages] = await Promise.all([
+      supabase.from('visits').select('id, visit_date, patient_status, manipulation_type, therapeutic_exercises, patient_id').gte('visit_date', from).lte('visit_date', to),
+      supabase.from('patients').select('id, payment_type, created_at'),
+      supabase.from('claims').select('id, claim_status, payment_type, amount_billed, amount_paid, claim_date').gte('claim_date', from).lte('claim_date', to),
+      supabase.from('daily_intake_images').select('id, business_date').gte('business_date', from).lte('business_date', to)
+    ]);
+
+    const v = visits.data || [];
+    const p = patients.data || [];
+    const c = claims.data || [];
+    const img = intakeImages.data || [];
+
+    // Visit stats
+    const totalVisits = v.length;
+    const uniquePatientVisits = new Set(v.map(x => x.patient_id)).size;
+    const newPatientVisits = v.filter(x => x.patient_status === 'new').length;
+    const e1Count = v.filter(x => x.manipulation_type === 'E1').length;
+    const e2Count = v.filter(x => x.manipulation_type === 'E2').length;
+    const avgExercises = v.length ? (v.reduce((sum, x) => sum + (x.therapeutic_exercises || 0), 0) / v.length).toFixed(1) : 0;
+
+    // Visits by date
+    const visitsByDate = {};
+    v.forEach(x => { visitsByDate[x.visit_date] = (visitsByDate[x.visit_date] || 0) + 1; });
+
+    // Claim stats
+    const totalBilled = c.reduce((sum, x) => sum + (parseFloat(x.amount_billed) || 0), 0);
+    const totalPaid = c.reduce((sum, x) => sum + (parseFloat(x.amount_paid) || 0), 0);
+    const claimsByStatus = {};
+    c.forEach(x => { claimsByStatus[x.claim_status] = (claimsByStatus[x.claim_status] || 0) + 1; });
+
+    // Patient stats
+    const totalPatients = p.length;
+    const insurancePatients = p.filter(x => x.payment_type === 'insurance').length;
+    const cashPatients = p.filter(x => x.payment_type === 'cash').length;
+    const newPatientsInRange = p.filter(x => x.created_at >= from && x.created_at <= to + 'T23:59:59').length;
+
+    // Images count
+    const totalImages = img.length;
+    const imageDays = new Set(img.map(x => x.business_date)).size;
+
+    res.json({
+      period: { from, to },
+      visits: {
+        total: totalVisits,
+        uniquePatients: uniquePatientVisits,
+        newPatients: newPatientVisits,
+        e1: e1Count,
+        e2: e2Count,
+        avgExercises: parseFloat(avgExercises),
+        byDate: visitsByDate
+      },
+      claims: {
+        total: c.length,
+        totalBilled,
+        totalPaid,
+        outstanding: totalBilled - totalPaid,
+        byStatus: claimsByStatus
+      },
+      patients: {
+        total: totalPatients,
+        insurance: insurancePatients,
+        cash: cashPatients,
+        newInPeriod: newPatientsInRange
+      },
+      images: {
+        total: totalImages,
+        daysWithImages: imageDays
+      }
+    });
+  } catch (e) {
+    console.error('Report error:', e);
+    res.status(500).json({ error: 'Failed to generate report' });
+  }
 });
 
 // SPA fallback — serve index.html for non-API routes

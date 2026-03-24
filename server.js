@@ -574,7 +574,7 @@ app.put('/api/visits/batch-advance', async (req, res) => {
 app.get('/api/intake-images', async (req, res) => {
   let query = supabase
     .from('daily_intake_images')
-    .select('id, business_date, file_name, notes, uploaded_by, created_at')
+    .select('id, business_date, file_name, image_tag, notes, uploaded_by, created_at')
     .order('business_date', { ascending: false })
     .order('created_at', { ascending: true });
 
@@ -625,6 +625,7 @@ app.post('/api/intake-images', async (req, res) => {
     business_date,
     file_name: img.file_name || 'intake.jpg',
     image_data: img.image_data,
+    image_tag: img.image_tag || 'intake_form',
     notes: img.notes || null,
     uploaded_by: req.user.email
   }));
@@ -632,9 +633,26 @@ app.post('/api/intake-images', async (req, res) => {
   const { data, error } = await supabase
     .from('daily_intake_images')
     .insert(records)
-    .select('id, business_date, file_name, notes, uploaded_by, created_at');
+    .select('id, business_date, file_name, image_tag, notes, uploaded_by, created_at');
   if (error) return dbError(res, error);
   res.json({ inserted: data.length, data });
+});
+
+// Update image tag
+app.patch('/api/intake-images/:id', async (req, res) => {
+  const updates = {};
+  if (req.body.image_tag) updates.image_tag = req.body.image_tag;
+  if (req.body.notes !== undefined) updates.notes = req.body.notes;
+  if (!Object.keys(updates).length) return res.status(400).json({ error: 'Nothing to update' });
+
+  const { data, error } = await supabase
+    .from('daily_intake_images')
+    .update(updates)
+    .eq('id', req.params.id)
+    .select('id, image_tag, notes')
+    .single();
+  if (error) return dbError(res, error);
+  res.json(data);
 });
 
 // Delete an image

@@ -618,6 +618,17 @@
       border-radius: 4px;
     }
     .img-card .img-delete:hover { background: var(--danger-dim); }
+    .img-tag-select {
+      font-size: 11px; padding: 2px 6px; border-radius: 4px;
+      border: 1px solid var(--border); background: var(--surface2); color: var(--ink);
+      cursor: pointer; max-width: 120px;
+    }
+    .img-tag-badge {
+      display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10px; font-weight: 600;
+    }
+    .img-tag-badge.intake_form { background: #dbeafe; color: #1d4ed8; }
+    .img-tag-badge.charge_capture { background: #fef3c7; color: #92400e; }
+    .img-tag-badge.other { background: #e5e7eb; color: #374151; }
 
     /* Image Lightbox */
     .lightbox {
@@ -3098,7 +3109,11 @@ async function loadIntakeImages() {
       <div class="img-card" id="img-card-${img.id}">
         <img src="" data-id="${img.id}" onclick="openLightbox('${img.id}')" alt="${esc(img.file_name)}" loading="lazy"/>
         <div class="img-info">
-          <span class="img-name" title="${esc(img.file_name)}">${esc(img.file_name)}</span>
+          <select class="img-tag-select" onchange="updateImageTag('${img.id}', this.value)" title="Image type">
+            <option value="intake_form"${img.image_tag === 'intake_form' ? ' selected' : ''}>Intake Form</option>
+            <option value="charge_capture"${img.image_tag === 'charge_capture' ? ' selected' : ''}>Charge Capture</option>
+            <option value="other"${img.image_tag === 'other' ? ' selected' : ''}>Other</option>
+          </select>
           <button class="img-delete" onclick="deleteIntakeImage('${img.id}')" title="Delete">✕</button>
         </div>
       </div>
@@ -3134,6 +3149,13 @@ function closeLightbox() {
   document.getElementById('lightbox').classList.remove('open');
 }
 
+async function updateImageTag(id, tag) {
+  try {
+    await api('PATCH', `/api/intake-images/${id}`, { image_tag: tag });
+    toast('Tag updated', 'success');
+  } catch(e) { toast('Failed to update tag: ' + e.message, 'error'); }
+}
+
 async function deleteIntakeImage(id) {
   if (!confirm('Delete this image?')) return;
   try {
@@ -3156,7 +3178,8 @@ async function handleImageUpload(event) {
   await uploadImageFiles(files);
 }
 
-async function uploadImageFiles(files) {
+async function uploadImageFiles(files, tag) {
+  tag = tag || 'intake_form';
   const date = document.getElementById('intake-date').value;
   if (!date) { toast('Please select a business date first', 'error'); return; }
   if (files.length > 20) { toast('Maximum 20 images per upload', 'error'); return; }
@@ -3167,7 +3190,7 @@ async function uploadImageFiles(files) {
     const images = [];
     for (const file of files) {
       const dataUrl = await fileToPreviewableDataURL(file);
-      images.push({ file_name: file.name || 'pasted-image.png', image_data: dataUrl });
+      images.push({ file_name: file.name || 'pasted-image.png', image_data: dataUrl, image_tag: tag });
     }
 
     const result = await api('POST', '/api/intake-images', { business_date: date, images });
@@ -3250,7 +3273,7 @@ function setupImageDragDrop() {
       e.preventDefault();
       eodZone.classList.remove('dragover');
       const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || f.name?.match(/\.heic$/i));
-      if (files.length) uploadImageFiles(files);
+      if (files.length) uploadImageFiles(files, 'charge_capture');
     });
   }
 }
@@ -3260,7 +3283,7 @@ async function handleEodUpload(event) {
   const files = Array.from(event.target.files || []);
   if (!files.length) return;
   event.target.value = '';
-  await uploadImageFiles(files);
+  await uploadImageFiles(files, 'charge_capture');
 }
 
 // ════════════════════════════════════
@@ -3279,80 +3302,176 @@ async function exportDailyPDF() {
       api('GET', `/api/intake-images?date=${date}`)
     ]);
 
-    // Build a printable HTML document
+    // Separate images by tag
+    const intakeImages = images.filter(i => i.image_tag === 'intake_form' || !i.image_tag);
+    const captureImages = images.filter(i => i.image_tag === 'charge_capture');
+    const otherImages = images.filter(i => i.image_tag === 'other');
+
+    // Format date for header
+    const d = new Date(date + 'T12:00:00');
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const dateLabel = dayNames[d.getDay()] + ', ' + d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+
+    // Stats
+    const e1 = visits.filter(v => v.manipulation_type === 'E1').length;
+    const e2 = visits.filter(v => v.manipulation_type === 'E2').length;
+    const sameDateCount = visits.filter(v => !v.is_backdated).length;
+    const backDateCount = visits.filter(v => v.is_backdated).length;
+    const newPt = visits.filter(v => v.new_patient).length;
+    const returning = visits.filter(v => v.returning_patient).length;
+
+    // Build printable HTML matching Excel mockup
     let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
     <title>Daily Report - ${date}</title>
     <style>
-      body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #1a1a2e; font-size: 12px; }
-      h1 { font-size: 18px; margin-bottom: 4px; }
-      h2 { font-size: 14px; margin-top: 20px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
-      .meta { color: #666; font-size: 12px; margin-bottom: 16px; }
-      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-      th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; font-size: 11px; }
-      th { background: #f5f5f5; font-weight: 600; }
-      .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
-      .badge-E1 { background: #dbeafe; color: #1d4ed8; }
-      .badge-E2 { background: #fef3c7; color: #92400e; }
-      .badge-new { background: #d1fae5; color: #065f46; }
-      .badge-existing { background: #e0e7ff; color: #3730a3; }
-      .img-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
-      .img-row img { max-width: 280px; max-height: 200px; border: 1px solid #ddd; border-radius: 4px; }
-      .summary { display: flex; gap: 24px; margin: 12px 0; }
-      .summary-item { text-align: center; }
-      .summary-item .num { font-size: 24px; font-weight: 700; }
-      .summary-item .label { font-size: 11px; color: #666; }
-      @media print { body { padding: 0; } }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; font-size: 11px; }
+      @page { size: landscape; margin: 10mm; }
+      @media print { body { padding: 0; } .page-break { page-break-before: always; } }
+
+      .header { display: flex; justify-content: space-between; align-items: center; background: #1e3a5f; color: white; padding: 8px 16px; font-weight: 700; font-size: 13px; }
+      .header .status { background: #22c55e; color: white; padding: 2px 12px; border-radius: 4px; font-size: 12px; }
+
+      .section-label { background: #2563eb; color: white; padding: 4px 12px; font-weight: 700; font-size: 12px; margin-top: 10px; display: inline-block; }
+      .section-label.green { background: #16a34a; }
+      .complete-badge { float: right; background: #16a34a; color: white; padding: 2px 10px; font-size: 11px; font-weight: 700; }
+
+      .two-col { display: flex; gap: 16px; margin-top: 8px; }
+      .col-left { flex: 1; min-width: 0; }
+      .col-right { flex: 1; min-width: 0; }
+
+      .intake-img { width: 100%; max-height: 500px; object-fit: contain; border: 2px solid #ccc; border-radius: 4px; background: #f9f9f9; }
+      .capture-img { width: 100%; max-height: 600px; object-fit: contain; border: 2px solid #ccc; border-radius: 4px; background: #f9f9f9; margin-top: 8px; }
+
+      .count-box { border: 1px solid #ccc; padding: 8px 12px; margin-top: 8px; font-size: 11px; }
+      .count-box table { width: 100%; border-collapse: collapse; }
+      .count-box td { padding: 2px 8px; }
+      .count-box td:last-child { text-align: right; font-weight: 700; }
+      .count-box .section-title { font-weight: 700; font-size: 11px; margin-bottom: 4px; }
+
+      table.visits { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10px; }
+      table.visits th { background: #2563eb; color: white; padding: 4px 6px; text-align: left; font-weight: 600; font-size: 10px; white-space: nowrap; }
+      table.visits td { border: 1px solid #ddd; padding: 3px 6px; font-size: 10px; }
+      table.visits tr:nth-child(even) { background: #f8fafc; }
+      table.visits .highlight { background: #bfdbfe; font-weight: 600; }
+
+      .total-row { text-align: right; font-weight: 700; font-size: 12px; margin-top: 6px; padding: 4px 8px; border-top: 2px solid #333; }
+
+      .notes-box { border: 1px solid #ccc; padding: 8px 12px; margin-top: 8px; min-height: 40px; font-size: 11px; }
     </style></head><body>`;
 
-    html += `<h1>Daily Intake Report</h1>`;
-    html += `<div class="meta">${date} &mdash; Generated ${new Date().toLocaleString()}</div>`;
-
-    // Summary
-    const e1 = visits.filter(v => v.manipulation_type === 'E1').length;
-    const e2 = visits.filter(v => v.manipulation_type === 'E2').length;
-    html += `<div class="summary">
-      <div class="summary-item"><div class="num">${visits.length}</div><div class="label">Total Visits</div></div>
-      <div class="summary-item"><div class="num">${e1}</div><div class="label">E1 Manip</div></div>
-      <div class="summary-item"><div class="num">${e2}</div><div class="label">E2 Manip</div></div>
-      <div class="summary-item"><div class="num">${images.length}</div><div class="label">Images</div></div>
+    // ── HEADER BAR ──
+    html += `<div class="header">
+      <span>${dateLabel}</span>
+      <span>DAILY INTAKE REPORT</span>
+      <span>STATUS: <span class="status">COMPLETE</span></span>
     </div>`;
 
-    // Visits table
-    html += `<h2>Visits (${visits.length})</h2>`;
+    // ── NOTES ──
+    const notesVisits = visits.filter(v => v.notes && v.notes.trim());
+    if (notesVisits.length) {
+      html += `<div class="section-label">NOTES</div>`;
+      html += `<div class="notes-box">`;
+      notesVisits.forEach(v => {
+        const name = v.patients ? (v.patients.first_name + ' ' + v.patients.last_name).trim() : (v.patient_name || '');
+        html += `${esc(name)} - ${esc(v.notes)}<br/>`;
+      });
+      html += `</div>`;
+    }
+
+    // ── TWO-COLUMN: INTAKE FORM (left) + RECORD COUNT & STATS (right) ──
+    html += `<div class="two-col">`;
+
+    // Left: Intake Form Image(s)
+    html += `<div class="col-left">`;
+    html += `<div class="section-label">INTAKE FORM</div>`;
+    if (intakeImages.length) {
+      for (const img of intakeImages) {
+        try {
+          const full = await api('GET', `/api/intake-images/${img.id}`);
+          html += `<img class="intake-img" src="${full.image_data}" alt="${esc(full.file_name)}"/>`;
+        } catch(e) { html += `<p>[Image: ${esc(img.file_name)}]</p>`; }
+      }
+    } else {
+      html += `<div class="notes-box" style="min-height:200px;display:flex;align-items:center;justify-content:center;color:#999">No intake form image uploaded</div>`;
+    }
+    html += `</div>`;
+
+    // Right: Record Count Check + Stats
+    html += `<div class="col-right">`;
+    html += `<div class="section-label green">RECORD COUNT CHECK</div>`;
+    html += `<div class="count-box"><table>
+      <tr><td>TOTAL</td><td>${visits.length}</td></tr>
+      <tr><td>SAME DATE</td><td>${sameDateCount}</td></tr>
+      <tr><td>BACK DATE</td><td>${backDateCount}</td></tr>
+    </table></div>`;
+
+    html += `<div class="count-box" style="margin-top:8px"><table>
+      <tr><td>NEW PATIENTS</td><td>${newPt}</td></tr>
+      <tr><td>RETURNING</td><td>${returning || '—'}</td></tr>
+      <tr><td>E1 MANIP</td><td>${e1}</td></tr>
+      <tr><td>E2 MANIP</td><td>${e2}</td></tr>
+    </table></div>`;
+    html += `</div>`;
+    html += `</div>`; // end two-col
+
+    // ── DIGITALIZED LIST ──
+    html += `<div style="margin-top:12px"><div class="section-label">DIGITALIZED LIST</div></div>`;
     if (visits.length) {
-      html += `<table><thead><tr><th>Patient</th><th>Status</th><th>Manipulation</th><th>Exercises</th><th>Dx Codes</th><th>Billed</th><th>Workflow</th><th>Notes</th></tr></thead><tbody>`;
-      visits.forEach(v => {
-        const name = v.patients ? (v.patients.first_name + ' ' + v.patients.last_name).trim() : (v.patient_name || '—');
-        html += `<tr>
-          <td>${esc(name)}</td>
-          <td>${v.patient_status ? '<span class="badge badge-' + v.patient_status + '">' + v.patient_status + '</span>' : '—'}</td>
-          <td>${v.manipulation_type ? '<span class="badge badge-' + v.manipulation_type + '">' + v.manipulation_type + '</span>' : '—'}</td>
-          <td>${v.therapeutic_exercises ?? '—'}</td>
-          <td>${esc(v.diagnosis_codes || '—')}</td>
-          <td>${v.amount_billed != null ? '$' + Number(v.amount_billed).toFixed(2) : '—'}</td>
+      html += `<table class="visits"><thead><tr>
+        <th>ID</th><th>SVC DATE</th><th>PAT NO</th><th>PATIENT NAME</th>
+        <th>E1/E2</th><th>TE</th><th>DIAGNOSIS</th><th>STATUS</th><th>NOTES</th>
+      </tr></thead><tbody>`;
+      visits.forEach((v, i) => {
+        const name = v.patients ? (v.patients.first_name + ' ' + v.patients.last_name).trim().toUpperCase() : (v.patient_name || '—').toUpperCase();
+        const patCode = v.patients?.patient_code || '—';
+        const intId = v.intake_id || String(i + 1).padStart(2, '0');
+        const dx = Array.isArray(v.diagnosis_codes) ? v.diagnosis_codes.join(',') : (v.diagnosis_codes || '—');
+        const te = v.therapeutic_exercises != null ? ('TE ' + v.therapeutic_exercises) : '—';
+        const isHighlight = v.new_patient || v.no_fault;
+        html += `<tr${isHighlight ? ' class="highlight"' : ''}>
+          <td>${esc(intId)}</td>
+          <td>${v.visit_date || '—'}</td>
+          <td>${esc(patCode)}</td>
+          <td><strong>${esc(name)}</strong></td>
+          <td>${v.manipulation_type || '—'}</td>
+          <td>${te}</td>
+          <td style="font-size:9px">${esc(dx)}</td>
           <td>${v.workflow_status ? formatStage(v.workflow_status) : '—'}</td>
-          <td>${esc(v.notes || '')}</td>
+          <td style="font-size:9px">${esc(v.notes || '')}</td>
         </tr>`;
       });
       html += `</tbody></table>`;
-    } else {
-      html += `<p>No visits recorded for this date.</p>`;
+      html += `<div class="total-row">TOTAL (SAME DAY) &nbsp; ${visits.length}</div>`;
     }
 
-    // Images
-    if (images.length) {
-      html += `<h2>Intake Images (${images.length})</h2>`;
-      // Load full image data for each
-      html += `<div class="img-row">`;
-      for (const img of images) {
+    // ── CHARGE CAPTURE REPORT (page break) ──
+    if (captureImages.length) {
+      html += `<div class="page-break"></div>`;
+      html += `<div class="header">
+        <span>${dateLabel}</span>
+        <span>Charge Capture Report - End of Day Summary</span>
+        <span></span>
+      </div>`;
+      for (const img of captureImages) {
         try {
           const full = await api('GET', `/api/intake-images/${img.id}`);
-          html += `<img src="${full.image_data}" alt="${esc(full.file_name)}"/>`;
-        } catch(e) {
-          html += `<span>[Image: ${esc(img.file_name)}]</span>`;
-        }
+          html += `<img class="capture-img" src="${full.image_data}" alt="${esc(full.file_name)}"/>`;
+        } catch(e) { html += `<p>[Image: ${esc(img.file_name)}]</p>`; }
       }
-      html += `</div>`;
+      html += `<div class="total-row">TOTAL &nbsp; ${visits.length}</div>`;
+    }
+
+    // ── OTHER IMAGES ──
+    if (otherImages.length) {
+      html += `<div class="page-break"></div>`;
+      html += `<div class="section-label">Additional Images</div>`;
+      for (const img of otherImages) {
+        try {
+          const full = await api('GET', `/api/intake-images/${img.id}`);
+          html += `<img class="capture-img" src="${full.image_data}" alt="${esc(full.file_name)}"/>`;
+        } catch(e) { html += `<p>[Image: ${esc(img.file_name)}]</p>`; }
+      }
     }
 
     html += `</body></html>`;

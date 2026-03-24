@@ -3305,7 +3305,6 @@ async function exportDailyPDF() {
     // Separate images by tag
     const intakeImages = images.filter(i => i.image_tag === 'intake_form' || !i.image_tag);
     const captureImages = images.filter(i => i.image_tag === 'charge_capture');
-    const otherImages = images.filter(i => i.image_tag === 'other');
 
     // Format date for header
     const d = new Date(date + 'T12:00:00');
@@ -3320,44 +3319,61 @@ async function exportDailyPDF() {
     const newPt = visits.filter(v => v.new_patient).length;
     const returning = visits.filter(v => v.returning_patient).length;
 
-    // Build printable HTML matching Excel mockup
+    // Load all images in parallel
+    const intakeImageData = [];
+    const captureImageData = [];
+    for (const img of intakeImages) {
+      try { const full = await api('GET', `/api/intake-images/${img.id}`); intakeImageData.push(full); } catch(e) {}
+    }
+    for (const img of captureImages) {
+      try { const full = await api('GET', `/api/intake-images/${img.id}`); captureImageData.push(full); } catch(e) {}
+    }
+
+    // Build single-page landscape PDF
     let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
     <title>Daily Report - ${date}</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; font-size: 11px; }
-      @page { size: landscape; margin: 10mm; }
-      @media print { body { padding: 0; } .page-break { page-break-before: always; } }
+      body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; font-size: 8px; width: 100%; height: 100%; overflow: hidden; }
+      @page { size: landscape; margin: 6mm; }
+      @media print { body { padding: 0; } }
 
-      .header { display: flex; justify-content: space-between; align-items: center; background: #1e3a5f; color: white; padding: 8px 16px; font-weight: 700; font-size: 13px; }
-      .header .status { background: #22c55e; color: white; padding: 2px 12px; border-radius: 4px; font-size: 12px; }
+      .header { display: flex; justify-content: space-between; align-items: center; background: #1e3a5f; color: white; padding: 4px 10px; font-weight: 700; font-size: 10px; }
+      .header .status { background: #22c55e; color: white; padding: 1px 8px; border-radius: 3px; font-size: 9px; }
 
-      .section-label { background: #2563eb; color: white; padding: 4px 12px; font-weight: 700; font-size: 12px; margin-top: 10px; display: inline-block; }
+      .main { display: flex; gap: 6px; margin-top: 4px; height: calc(100vh - 30px); }
+
+      /* Left column: notes + intake image */
+      .col-left { width: 28%; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+      /* Center column: digitalized list */
+      .col-center { width: 48%; display: flex; flex-direction: column; min-width: 0; }
+
+      /* Right column: record count + charge capture */
+      .col-right { width: 24%; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+      .section-label { background: #2563eb; color: white; padding: 2px 8px; font-weight: 700; font-size: 8px; display: block; }
       .section-label.green { background: #16a34a; }
-      .complete-badge { float: right; background: #16a34a; color: white; padding: 2px 10px; font-size: 11px; font-weight: 700; }
+      .section-label.complete::after { content: 'COMPLETE'; float: right; }
 
-      .two-col { display: flex; gap: 16px; margin-top: 8px; }
-      .col-left { flex: 1; min-width: 0; }
-      .col-right { flex: 1; min-width: 0; }
+      .notes-box { border: 1px solid #ccc; padding: 3px 6px; font-size: 7px; line-height: 1.3; flex-shrink: 0; }
 
-      .intake-img { width: 100%; max-height: 500px; object-fit: contain; border: 2px solid #ccc; border-radius: 4px; background: #f9f9f9; }
-      .capture-img { width: 100%; max-height: 600px; object-fit: contain; border: 2px solid #ccc; border-radius: 4px; background: #f9f9f9; margin-top: 8px; }
+      .intake-img { width: 100%; flex: 1; object-fit: contain; border: 1px solid #ccc; background: #f9f9f9; min-height: 0; }
+      .capture-img { width: 100%; flex: 1; object-fit: contain; border: 1px solid #ccc; background: #f9f9f9; min-height: 0; }
 
-      .count-box { border: 1px solid #ccc; padding: 8px 12px; margin-top: 8px; font-size: 11px; }
+      .count-box { border: 1px solid #ccc; padding: 3px 6px; font-size: 8px; }
       .count-box table { width: 100%; border-collapse: collapse; }
-      .count-box td { padding: 2px 8px; }
+      .count-box td { padding: 1px 4px; }
       .count-box td:last-child { text-align: right; font-weight: 700; }
-      .count-box .section-title { font-weight: 700; font-size: 11px; margin-bottom: 4px; }
 
-      table.visits { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10px; }
-      table.visits th { background: #2563eb; color: white; padding: 4px 6px; text-align: left; font-weight: 600; font-size: 10px; white-space: nowrap; }
-      table.visits td { border: 1px solid #ddd; padding: 3px 6px; font-size: 10px; }
+      table.visits { width: 100%; border-collapse: collapse; font-size: 7.5px; flex: 1; }
+      table.visits th { background: #2563eb; color: white; padding: 2px 3px; text-align: left; font-weight: 600; font-size: 7px; white-space: nowrap; position: sticky; top: 0; }
+      table.visits td { border: 1px solid #ddd; padding: 1px 3px; font-size: 7.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
+      table.visits td.dx { white-space: normal; font-size: 6.5px; max-width: 80px; }
       table.visits tr:nth-child(even) { background: #f8fafc; }
       table.visits .highlight { background: #bfdbfe; font-weight: 600; }
 
-      .total-row { text-align: right; font-weight: 700; font-size: 12px; margin-top: 6px; padding: 4px 8px; border-top: 2px solid #333; }
-
-      .notes-box { border: 1px solid #ccc; padding: 8px 12px; margin-top: 8px; min-height: 40px; font-size: 11px; }
+      .total-row { text-align: right; font-weight: 700; font-size: 9px; padding: 2px 6px; border-top: 2px solid #333; flex-shrink: 0; }
     </style></head><body>`;
 
     // ── HEADER BAR ──
@@ -3367,56 +3383,35 @@ async function exportDailyPDF() {
       <span>STATUS: <span class="status">COMPLETE</span></span>
     </div>`;
 
-    // ── NOTES ──
+    html += `<div class="main">`;
+
+    // ═══ LEFT COLUMN: Notes + Intake Form Image ═══
+    html += `<div class="col-left">`;
+
+    // Notes
     const notesVisits = visits.filter(v => v.notes && v.notes.trim());
+    html += `<div class="section-label complete">NOTES</div>`;
+    html += `<div class="notes-box">`;
     if (notesVisits.length) {
-      html += `<div class="section-label">NOTES</div>`;
-      html += `<div class="notes-box">`;
       notesVisits.forEach(v => {
         const name = v.patients ? (v.patients.first_name + ' ' + v.patients.last_name).trim() : (v.patient_name || '');
         html += `${esc(name)} - ${esc(v.notes)}<br/>`;
       });
-      html += `</div>`;
-    }
+    } else { html += `&nbsp;`; }
+    html += `</div>`;
 
-    // ── TWO-COLUMN: INTAKE FORM (left) + RECORD COUNT & STATS (right) ──
-    html += `<div class="two-col">`;
-
-    // Left: Intake Form Image(s)
-    html += `<div class="col-left">`;
-    html += `<div class="section-label">INTAKE FORM</div>`;
-    if (intakeImages.length) {
-      for (const img of intakeImages) {
-        try {
-          const full = await api('GET', `/api/intake-images/${img.id}`);
-          html += `<img class="intake-img" src="${full.image_data}" alt="${esc(full.file_name)}"/>`;
-        } catch(e) { html += `<p>[Image: ${esc(img.file_name)}]</p>`; }
-      }
+    // Intake Form Image
+    html += `<div class="section-label complete">INTAKE FORM</div>`;
+    if (intakeImageData.length) {
+      html += `<img class="intake-img" src="${intakeImageData[0].image_data}" alt="Intake Form"/>`;
     } else {
-      html += `<div class="notes-box" style="min-height:200px;display:flex;align-items:center;justify-content:center;color:#999">No intake form image uploaded</div>`;
+      html += `<div style="flex:1;border:1px solid #ccc;display:flex;align-items:center;justify-content:center;color:#999;font-size:9px">No intake form</div>`;
     }
     html += `</div>`;
 
-    // Right: Record Count Check + Stats
-    html += `<div class="col-right">`;
-    html += `<div class="section-label green">RECORD COUNT CHECK</div>`;
-    html += `<div class="count-box"><table>
-      <tr><td>TOTAL</td><td>${visits.length}</td></tr>
-      <tr><td>SAME DATE</td><td>${sameDateCount}</td></tr>
-      <tr><td>BACK DATE</td><td>${backDateCount}</td></tr>
-    </table></div>`;
-
-    html += `<div class="count-box" style="margin-top:8px"><table>
-      <tr><td>NEW PATIENTS</td><td>${newPt}</td></tr>
-      <tr><td>RETURNING</td><td>${returning || '—'}</td></tr>
-      <tr><td>E1 MANIP</td><td>${e1}</td></tr>
-      <tr><td>E2 MANIP</td><td>${e2}</td></tr>
-    </table></div>`;
-    html += `</div>`;
-    html += `</div>`; // end two-col
-
-    // ── DIGITALIZED LIST ──
-    html += `<div style="margin-top:12px"><div class="section-label">DIGITALIZED LIST</div></div>`;
+    // ═══ CENTER COLUMN: Digitalized List ═══
+    html += `<div class="col-center">`;
+    html += `<div class="section-label complete">DIGITALIZED LIST</div>`;
     if (visits.length) {
       html += `<table class="visits"><thead><tr>
         <th>ID</th><th>SVC DATE</th><th>PAT NO</th><th>PATIENT NAME</th>
@@ -3436,43 +3431,45 @@ async function exportDailyPDF() {
           <td><strong>${esc(name)}</strong></td>
           <td>${v.manipulation_type || '—'}</td>
           <td>${te}</td>
-          <td style="font-size:9px">${esc(dx)}</td>
+          <td class="dx">${esc(dx)}</td>
           <td>${v.workflow_status ? formatStage(v.workflow_status) : '—'}</td>
-          <td style="font-size:9px">${esc(v.notes || '')}</td>
+          <td style="font-size:6.5px">${esc(v.notes || '')}</td>
         </tr>`;
       });
       html += `</tbody></table>`;
-      html += `<div class="total-row">TOTAL (SAME DAY) &nbsp; ${visits.length}</div>`;
     }
+    html += `<div class="total-row">TOTAL (SAME DAY) &nbsp; ${visits.length}</div>`;
+    html += `</div>`;
 
-    // ── CHARGE CAPTURE REPORT (page break) ──
-    if (captureImages.length) {
-      html += `<div class="page-break"></div>`;
-      html += `<div class="header">
-        <span>${dateLabel}</span>
-        <span>Charge Capture Report - End of Day Summary</span>
-        <span></span>
-      </div>`;
-      for (const img of captureImages) {
-        try {
-          const full = await api('GET', `/api/intake-images/${img.id}`);
-          html += `<img class="capture-img" src="${full.image_data}" alt="${esc(full.file_name)}"/>`;
-        } catch(e) { html += `<p>[Image: ${esc(img.file_name)}]</p>`; }
-      }
-      html += `<div class="total-row">TOTAL &nbsp; ${visits.length}</div>`;
-    }
+    // ═══ RIGHT COLUMN: Record Count + Charge Capture ═══
+    html += `<div class="col-right">`;
 
-    // ── OTHER IMAGES ──
-    if (otherImages.length) {
-      html += `<div class="page-break"></div>`;
-      html += `<div class="section-label">Additional Images</div>`;
-      for (const img of otherImages) {
-        try {
-          const full = await api('GET', `/api/intake-images/${img.id}`);
-          html += `<img class="capture-img" src="${full.image_data}" alt="${esc(full.file_name)}"/>`;
-        } catch(e) { html += `<p>[Image: ${esc(img.file_name)}]</p>`; }
-      }
+    // Record Count Check
+    html += `<div class="section-label green complete">RECORD COUNT CHECK</div>`;
+    html += `<div class="count-box"><table>
+      <tr><td>TOTAL</td><td>${visits.length}</td></tr>
+      <tr><td>SAME DATE</td><td>${sameDateCount}</td></tr>
+      <tr><td>BACK DATE</td><td>${backDateCount}</td></tr>
+    </table></div>`;
+
+    html += `<div class="count-box"><table>
+      <tr><td>NEW PATIENTS</td><td>${newPt}</td></tr>
+      <tr><td>RETURNING</td><td>${returning || '—'}</td></tr>
+      <tr><td>E1 MANIP</td><td>${e1}</td></tr>
+      <tr><td>E2 MANIP</td><td>${e2}</td></tr>
+    </table></div>`;
+
+    // Charge Capture Image
+    html += `<div class="section-label" style="margin-top:4px">CHARGE CAPTURE</div>`;
+    if (captureImageData.length) {
+      html += `<img class="capture-img" src="${captureImageData[0].image_data}" alt="Charge Capture"/>`;
+    } else {
+      html += `<div style="flex:1;border:1px solid #ccc;display:flex;align-items:center;justify-content:center;color:#999;font-size:9px">No capture image</div>`;
     }
+    html += `<div class="total-row">TOTAL &nbsp; ${visits.length}</div>`;
+
+    html += `</div>`; // end col-right
+    html += `</div>`; // end main
 
     html += `</body></html>`;
 

@@ -110,6 +110,25 @@ create table daily_intake_images (
 
 create index on daily_intake_images(business_date);
 
+-- TASKS TABLE
+create table tasks (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  description text,
+  assigned_by text,                        -- e.g. "Dina"
+  assigned_to text,
+  priority text default 'normal' check (priority in ('low', 'normal', 'high', 'urgent')),
+  status text default 'todo' check (status in ('todo', 'in_progress', 'done')),
+  due_date date,
+  completed_at timestamptz,
+  created_by text,
+  created_at timestamptz default now()
+);
+
+create index on tasks(status);
+create index on tasks(due_date);
+create index on tasks(priority);
+
 -- ============================================
 -- ROW LEVEL SECURITY (enable when ready)
 -- ============================================

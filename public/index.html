@@ -3343,37 +3343,40 @@ async function exportDailyPDF() {
 
       .main { display: flex; gap: 6px; margin-top: 4px; height: calc(100vh - 30px); }
 
-      /* Left column: notes + intake image */
-      .col-left { width: 28%; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+      /* Left column: notes + intake image (33%) */
+      .col-left { width: 33%; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 
-      /* Center column: digitalized list */
-      .col-center { width: 48%; display: flex; flex-direction: column; min-width: 0; }
+      /* Right column: record count + digitalized list + charge capture (67%) */
+      .col-right { width: 67%; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 
-      /* Right column: record count + charge capture */
-      .col-right { width: 24%; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-
-      .section-label { background: #2563eb; color: white; padding: 2px 8px; font-weight: 700; font-size: 8px; display: block; }
+      .section-label { background: #2563eb; color: white; padding: 2px 8px; font-weight: 700; font-size: 8px; display: block; flex-shrink: 0; }
       .section-label.green { background: #16a34a; }
       .section-label.complete::after { content: 'COMPLETE'; float: right; }
 
       .notes-box { border: 1px solid #ccc; padding: 3px 6px; font-size: 7px; line-height: 1.3; flex-shrink: 0; }
 
       .intake-img { width: 100%; flex: 1; object-fit: contain; border: 1px solid #ccc; background: #f9f9f9; min-height: 0; }
-      .capture-img { width: 100%; flex: 1; object-fit: contain; border: 1px solid #ccc; background: #f9f9f9; min-height: 0; }
 
-      .count-box { border: 1px solid #ccc; padding: 3px 6px; font-size: 8px; }
+      /* Right column top: record count inline + digitalized list */
+      .right-top { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+      .count-row { display: flex; gap: 6px; flex-shrink: 0; }
+      .count-box { border: 1px solid #ccc; padding: 3px 6px; font-size: 8px; flex: 1; }
       .count-box table { width: 100%; border-collapse: collapse; }
       .count-box td { padding: 1px 4px; }
       .count-box td:last-child { text-align: right; font-weight: 700; }
 
-      table.visits { width: 100%; border-collapse: collapse; font-size: 7.5px; flex: 1; }
-      table.visits th { background: #2563eb; color: white; padding: 2px 3px; text-align: left; font-weight: 600; font-size: 7px; white-space: nowrap; position: sticky; top: 0; }
-      table.visits td { border: 1px solid #ddd; padding: 1px 3px; font-size: 7.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
-      table.visits td.dx { white-space: normal; font-size: 6.5px; max-width: 80px; }
+      table.visits { width: 100%; border-collapse: collapse; font-size: 7.5px; }
+      table.visits th { background: #2563eb; color: white; padding: 1px 2px; text-align: left; font-weight: 600; font-size: 7px; white-space: nowrap; }
+      table.visits td { border: 1px solid #ddd; padding: 0px 2px; font-size: 7.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; line-height: 1.2; }
+      table.visits td.dx { white-space: normal; font-size: 6.5px; max-width: 90px; }
       table.visits tr:nth-child(even) { background: #f8fafc; }
       table.visits .highlight { background: #bfdbfe; font-weight: 600; }
 
       .total-row { text-align: right; font-weight: 700; font-size: 9px; padding: 2px 6px; border-top: 2px solid #333; flex-shrink: 0; }
+
+      /* Bottom charge capture */
+      .capture-section { flex-shrink: 0; margin-top: 3px; }
+      .capture-img { width: 100%; max-height: 160px; object-fit: contain; border: 1px solid #ccc; background: #f9f9f9; }
     </style></head><body>`;
 
     // ── HEADER BAR ──
@@ -3385,7 +3388,7 @@ async function exportDailyPDF() {
 
     html += `<div class="main">`;
 
-    // ═══ LEFT COLUMN: Notes + Intake Form Image ═══
+    // ═══ LEFT COLUMN (33%): Notes + Intake Form Image ═══
     html += `<div class="col-left">`;
 
     // Notes
@@ -3400,7 +3403,7 @@ async function exportDailyPDF() {
     } else { html += `&nbsp;`; }
     html += `</div>`;
 
-    // Intake Form Image
+    // Intake Form Image — fills remaining height
     html += `<div class="section-label complete">INTAKE FORM</div>`;
     if (intakeImageData.length) {
       html += `<img class="intake-img" src="${intakeImageData[0].image_data}" alt="Intake Form"/>`;
@@ -3409,8 +3412,28 @@ async function exportDailyPDF() {
     }
     html += `</div>`;
 
-    // ═══ CENTER COLUMN: Digitalized List ═══
-    html += `<div class="col-center">`;
+    // ═══ RIGHT COLUMN (67%): Record Count + Digitalized List + Charge Capture ═══
+    html += `<div class="col-right">`;
+
+    // Record Count Check — inline row
+    html += `<div class="section-label green complete">RECORD COUNT CHECK</div>`;
+    html += `<div class="count-row">
+      <div class="count-box"><table>
+        <tr><td>TOTAL</td><td>${visits.length}</td></tr>
+        <tr><td>SAME DATE</td><td>${sameDateCount}</td></tr>
+        <tr><td>BACK DATE</td><td>${backDateCount}</td></tr>
+      </table></div>
+      <div class="count-box"><table>
+        <tr><td>NEW PATIENTS</td><td>${newPt}</td></tr>
+        <tr><td>RETURNING</td><td>${returning || '—'}</td></tr>
+      </table></div>
+      <div class="count-box"><table>
+        <tr><td>E1 MANIP</td><td>${e1}</td></tr>
+        <tr><td>E2 MANIP</td><td>${e2}</td></tr>
+      </table></div>
+    </div>`;
+
+    // Digitalized List
     html += `<div class="section-label complete">DIGITALIZED LIST</div>`;
     if (visits.length) {
       html += `<table class="visits"><thead><tr>
@@ -3439,34 +3462,17 @@ async function exportDailyPDF() {
       html += `</tbody></table>`;
     }
     html += `<div class="total-row">TOTAL (SAME DAY) &nbsp; ${visits.length}</div>`;
-    html += `</div>`;
 
-    // ═══ RIGHT COLUMN: Record Count + Charge Capture ═══
-    html += `<div class="col-right">`;
-
-    // Record Count Check
-    html += `<div class="section-label green complete">RECORD COUNT CHECK</div>`;
-    html += `<div class="count-box"><table>
-      <tr><td>TOTAL</td><td>${visits.length}</td></tr>
-      <tr><td>SAME DATE</td><td>${sameDateCount}</td></tr>
-      <tr><td>BACK DATE</td><td>${backDateCount}</td></tr>
-    </table></div>`;
-
-    html += `<div class="count-box"><table>
-      <tr><td>NEW PATIENTS</td><td>${newPt}</td></tr>
-      <tr><td>RETURNING</td><td>${returning || '—'}</td></tr>
-      <tr><td>E1 MANIP</td><td>${e1}</td></tr>
-      <tr><td>E2 MANIP</td><td>${e2}</td></tr>
-    </table></div>`;
-
-    // Charge Capture Image
-    html += `<div class="section-label" style="margin-top:4px">CHARGE CAPTURE</div>`;
+    // Charge Capture Report — below the list
+    html += `<div class="capture-section">`;
+    html += `<div class="section-label">CHARGE CAPTURE REPORT - End of Day Summary</div>`;
     if (captureImageData.length) {
       html += `<img class="capture-img" src="${captureImageData[0].image_data}" alt="Charge Capture"/>`;
     } else {
-      html += `<div style="flex:1;border:1px solid #ccc;display:flex;align-items:center;justify-content:center;color:#999;font-size:9px">No capture image</div>`;
+      html += `<div style="height:80px;border:1px solid #ccc;display:flex;align-items:center;justify-content:center;color:#999;font-size:9px">No capture image</div>`;
     }
     html += `<div class="total-row">TOTAL &nbsp; ${visits.length}</div>`;
+    html += `</div>`;
 
     html += `</div>`; // end col-right
     html += `</div>`; // end main

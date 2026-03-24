@@ -7,24 +7,24 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
   <style>
     :root {
-      --bg: #0e1117;
-      --surface: #161b27;
-      --surface2: #1e2535;
-      --surface3: #252d40;
-      --border: #2a3348;
-      --ink: #e8eaf2;
-      --ink2: #7a8aaa;
-      --ink3: #4a5570;
-      --accent: #4f8ef7;
-      --accent-dim: rgba(79,142,247,0.12);
-      --accent2: #38d9a9;
-      --accent2-dim: rgba(56,217,169,0.12);
-      --warn: #f7934f;
-      --warn-dim: rgba(247,147,79,0.12);
-      --danger: #f75f5f;
-      --danger-dim: rgba(247,95,95,0.12);
+      --bg: #f5f0e8;
+      --surface: #fffdf7;
+      --surface2: #ede7da;
+      --surface3: #e0d9ca;
+      --border: #d4ccb8;
+      --ink: #2c2a25;
+      --ink2: #6b6558;
+      --ink3: #9a9283;
+      --accent: #2e7d32;
+      --accent-dim: rgba(46,125,50,0.10);
+      --accent2: #43a047;
+      --accent2-dim: rgba(67,160,71,0.10);
+      --warn: #e67e22;
+      --warn-dim: rgba(230,126,34,0.10);
+      --danger: #c0392b;
+      --danger-dim: rgba(192,57,43,0.10);
       --radius: 10px;
-      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+      --shadow: 0 4px 24px rgba(0,0,0,0.08);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -212,18 +212,18 @@
       letter-spacing: 0.3px;
       white-space: nowrap;
     }
-    .badge-new { background: rgba(79,142,247,0.15); color: #7ab3ff; }
-    .badge-existing { background: rgba(56,217,169,0.15); color: #38d9a9; }
-    .badge-e1 { background: rgba(247,147,79,0.15); color: #f7934f; }
-    .badge-e2 { background: rgba(175,107,247,0.15); color: #c07fff; }
-    .badge-pending { background: rgba(247,147,79,0.15); color: #f7934f; }
-    .badge-submitted { background: rgba(79,142,247,0.15); color: #7ab3ff; }
-    .badge-approved { background: rgba(56,217,169,0.15); color: #38d9a9; }
-    .badge-paid { background: rgba(56,217,169,0.2); color: #38d9a9; }
-    .badge-denied { background: rgba(247,95,95,0.15); color: #f75f5f; }
-    .badge-insurance { background: rgba(79,142,247,0.15); color: #7ab3ff; }
-    .badge-cash { background: rgba(56,217,169,0.15); color: #38d9a9; }
-    .badge-active { background: rgba(56,217,169,0.15); color: #38d9a9; }
+    .badge-new { background: rgba(46,125,50,0.12); color: #2e7d32; }
+    .badge-existing { background: rgba(67,160,71,0.12); color: #2e7d32; }
+    .badge-e1 { background: rgba(230,126,34,0.12); color: #c76b10; }
+    .badge-e2 { background: rgba(142,68,173,0.12); color: #8e44ad; }
+    .badge-pending { background: rgba(230,126,34,0.12); color: #c76b10; }
+    .badge-submitted { background: rgba(46,125,50,0.12); color: #2e7d32; }
+    .badge-approved { background: rgba(67,160,71,0.15); color: #2e7d32; }
+    .badge-paid { background: rgba(67,160,71,0.20); color: #1b5e20; }
+    .badge-denied { background: rgba(192,57,43,0.12); color: #c0392b; }
+    .badge-insurance { background: rgba(46,125,50,0.12); color: #2e7d32; }
+    .badge-cash { background: rgba(67,160,71,0.12); color: #2e7d32; }
+    .badge-active { background: rgba(67,160,71,0.12); color: #2e7d32; }
     .badge-inactive { background: var(--surface3); color: var(--ink3); }
 
     /* ---- BUTTONS ---- */
@@ -242,7 +242,7 @@
       white-space: nowrap;
     }
     .btn-primary { background: var(--accent); color: white; }
-    .btn-primary:hover { background: #3a7ae8; }
+    .btn-primary:hover { background: #256427; }
     .btn-secondary { background: var(--surface2); color: var(--ink); border: 1px solid var(--border); }
     .btn-secondary:hover { background: var(--surface3); }
     .btn-ghost { background: transparent; color: var(--ink2); border: 1px solid var(--border); }
@@ -530,11 +530,11 @@
     .batch-bar .bb-actions { margin-left: auto; display: flex; gap: 8px; }
 
     /* Workflow badge colors */
-    .badge-intake { background: rgba(247,147,79,0.15); color: #f7934f; }
-    .badge-entered_ebs { background: rgba(79,142,247,0.15); color: #7ab3ff; }
-    .badge-claim_created { background: rgba(175,107,247,0.15); color: #c07fff; }
-    .badge-submitted { background: rgba(56,217,169,0.15); color: #38d9a9; }
-    .badge-processed { background: rgba(56,217,169,0.25); color: #2bc9a0; }
+    .badge-intake { background: rgba(230,126,34,0.12); color: #c76b10; }
+    .badge-entered_ebs { background: rgba(46,125,50,0.12); color: #2e7d32; }
+    .badge-claim_created { background: rgba(142,68,173,0.12); color: #8e44ad; }
+    .badge-submitted { background: rgba(67,160,71,0.15); color: #2e7d32; }
+    .badge-processed { background: rgba(67,160,71,0.25); color: #1b5e20; }
 
     /* ---- LOGIN SCREEN ---- */
     .login-screen {

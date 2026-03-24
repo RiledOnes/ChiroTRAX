@@ -18,7 +18,7 @@ create table patients (
   created_at timestamp with time zone default now()
 );
 
--- VISITS TABLE (daily intake)
+-- VISITS TABLE (daily intake — manual or bulk uploaded)
 create table visits (
   id uuid default gen_random_uuid() primary key,
   patient_id uuid references patients(id) on delete cascade,
@@ -27,6 +27,14 @@ create table visits (
   manipulation_type text check (manipulation_type in ('E1', 'E2', null)),
   therapeutic_exercises int check (therapeutic_exercises between 0 and 10),
   notes text,
+  -- Bulk-upload & workflow fields
+  intake_id text unique,                    -- unique ID from CSV upload (prevents duplicates)
+  patient_name text,                        -- denormalized name from CSV
+  diagnosis_codes text,                     -- comma-separated ICD-10 codes
+  insurance_provider text,
+  amount_billed numeric(10,2),
+  workflow_status text default 'intake' check (workflow_status in ('intake', 'entered_ebs', 'claim_created', 'submitted', 'processed')),
+  batch_id text,                            -- groups records from same CSV upload
   created_at timestamp with time zone default now()
 );
 
@@ -57,24 +65,7 @@ create table claims (
   created_at timestamp with time zone default now()
 );
 
--- INTAKE RECORDS TABLE (Bulk Upload + Workflow)
-create table intake_records (
-  id uuid default gen_random_uuid() primary key,
-  intake_id text unique not null,           -- unique ID from uploaded data (prevents duplicates)
-  patient_code text,                        -- maps to patients.patient_code
-  patient_id uuid references patients(id) on delete set null,
-  patient_name text,                        -- denormalized name from upload
-  service_date date,
-  manipulation_type text,
-  therapeutic_exercises int,
-  diagnosis_codes text,                     -- comma-separated ICD-10 codes
-  insurance_provider text,
-  amount_billed numeric(10,2),
-  notes text,
-  workflow_status text default 'intake' check (workflow_status in ('intake', 'entered_ebs', 'claim_created', 'submitted', 'processed')),
-  batch_id text,                            -- groups records from same upload
-  created_at timestamp with time zone default now()
-);
+-- (intake_records table removed — bulk uploads now go into visits table directly)
 
 -- APPROVED USERS TABLE (Auth)
 create table approved_users (
@@ -89,13 +80,12 @@ create table approved_users (
 -- ============================================
 create index on visits(visit_date);
 create index on visits(patient_id);
+create index on visits(workflow_status);
+create index on visits(batch_id);
+create index on visits(intake_id);
 create index on diagnoses(patient_id);
 create index on claims(patient_id);
 create index on claims(claim_status);
-create index on intake_records(workflow_status);
-create index on intake_records(batch_id);
-create index on intake_records(patient_code);
-create index on intake_records(service_date);
 
 -- DAILY INTAKE IMAGES TABLE
 create table daily_intake_images (

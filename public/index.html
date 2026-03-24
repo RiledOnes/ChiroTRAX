@@ -1420,7 +1420,6 @@
           <span style="color:var(--ink3)">to</span>
           <input type="date" id="rpt-to" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
           <button class="btn btn-primary btn-sm" onclick="loadReports()">Run Report</button>
-          <button class="btn btn-secondary btn-sm" onclick="exportByPatientPDF()">Patient Report PDF</button>
         </div>
       </div>
 
@@ -2514,7 +2513,7 @@ function renderPatientRows(patients) {
       <td class="muted">${p.phone || '—'}</td>
       <td class="muted">${p.insurance_provider || '—'}</td>
       <td>${badge(p.payment_type)}</td>
-      <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openPatientModal(${JSON.stringify(p)})'>Edit</button></div></td>
+      <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='exportPatientPDF("${p.id}")'>Report</button><button class="btn btn-secondary btn-xs" onclick='openPatientModal(${JSON.stringify(p)})'>Edit</button></div></td>
     </tr>
   `).join('');
 }
@@ -3520,187 +3519,198 @@ async function exportDailyPDF() {
 }
 
 // ════════════════════════════════════
-// BY-PATIENT PDF REPORT
+// SINGLE PATIENT PDF REPORT
 // ════════════════════════════════════
-async function exportByPatientPDF() {
-  const from = document.getElementById('rpt-from').value;
-  const to = document.getElementById('rpt-to').value;
-  if (!from || !to) { toast('Select a date range first', 'error'); return; }
-
+async function exportPatientPDF(patientId) {
   toast('Generating patient report...');
 
   try {
-    const data = await api('GET', `/api/reports/by-patient?from=${from}&to=${to}`);
-    const patients = data.patients || [];
-    if (!patients.length) { toast('No patient visits found in this period', 'error'); return; }
+    // Fetch patient with visits + diagnoses, and claims separately
+    const [patient, allClaims] = await Promise.all([
+      api('GET', `/api/patients/${patientId}`),
+      api('GET', '/api/claims')
+    ]);
 
-    const fromLabel = new Date(from + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const toLabel = new Date(to + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const name = (patient.first_name + ' ' + patient.last_name).trim().toUpperCase();
+    const visits = (patient.visits || []).sort((a, b) => (a.visit_date || '').localeCompare(b.visit_date || ''));
+    const diagnoses = (patient.diagnoses || []).sort((a, b) => (a.diagnosed_date || '').localeCompare(b.diagnosed_date || ''));
+    const claims = allClaims.filter(c => c.patient_id === patientId).sort((a, b) => (a.claim_date || '').localeCompare(b.claim_date || ''));
+
+    // Stats
+    const totalVisits = visits.length;
+    const e1 = visits.filter(v => v.manipulation_type === 'E1').length;
+    const e2 = visits.filter(v => v.manipulation_type === 'E2').length;
+    const totalBilled = claims.reduce((s, c) => s + (parseFloat(c.amount_billed) || 0), 0);
+    const totalPaid = claims.reduce((s, c) => s + (parseFloat(c.amount_paid) || 0), 0);
+    const activeDx = diagnoses.filter(d => d.is_active);
 
     let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>Patient Report ${from} to ${to}</title>
+    <title>Patient Report - ${name}</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; font-size: 9px; }
-      @page { size: landscape; margin: 8mm; }
-      @media print { body { padding: 0; } .page-break { page-break-before: always; } }
+      body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; font-size: 10px; padding: 12px; }
+      @page { size: portrait; margin: 10mm; }
+      @media print { body { padding: 0; } }
 
-      .header { display: flex; justify-content: space-between; align-items: center; background: #1e3a5f; color: white; padding: 6px 12px; font-weight: 700; font-size: 11px; }
-      .header .status { background: #22c55e; color: white; padding: 2px 10px; border-radius: 3px; font-size: 9px; }
+      .header { background: #1e3a5f; color: white; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
+      .header h1 { font-size: 16px; font-weight: 700; }
+      .header .sub { font-size: 10px; opacity: 0.85; }
 
-      .summary-bar { display: flex; gap: 12px; margin: 8px 0; padding: 6px 12px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 9px; }
-      .summary-bar .stat { text-align: center; }
-      .summary-bar .stat-val { font-size: 14px; font-weight: 700; color: #1e3a5f; }
-      .summary-bar .stat-lbl { color: #64748b; font-size: 8px; }
+      .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 12px 0; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; }
+      .info-item { font-size: 10px; }
+      .info-label { color: #64748b; font-size: 8px; text-transform: uppercase; font-weight: 600; }
+      .info-val { font-weight: 600; margin-top: 2px; }
 
-      table.patients { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 8px; }
-      table.patients th { background: #1e3a5f; color: white; padding: 4px 6px; text-align: left; font-weight: 600; font-size: 7.5px; white-space: nowrap; }
-      table.patients td { border-bottom: 1px solid #e2e8f0; padding: 4px 6px; vertical-align: top; line-height: 1.3; }
-      table.patients tr:nth-child(even) { background: #f8fafc; }
-      table.patients tr:hover { background: #eff6ff; }
-      .name { font-weight: 700; font-size: 8.5px; }
-      .code { color: #64748b; font-size: 7.5px; }
-      .dx-list { font-size: 7px; color: #475569; max-width: 140px; word-wrap: break-word; }
-      .visit-detail { font-size: 7px; color: #475569; }
-      .badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 7px; font-weight: 600; }
+      .stats-row { display: flex; gap: 10px; margin: 10px 0; }
+      .stat-box { flex: 1; text-align: center; padding: 8px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px; }
+      .stat-box .val { font-size: 18px; font-weight: 700; color: #1e3a5f; }
+      .stat-box .lbl { font-size: 8px; color: #64748b; text-transform: uppercase; }
+      .stat-box.green .val { color: #16a34a; }
+      .stat-box.red .val { color: #dc2626; }
+
+      .section { margin-top: 14px; }
+      .section-title { background: #2563eb; color: white; padding: 4px 10px; font-weight: 700; font-size: 10px; margin-bottom: 0; }
+      .section-title.green { background: #16a34a; }
+
+      table { width: 100%; border-collapse: collapse; font-size: 9px; }
+      th { background: #f1f5f9; padding: 4px 6px; text-align: left; font-weight: 600; font-size: 8px; color: #475569; border-bottom: 2px solid #e2e8f0; }
+      td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+      tr:nth-child(even) { background: #f8fafc; }
+
+      .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 8px; font-weight: 600; }
+      .badge-active { background: #dcfce7; color: #166534; }
+      .badge-inactive { background: #fee2e2; color: #991b1b; }
       .badge-ins { background: #dbeafe; color: #1e40af; }
       .badge-cash { background: #fef3c7; color: #92400e; }
-      .claim-pending { color: #d97706; }
-      .claim-submitted { color: #2563eb; }
-      .claim-approved { color: #16a34a; }
-      .claim-paid { color: #15803d; font-weight: 700; }
-      .claim-denied { color: #dc2626; }
+      .badge-pending { background: #fef3c7; color: #92400e; }
+      .badge-submitted { background: #dbeafe; color: #1e40af; }
+      .badge-approved { background: #dcfce7; color: #166534; }
+      .badge-paid { background: #bbf7d0; color: #14532d; }
+      .badge-denied { background: #fee2e2; color: #991b1b; }
 
-      .totals-row td { border-top: 2px solid #1e3a5f; font-weight: 700; font-size: 9px; padding: 6px; background: #f1f5f9; }
+      .totals { text-align: right; font-weight: 700; font-size: 10px; padding: 6px; border-top: 2px solid #1e3a5f; background: #f1f5f9; }
 
-      .footer { margin-top: 8px; text-align: center; font-size: 8px; color: #94a3b8; }
+      .footer { margin-top: 16px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
     </style></head><body>`;
 
     // Header
     html += `<div class="header">
-      <span>PATIENT REPORT</span>
-      <span>${fromLabel} — ${toLabel}</span>
-      <span>${patients.length} Patients</span>
+      <div>
+        <h1>${esc(name)}</h1>
+        <div class="sub">Patient Code: ${esc(patient.patient_code || '—')}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:12px;font-weight:700">PATIENT REPORT</div>
+        <div class="sub">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+      </div>
+    </div>`;
+
+    // Patient info grid
+    html += `<div class="info-grid">
+      <div class="info-item"><div class="info-label">Date of Birth</div><div class="info-val">${patient.date_of_birth || '—'}</div></div>
+      <div class="info-item"><div class="info-label">Phone</div><div class="info-val">${esc(patient.phone || '—')}</div></div>
+      <div class="info-item"><div class="info-label">Email</div><div class="info-val">${esc(patient.email || '—')}</div></div>
+      <div class="info-item"><div class="info-label">Payment Type</div><div class="info-val">${patient.payment_type ? '<span class="badge badge-' + patient.payment_type + '">' + patient.payment_type.toUpperCase() + '</span>' : '—'}</div></div>
+      <div class="info-item"><div class="info-label">Insurance Provider</div><div class="info-val">${esc(patient.insurance_provider || '—')}</div></div>
+      <div class="info-item"><div class="info-label">Member ID</div><div class="info-val">${esc(patient.insurance_id || '—')}</div></div>
     </div>`;
 
     // Summary stats
-    const totalVisits = patients.reduce((s, p) => s + p.summary.visitCount, 0);
-    const totalBilled = patients.reduce((s, p) => s + p.summary.totalBilled, 0);
-    const totalPaid = patients.reduce((s, p) => s + p.summary.totalPaid, 0);
-    const totalOutstanding = totalBilled - totalPaid;
-    const totalClaims = patients.reduce((s, p) => s + p.summary.claimCount, 0);
-    const totalE1 = patients.reduce((s, p) => s + p.summary.e1, 0);
-    const totalE2 = patients.reduce((s, p) => s + p.summary.e2, 0);
-
-    html += `<div class="summary-bar">
-      <div class="stat"><div class="stat-val">${patients.length}</div><div class="stat-lbl">PATIENTS</div></div>
-      <div class="stat"><div class="stat-val">${totalVisits}</div><div class="stat-lbl">VISITS</div></div>
-      <div class="stat"><div class="stat-val">${totalE1}</div><div class="stat-lbl">E1 MANIP</div></div>
-      <div class="stat"><div class="stat-val">${totalE2}</div><div class="stat-lbl">E2 MANIP</div></div>
-      <div class="stat"><div class="stat-val">${totalClaims}</div><div class="stat-lbl">CLAIMS</div></div>
-      <div class="stat"><div class="stat-val">$${totalBilled.toLocaleString()}</div><div class="stat-lbl">BILLED</div></div>
-      <div class="stat"><div class="stat-val">$${totalPaid.toLocaleString()}</div><div class="stat-lbl">PAID</div></div>
-      <div class="stat"><div class="stat-val">$${totalOutstanding.toLocaleString()}</div><div class="stat-lbl">OUTSTANDING</div></div>
+    html += `<div class="stats-row">
+      <div class="stat-box"><div class="val">${totalVisits}</div><div class="lbl">Total Visits</div></div>
+      <div class="stat-box"><div class="val">${e1}</div><div class="lbl">E1 Manip</div></div>
+      <div class="stat-box"><div class="val">${e2}</div><div class="lbl">E2 Manip</div></div>
+      <div class="stat-box"><div class="val">${activeDx.length}</div><div class="lbl">Active Dx</div></div>
+      <div class="stat-box"><div class="val">$${totalBilled.toLocaleString()}</div><div class="lbl">Total Billed</div></div>
+      <div class="stat-box green"><div class="val">$${totalPaid.toLocaleString()}</div><div class="lbl">Total Paid</div></div>
+      <div class="stat-box${totalBilled - totalPaid > 0 ? ' red' : ''}"><div class="val">$${(totalBilled - totalPaid).toLocaleString()}</div><div class="lbl">Outstanding</div></div>
     </div>`;
 
-    // Patient table
-    html += `<table class="patients">
-      <thead><tr>
-        <th>#</th>
-        <th>PATIENT</th>
-        <th>INSURANCE</th>
-        <th>VISITS</th>
-        <th>VISIT DATES</th>
-        <th>E1/E2</th>
-        <th>DIAGNOSES</th>
-        <th>CLAIMS</th>
-        <th>BILLED</th>
-        <th>PAID</th>
-        <th>BALANCE</th>
-        <th>STATUS</th>
+    // ── VISIT HISTORY ──
+    html += `<div class="section">`;
+    html += `<div class="section-title">VISIT HISTORY (${visits.length})</div>`;
+    if (visits.length) {
+      html += `<table><thead><tr>
+        <th>#</th><th>DATE</th><th>STATUS</th><th>MANIP</th><th>TE</th>
+        <th>DIAGNOSIS CODES</th><th>BILLED</th><th>WORKFLOW</th><th>NOTES</th>
       </tr></thead><tbody>`;
-
-    patients.forEach((p, idx) => {
-      const pt = p.patient;
-      const s = p.summary;
-      const name = (pt.first_name + ' ' + pt.last_name).trim().toUpperCase();
-      const payBadge = pt.payment_type === 'insurance'
-        ? '<span class="badge badge-ins">INS</span>'
-        : pt.payment_type === 'cash'
-          ? '<span class="badge badge-cash">CASH</span>'
-          : '';
-
-      // Visit dates list
-      const visitDates = p.visits.map(v => v.visit_date).filter(Boolean);
-      const uniqueDates = [...new Set(visitDates)].sort();
-      const datesDisplay = uniqueDates.length <= 4
-        ? uniqueDates.join(', ')
-        : uniqueDates.slice(0, 3).join(', ') + ` +${uniqueDates.length - 3} more`;
-
-      // Visit breakdown
-      const manipBreak = [];
-      if (s.e1) manipBreak.push('E1:' + s.e1);
-      if (s.e2) manipBreak.push('E2:' + s.e2);
-
-      // Diagnoses
-      const dxDisplay = s.diagnoses.length
-        ? s.diagnoses.join(', ')
-        : '—';
-
-      // Claims status summary
-      const claimStatuses = {};
-      p.claims.forEach(c => {
-        claimStatuses[c.claim_status] = (claimStatuses[c.claim_status] || 0) + 1;
+      let visitBilledTotal = 0;
+      visits.forEach((v, i) => {
+        const billed = calcBilled(v);
+        visitBilledTotal += billed;
+        const te = v.therapeutic_exercises != null ? v.therapeutic_exercises : '—';
+        const dx = v.diagnosis_codes || '—';
+        html += `<tr>
+          <td>${i + 1}</td>
+          <td style="white-space:nowrap">${v.visit_date || '—'}</td>
+          <td>${v.patient_status || '—'}</td>
+          <td style="text-align:center;font-weight:600">${v.manipulation_type || '—'}</td>
+          <td style="text-align:center">${te}</td>
+          <td style="font-size:8px;max-width:120px;word-wrap:break-word">${esc(String(dx))}</td>
+          <td style="text-align:right;font-weight:600">$${billed}</td>
+          <td>${v.workflow_status ? formatStage(v.workflow_status) : '—'}</td>
+          <td style="font-size:8px;max-width:100px;word-wrap:break-word;color:#64748b">${esc(v.notes || '')}</td>
+        </tr>`;
       });
-      const claimDisplay = Object.keys(claimStatuses).length
-        ? Object.entries(claimStatuses).map(([st, ct]) =>
-            `<span class="claim-${st}">${ct} ${st}</span>`
-          ).join(', ')
-        : '—';
+      html += `</tbody></table>`;
+      html += `<div class="totals">TOTAL CALCULATED: $${visitBilledTotal.toLocaleString()}</div>`;
+    } else {
+      html += `<div style="padding:12px;color:#64748b;text-align:center">No visits recorded</div>`;
+    }
+    html += `</div>`;
 
-      // Workflow statuses from visits
-      const wfStatuses = {};
-      p.visits.forEach(v => {
-        if (v.workflow_status) wfStatuses[v.workflow_status] = (wfStatuses[v.workflow_status] || 0) + 1;
+    // ── DIAGNOSIS HISTORY ──
+    html += `<div class="section">`;
+    html += `<div class="section-title green">DIAGNOSIS HISTORY (${diagnoses.length})</div>`;
+    if (diagnoses.length) {
+      html += `<table><thead><tr>
+        <th>#</th><th>ICD-10 CODE</th><th>DESCRIPTION</th><th>DATE DIAGNOSED</th><th>STATUS</th>
+      </tr></thead><tbody>`;
+      diagnoses.forEach((d, i) => {
+        const statusBadge = d.is_active
+          ? '<span class="badge badge-active">Active</span>'
+          : '<span class="badge badge-inactive">Inactive</span>';
+        html += `<tr>
+          <td>${i + 1}</td>
+          <td style="font-weight:600">${esc(d.diagnosis_code || '—')}</td>
+          <td>${esc(d.diagnosis_description || '—')}</td>
+          <td>${d.diagnosed_date || '—'}</td>
+          <td>${statusBadge}</td>
+        </tr>`;
       });
-      const wfDisplay = Object.keys(wfStatuses).length
-        ? Object.entries(wfStatuses).map(([st, ct]) => `${ct} ${formatStage(st)}`).join(', ')
-        : '—';
+      html += `</tbody></table>`;
+    } else {
+      html += `<div style="padding:12px;color:#64748b;text-align:center">No diagnoses recorded</div>`;
+    }
+    html += `</div>`;
 
-      html += `<tr>
-        <td>${idx + 1}</td>
-        <td><div class="name">${esc(name)}</div><div class="code">${esc(pt.patient_code)} ${payBadge}</div></td>
-        <td>${esc(pt.insurance_provider || '—')}<br/><span class="code">${esc(pt.insurance_id || '')}</span></td>
-        <td style="text-align:center;font-weight:700">${s.visitCount}</td>
-        <td class="visit-detail">${datesDisplay}</td>
-        <td style="text-align:center">${manipBreak.join(' / ') || '—'}</td>
-        <td class="dx-list">${esc(dxDisplay)}</td>
-        <td style="text-align:center">${claimDisplay}</td>
-        <td style="text-align:right;font-weight:600">$${s.totalBilled.toLocaleString()}</td>
-        <td style="text-align:right">$${s.totalPaid.toLocaleString()}</td>
-        <td style="text-align:right;font-weight:700;color:${s.outstanding > 0 ? '#dc2626' : '#16a34a'}">$${s.outstanding.toLocaleString()}</td>
-        <td class="visit-detail">${wfDisplay}</td>
-      </tr>`;
-    });
+    // ── CLAIMS HISTORY ──
+    if (claims.length) {
+      html += `<div class="section">`;
+      html += `<div class="section-title">CLAIMS HISTORY (${claims.length})</div>`;
+      html += `<table><thead><tr>
+        <th>#</th><th>CLAIM DATE</th><th>VISIT DATE</th><th>TYPE</th><th>STATUS</th>
+        <th style="text-align:right">BILLED</th><th style="text-align:right">PAID</th><th>NOTES</th>
+      </tr></thead><tbody>`;
+      claims.forEach((c, i) => {
+        const visitDate = c.visits?.visit_date || '—';
+        html += `<tr>
+          <td>${i + 1}</td>
+          <td>${c.claim_date || '—'}</td>
+          <td>${visitDate}</td>
+          <td>${c.payment_type || '—'}</td>
+          <td><span class="badge badge-${c.claim_status || 'pending'}">${(c.claim_status || 'pending').toUpperCase()}</span></td>
+          <td style="text-align:right;font-weight:600">$${(parseFloat(c.amount_billed) || 0).toLocaleString()}</td>
+          <td style="text-align:right">$${(parseFloat(c.amount_paid) || 0).toLocaleString()}</td>
+          <td style="font-size:8px;color:#64748b">${esc(c.notes || '')}</td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+      html += `<div class="totals">BILLED: $${totalBilled.toLocaleString()} &nbsp;&nbsp; PAID: $${totalPaid.toLocaleString()} &nbsp;&nbsp; OUTSTANDING: $${(totalBilled - totalPaid).toLocaleString()}</div>`;
+      html += `</div>`;
+    }
 
-    // Totals row
-    html += `<tr class="totals-row">
-      <td></td>
-      <td>TOTALS</td>
-      <td></td>
-      <td style="text-align:center">${totalVisits}</td>
-      <td></td>
-      <td style="text-align:center">${totalE1 + totalE2}</td>
-      <td></td>
-      <td style="text-align:center">${totalClaims}</td>
-      <td style="text-align:right">$${totalBilled.toLocaleString()}</td>
-      <td style="text-align:right">$${totalPaid.toLocaleString()}</td>
-      <td style="text-align:right">$${totalOutstanding.toLocaleString()}</td>
-      <td></td>
-    </tr>`;
-
-    html += `</tbody></table>`;
-    html += `<div class="footer">ChiroTRAX Patient Report &mdash; Generated ${new Date().toLocaleString()}</div>`;
+    html += `<div class="footer">ChiroTRAX &mdash; Patient Report for ${esc(name)} &mdash; ${new Date().toLocaleString()}</div>`;
     html += `</body></html>`;
 
     const win = window.open('', '_blank');
@@ -3708,9 +3718,9 @@ async function exportByPatientPDF() {
     win.document.close();
     win.onload = () => { win.print(); };
 
-    toast('Patient report ready — use Print dialog to save as PDF', 'success');
+    toast('Patient report ready', 'success');
   } catch(e) {
-    toast('Failed to generate patient report: ' + e.message, 'error');
+    toast('Failed to generate report: ' + e.message, 'error');
   }
 }
 

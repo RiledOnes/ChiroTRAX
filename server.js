@@ -470,6 +470,9 @@ app.get('/api/intake', async (req, res) => {
   if (req.query.batch_id) {
     query = query.eq('batch_id', req.query.batch_id);
   }
+  if (req.query.service_date) {
+    query = query.eq('service_date', req.query.service_date);
+  }
 
   const { data, error } = await query;
   if (error) return dbError(res, error);

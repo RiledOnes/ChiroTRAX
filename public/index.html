@@ -536,6 +536,41 @@
     .badge-submitted { background: rgba(67,160,71,0.15); color: #2e7d32; }
     .badge-processed { background: rgba(67,160,71,0.25); color: #1b5e20; }
 
+    /* ---- DAILY INTAKE TABS ---- */
+    .intake-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .intake-tab {
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink2);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.15s;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+    }
+    .intake-tab:hover { color: var(--ink); }
+    .intake-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .intake-tab .tab-count {
+      font-size: 11px;
+      background: var(--surface2);
+      padding: 1px 7px;
+      border-radius: 10px;
+      margin-left: 6px;
+      font-weight: 500;
+    }
+    .intake-tab.active .tab-count { background: var(--accent-dim); color: var(--accent); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
     /* ---- IMAGE GRID ---- */
     .img-grid {
       display: grid;
@@ -925,15 +960,9 @@
       <div class="nav-item" data-page="diagnoses" onclick="showPage('diagnoses', this)">
         <span class="icon">🩺</span> Diagnoses
       </div>
-      <div class="nav-item" data-page="intake-images" onclick="showPage('intake-images', this)">
-        <span class="icon">📷</span> Intake Images
-      </div>
       <div class="nav-section">Billing</div>
       <div class="nav-item" data-page="claims" onclick="showPage('claims', this)">
         <span class="icon">💳</span> Claims
-      </div>
-      <div class="nav-item" data-page="bulk" onclick="showPage('bulk', this)">
-        <span class="icon">📤</span> Bulk Upload
       </div>
       <div class="nav-section">Workspace</div>
       <div class="nav-item" data-page="tasks" onclick="showPage('tasks', this)">
@@ -1020,36 +1049,174 @@
       <div class="page-header">
         <div>
           <h2>Daily Intake</h2>
-          <p>Log and manage patient visits by date</p>
+          <p>Visits, images, and bulk records for each business day</p>
         </div>
-        <button class="btn btn-primary" onclick="openVisitModal()">+ Log Visit</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-ghost btn-sm" onclick="dailyDateNav(-1)">← Prev</button>
+          <input type="date" id="intake-date" onchange="loadDailyPage()" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
+          <button class="btn btn-ghost btn-sm" onclick="dailyDateNav(1)">Next →</button>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('intake-date').value=today();loadDailyPage()">Today</button>
+          <button class="btn btn-primary" onclick="openVisitModal()">+ Log Visit</button>
+        </div>
       </div>
 
-      <div class="card">
-        <div class="toolbar">
-          <div class="date-nav">
-            <label style="color:var(--ink2);font-size:12px;font-weight:500">Date</label>
-            <input type="date" id="intake-date" onchange="loadVisits()"/>
-            <span class="visit-count" id="visit-count-label" style="display:none"></span>
+      <!-- Tabs -->
+      <div class="intake-tabs">
+        <button class="intake-tab active" onclick="switchDailyTab('visits', this)">Visits <span class="tab-count" id="tab-visits-count">0</span></button>
+        <button class="intake-tab" onclick="switchDailyTab('images', this)">Images <span class="tab-count" id="tab-images-count">0</span></button>
+        <button class="intake-tab" onclick="switchDailyTab('bulk', this)">Bulk CSV <span class="tab-count" id="tab-bulk-count">0</span></button>
+        <button class="intake-tab" onclick="switchDailyTab('workflow', this)">Workflow Pipeline</button>
+      </div>
+
+      <!-- TAB: Visits -->
+      <div class="tab-panel active" id="tab-visits">
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Patient ID</th>
+                  <th>Name</th>
+                  <th>Status</th>
+                  <th>Manipulation</th>
+                  <th>Exercises</th>
+                  <th>Notes</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="visits-tbody">
+                <tr><td colspan="7"><div class="empty-state"><div class="icon">📅</div><p>No visits for this date.</p></div></td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Patient ID</th>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Manipulation</th>
-                <th>Exercises</th>
-                <th>Notes</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="visits-tbody">
-              <tr><td colspan="7"><div class="empty-state"><div class="icon">📅</div><p>Select a date to load visits.</p></div></td></tr>
-            </tbody>
-          </table>
+      </div>
+
+      <!-- TAB: Images -->
+      <div class="tab-panel" id="tab-images">
+        <div class="upload-zone" id="img-upload-zone" onclick="document.getElementById('img-file-input').click()">
+          <div class="uz-icon">📷</div>
+          <div class="uz-title">Drop intake sheet photos here or click to browse</div>
+          <div class="uz-sub">Accepts JPG, PNG, HEIC — up to 20 images at once</div>
+          <input type="file" id="img-file-input" accept="image/*" multiple onchange="handleImageUpload(event)" style="display:none"/>
+        </div>
+        <div class="img-grid" id="img-grid">
+          <div class="empty-state" style="grid-column:1/-1;padding:40px"><div class="icon">📷</div><p>No images for this date.</p><small>Upload intake sheet photos above.</small></div>
+        </div>
+      </div>
+
+      <!-- TAB: Bulk CSV -->
+      <div class="tab-panel" id="tab-bulk">
+        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('csv-file').click()">
+          <div class="uz-icon">📄</div>
+          <div class="uz-title">Drop a CSV file here or click to browse</div>
+          <div class="uz-sub">Expected columns: intake_id, patient_code, patient_name, service_date, manipulation_type, therapeutic_exercises, diagnosis_codes, insurance_provider, amount_billed, notes</div>
+          <input type="file" id="csv-file" accept=".csv" onchange="handleCSVUpload(event)"/>
+        </div>
+        <div class="upload-result" id="upload-result">
+          <div>
+            <div class="ur-stat" id="ur-inserted" style="color:var(--accent2)">0</div>
+            <div class="ur-label">Inserted</div>
+          </div>
+          <div>
+            <div class="ur-stat" id="ur-duplicates" style="color:var(--warn)">0</div>
+            <div class="ur-label">Duplicates</div>
+          </div>
+          <div style="margin-left:auto">
+            <button class="btn btn-ghost btn-sm" onclick="hideUploadResult()">Dismiss</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Bulk Records for This Date</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th><input type="checkbox" class="row-check" id="check-all" onchange="toggleAllChecks(this)"/></th>
+                  <th>Intake ID</th>
+                  <th>Patient</th>
+                  <th>Manip</th>
+                  <th>Exercises</th>
+                  <th>Dx Codes</th>
+                  <th>Billed</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="intake-tbody">
+                <tr><td colspan="9"><div class="empty-state"><div class="icon">📤</div><p>No bulk records for this date.</p><small>Upload a CSV above.</small></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Workflow Pipeline (all dates) -->
+      <div class="tab-panel" id="tab-workflow">
+        <div class="workflow-pipeline" id="wf-pipeline">
+          <div class="wf-stage active" data-stage="" onclick="filterByStage('', this)">
+            <div class="wf-count" id="wf-all">—</div>
+            <div class="wf-label">All</div>
+          </div>
+          <div class="wf-stage" data-stage="intake" onclick="filterByStage('intake', this)">
+            <div class="wf-count" id="wf-intake">—</div>
+            <div class="wf-label">Intake</div>
+          </div>
+          <div class="wf-arrow">→</div>
+          <div class="wf-stage" data-stage="entered_ebs" onclick="filterByStage('entered_ebs', this)">
+            <div class="wf-count" id="wf-entered_ebs">—</div>
+            <div class="wf-label">Entered EBS</div>
+          </div>
+          <div class="wf-arrow">→</div>
+          <div class="wf-stage" data-stage="claim_created" onclick="filterByStage('claim_created', this)">
+            <div class="wf-count" id="wf-claim_created">—</div>
+            <div class="wf-label">Claim Created</div>
+          </div>
+          <div class="wf-arrow">→</div>
+          <div class="wf-stage" data-stage="submitted" onclick="filterByStage('submitted', this)">
+            <div class="wf-count" id="wf-submitted">—</div>
+            <div class="wf-label">Submitted</div>
+          </div>
+          <div class="wf-arrow">→</div>
+          <div class="wf-stage" data-stage="processed" onclick="filterByStage('processed', this)">
+            <div class="wf-count" id="wf-processed">—</div>
+            <div class="wf-label">Processed</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="batch-bar" id="batch-bar">
+            <span class="bb-count" id="bb-count">0 selected</span>
+            <div class="bb-actions">
+              <button class="btn btn-secondary btn-sm" onclick="batchAdvance('entered_ebs')">→ Entered EBS</button>
+              <button class="btn btn-secondary btn-sm" onclick="batchAdvance('claim_created')">→ Claim Created</button>
+              <button class="btn btn-secondary btn-sm" onclick="batchAdvance('submitted')">→ Submitted</button>
+              <button class="btn btn-primary btn-sm" onclick="batchAdvance('processed')">→ Processed</button>
+              <button class="btn btn-ghost btn-sm" onclick="clearSelection()">Clear</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th><input type="checkbox" class="row-check" id="check-all-wf" onchange="toggleAllChecks(this)"/></th>
+                  <th>Intake ID</th>
+                  <th>Patient</th>
+                  <th>Service Date</th>
+                  <th>Manip</th>
+                  <th>Exercises</th>
+                  <th>Dx Codes</th>
+                  <th>Billed</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="wf-intake-tbody">
+                <tr><td colspan="10"><div class="empty-state"><div class="icon">📤</div><p>No intake records yet.</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
@@ -1178,147 +1345,7 @@
       </div>
     </section>
 
-    <!-- ══════════════════════════════════ -->
-    <!-- BULK UPLOAD + WORKFLOW             -->
-    <!-- ══════════════════════════════════ -->
-    <section class="page" id="page-bulk">
-      <div class="page-header">
-        <div>
-          <h2>Bulk Upload & Workflow</h2>
-          <p>Import intake records and track them through the billing pipeline</p>
-        </div>
-      </div>
-
-      <!-- Workflow Pipeline -->
-      <div class="workflow-pipeline" id="wf-pipeline">
-        <div class="wf-stage active" data-stage="" onclick="filterByStage('', this)">
-          <div class="wf-count" id="wf-all">—</div>
-          <div class="wf-label">All</div>
-        </div>
-        <div class="wf-stage" data-stage="intake" onclick="filterByStage('intake', this)">
-          <div class="wf-count" id="wf-intake">—</div>
-          <div class="wf-label">Intake</div>
-        </div>
-        <div class="wf-arrow">→</div>
-        <div class="wf-stage" data-stage="entered_ebs" onclick="filterByStage('entered_ebs', this)">
-          <div class="wf-count" id="wf-entered_ebs">—</div>
-          <div class="wf-label">Entered EBS</div>
-        </div>
-        <div class="wf-arrow">→</div>
-        <div class="wf-stage" data-stage="claim_created" onclick="filterByStage('claim_created', this)">
-          <div class="wf-count" id="wf-claim_created">—</div>
-          <div class="wf-label">Claim Created</div>
-        </div>
-        <div class="wf-arrow">→</div>
-        <div class="wf-stage" data-stage="submitted" onclick="filterByStage('submitted', this)">
-          <div class="wf-count" id="wf-submitted">—</div>
-          <div class="wf-label">Submitted</div>
-        </div>
-        <div class="wf-arrow">→</div>
-        <div class="wf-stage" data-stage="processed" onclick="filterByStage('processed', this)">
-          <div class="wf-count" id="wf-processed">—</div>
-          <div class="wf-label">Processed</div>
-        </div>
-      </div>
-
-      <!-- Upload Zone -->
-      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('csv-file').click()">
-        <div class="uz-icon">📄</div>
-        <div class="uz-title">Drop a CSV file here or click to browse</div>
-        <div class="uz-sub">Expected columns: intake_id, patient_code, patient_name, service_date, manipulation_type, therapeutic_exercises, diagnosis_codes, insurance_provider, amount_billed, notes</div>
-        <input type="file" id="csv-file" accept=".csv" onchange="handleCSVUpload(event)"/>
-      </div>
-
-      <!-- Upload Result Banner -->
-      <div class="upload-result" id="upload-result">
-        <div>
-          <div class="ur-stat" id="ur-inserted" style="color:var(--accent2)">0</div>
-          <div class="ur-label">Inserted</div>
-        </div>
-        <div>
-          <div class="ur-stat" id="ur-duplicates" style="color:var(--warn)">0</div>
-          <div class="ur-label">Duplicates</div>
-        </div>
-        <div style="margin-left:auto">
-          <button class="btn btn-ghost btn-sm" onclick="hideUploadResult()">Dismiss</button>
-        </div>
-      </div>
-
-      <!-- Intake Records Table -->
-      <div class="card">
-        <div class="batch-bar" id="batch-bar">
-          <span class="bb-count" id="bb-count">0 selected</span>
-          <div class="bb-actions">
-            <button class="btn btn-secondary btn-sm" onclick="batchAdvance('entered_ebs')">→ Entered EBS</button>
-            <button class="btn btn-secondary btn-sm" onclick="batchAdvance('claim_created')">→ Claim Created</button>
-            <button class="btn btn-secondary btn-sm" onclick="batchAdvance('submitted')">→ Submitted</button>
-            <button class="btn btn-primary btn-sm" onclick="batchAdvance('processed')">→ Processed</button>
-            <button class="btn btn-ghost btn-sm" onclick="clearSelection()">Clear</button>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th><input type="checkbox" class="row-check" id="check-all" onchange="toggleAllChecks(this)"/></th>
-                <th>Intake ID</th>
-                <th>Patient</th>
-                <th>Service Date</th>
-                <th>Manip</th>
-                <th>Exercises</th>
-                <th>Dx Codes</th>
-                <th>Billed</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="intake-tbody">
-              <tr><td colspan="10"><div class="empty-state"><div class="icon">📤</div><p>No intake records yet.</p><small>Upload a CSV to get started.</small></div></td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- ══════════════════════════════════ -->
-    <!-- INTAKE IMAGES                      -->
-    <!-- ══════════════════════════════════ -->
-    <section class="page" id="page-intake-images">
-      <div class="page-header">
-        <div>
-          <h2>Intake Images</h2>
-          <p>Upload photos of handwritten intake sheets by business day</p>
-        </div>
-      </div>
-
-      <div class="card" style="margin-bottom:20px">
-        <div class="card-head">
-          <div style="display:flex;align-items:center;gap:12px">
-            <label style="font-size:13px;color:var(--ink2)">Business Date:</label>
-            <input type="date" id="img-date" onchange="loadIntakeImages()" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
-            <span class="badge badge-active" id="img-count-badge" style="display:none">0 images</span>
-          </div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-ghost btn-sm" onclick="imgDateNav(-1)">← Prev Day</button>
-            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('img-date').value=today();loadIntakeImages()">Today</button>
-            <button class="btn btn-ghost btn-sm" onclick="imgDateNav(1)">Next Day →</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Upload Zone -->
-      <div class="upload-zone" id="img-upload-zone" onclick="document.getElementById('img-file-input').click()">
-        <div class="uz-icon">📷</div>
-        <div class="uz-title">Drop intake sheet photos here or click to browse</div>
-        <div class="uz-sub">Accepts JPG, PNG, HEIC — up to 20 images at once</div>
-        <input type="file" id="img-file-input" accept="image/*" multiple onchange="handleImageUpload(event)" style="display:none"/>
-      </div>
-
-      <!-- Image Grid -->
-      <div class="img-grid" id="img-grid">
-        <div class="empty-state" style="grid-column:1/-1;padding:40px"><div class="icon">📷</div><p>No images for this date.</p><small>Select a date and upload intake sheet photos.</small></div>
-      </div>
-    </section>
+    <!-- Bulk Upload + Intake Images now merged into Daily Intake above -->
 
     <!-- ══════════════════════════════════ -->
     <!-- TASKS                               -->
@@ -2059,12 +2086,10 @@ function showPage(page, el) {
   if (el) el.classList.add('active');
 
   if (page === 'dashboard') loadDashboard();
-  if (page === 'daily') { setTodayDate(); loadVisits(); }
+  if (page === 'daily') { setTodayDate(); loadDailyPage(); }
   if (page === 'patients') loadPatients();
   if (page === 'diagnoses') loadDiagnoses();
   if (page === 'claims') loadClaims();
-  if (page === 'bulk') loadBulkPage();
-  if (page === 'intake-images') { initImageDate(); loadIntakeImages(); }
   if (page === 'tasks') loadTasks();
   if (page === 'reports') initReports();
 }
@@ -2183,6 +2208,117 @@ function setTodayDate() {
   if (!d.value) d.value = today();
 }
 
+function dailyDateNav(offset) {
+  const d = document.getElementById('intake-date');
+  const dt = new Date(d.value);
+  dt.setDate(dt.getDate() + offset);
+  d.value = dt.toISOString().split('T')[0];
+  loadDailyPage();
+}
+
+function switchDailyTab(tab, el) {
+  document.querySelectorAll('.intake-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+  // Load tab-specific data
+  if (tab === 'images') loadIntakeImages();
+  if (tab === 'bulk') loadIntakeRecordsForDate();
+  if (tab === 'workflow') loadWorkflowTab();
+}
+
+async function loadDailyPage() {
+  const date = document.getElementById('intake-date').value;
+  if (!date) return;
+  // Load visits (always)
+  loadVisits();
+  // Update image and bulk counts for tab badges
+  loadDailyTabCounts(date);
+  // If images tab is active, reload
+  if (document.getElementById('tab-images').classList.contains('active')) loadIntakeImages();
+  if (document.getElementById('tab-bulk').classList.contains('active')) loadIntakeRecordsForDate();
+  if (document.getElementById('tab-workflow').classList.contains('active')) loadWorkflowTab();
+}
+
+async function loadDailyTabCounts(date) {
+  try {
+    const [images, intakeRecs] = await Promise.all([
+      api('GET', `/api/intake-images?date=${date}`),
+      api('GET', `/api/intake?service_date=${date}`)
+    ]);
+    document.getElementById('tab-images-count').textContent = images.length;
+    document.getElementById('tab-bulk-count').textContent = intakeRecs.length;
+  } catch(e) { /* ignore */ }
+}
+
+async function loadIntakeRecordsForDate() {
+  const date = document.getElementById('intake-date').value;
+  if (!date) return;
+  try {
+    const records = await api('GET', `/api/intake?service_date=${date}`);
+    const tbody = document.getElementById('intake-tbody');
+    if (!records.length) {
+      tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="icon">📤</div><p>No bulk records for this date.</p><small>Upload a CSV above.</small></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = records.map(r => `
+      <tr>
+        <td><input type="checkbox" class="row-check" data-id="${r.id}" ${selectedIntakeIds.has(r.id) ? 'checked' : ''} onchange="toggleCheck('${r.id}', this.checked)"/></td>
+        <td><strong>${esc(r.intake_id)}</strong></td>
+        <td>${esc(r.patient_name || r.patient_code || '—')}</td>
+        <td>${r.manipulation_type ? badge(r.manipulation_type) : '<span class="muted">—</span>'}</td>
+        <td>${r.therapeutic_exercises != null ? r.therapeutic_exercises : '<span class="muted">—</span>'}</td>
+        <td class="muted">${esc(r.diagnosis_codes || '—')}</td>
+        <td>${r.amount_billed != null ? '$' + Number(r.amount_billed).toFixed(2) : '<span class="muted">—</span>'}</td>
+        <td><span class="badge badge-${r.workflow_status}">${formatStage(r.workflow_status)}</span></td>
+        <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openIntakeModal(${JSON.stringify(r).replace(/'/g, "&#39;")})'>Edit</button></div></td>
+      </tr>
+    `).join('');
+  } catch(e) {
+    document.getElementById('intake-tbody').innerHTML =
+      '<tr><td colspan="9"><div class="empty-state"><div class="icon">📤</div><p>No bulk records for this date.</p></div></td></tr>';
+  }
+}
+
+async function loadWorkflowTab() {
+  await Promise.all([loadWorkflowCounts(), loadAllIntakeRecords()]);
+}
+
+async function loadAllIntakeRecords() {
+  try {
+    const url = currentStageFilter
+      ? `/api/intake?workflow_status=${currentStageFilter}`
+      : '/api/intake';
+    intakeRecords = await api('GET', url);
+    renderWorkflowTable();
+  } catch(e) {
+    document.getElementById('wf-intake-tbody').innerHTML =
+      '<tr><td colspan="10"><div class="empty-state"><div class="icon">📤</div><p>No intake records yet.</p></div></td></tr>';
+  }
+}
+
+function renderWorkflowTable() {
+  const tbody = document.getElementById('wf-intake-tbody');
+  if (!intakeRecords.length) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="icon">📤</div><p>No records found.</p><small>${currentStageFilter ? 'No records at this stage.' : 'Upload CSV records to get started.'}</small></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = intakeRecords.map(r => `
+    <tr>
+      <td><input type="checkbox" class="row-check" data-id="${r.id}" ${selectedIntakeIds.has(r.id) ? 'checked' : ''} onchange="toggleCheck('${r.id}', this.checked)"/></td>
+      <td><strong>${esc(r.intake_id)}</strong></td>
+      <td>${esc(r.patient_name || r.patient_code || '—')}</td>
+      <td class="muted">${r.service_date || '—'}</td>
+      <td>${r.manipulation_type ? badge(r.manipulation_type) : '<span class="muted">—</span>'}</td>
+      <td>${r.therapeutic_exercises != null ? r.therapeutic_exercises : '<span class="muted">—</span>'}</td>
+      <td class="muted">${esc(r.diagnosis_codes || '—')}</td>
+      <td>${r.amount_billed != null ? '$' + Number(r.amount_billed).toFixed(2) : '<span class="muted">—</span>'}</td>
+      <td><span class="badge badge-${r.workflow_status}">${formatStage(r.workflow_status)}</span></td>
+      <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openIntakeModal(${JSON.stringify(r).replace(/'/g, "&#39;")})'>Edit</button></div></td>
+    </tr>
+  `).join('');
+}
+
 function badge(val, type) {
   if (!val) return '<span class="muted">—</span>';
   const classMap = {
@@ -2265,9 +2401,7 @@ async function loadVisits() {
   if (!date) return;
   try {
     const visits = await api('GET', `/api/visits?date=${date}`);
-    const lbl = document.getElementById('visit-count-label');
-    lbl.textContent = `${visits.length} visit${visits.length !== 1 ? 's' : ''}`;
-    lbl.style.display = 'inline-flex';
+    document.getElementById('tab-visits-count').textContent = visits.length;
     renderVisitRows('visits-tbody', visits, false);
   } catch(e) { toast('Failed to load visits: ' + e.message, 'error'); }
 }
@@ -2534,10 +2668,6 @@ let intakeRecords = [];
 let selectedIntakeIds = new Set();
 let currentStageFilter = '';
 
-async function loadBulkPage() {
-  await Promise.all([loadWorkflowCounts(), loadIntakeRecords()]);
-}
-
 async function loadWorkflowCounts() {
   try {
     const counts = await api('GET', '/api/intake/workflow-counts');
@@ -2549,41 +2679,6 @@ async function loadWorkflowCounts() {
     document.getElementById('wf-submitted').textContent = counts.submitted || 0;
     document.getElementById('wf-processed').textContent = counts.processed || 0;
   } catch(e) { /* counts may fail if table doesn't exist yet */ }
-}
-
-async function loadIntakeRecords() {
-  try {
-    const url = currentStageFilter
-      ? `/api/intake?workflow_status=${currentStageFilter}`
-      : '/api/intake';
-    intakeRecords = await api('GET', url);
-    renderIntakeTable();
-  } catch(e) {
-    document.getElementById('intake-tbody').innerHTML =
-      `<tr><td colspan="10"><div class="empty-state"><div class="icon">📤</div><p>No intake records yet.</p><small>Upload a CSV to get started.</small></div></td></tr>`;
-  }
-}
-
-function renderIntakeTable() {
-  const tbody = document.getElementById('intake-tbody');
-  if (!intakeRecords.length) {
-    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="icon">📤</div><p>No records found.</p><small>${currentStageFilter ? 'No records at this stage.' : 'Upload a CSV to get started.'}</small></div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = intakeRecords.map(r => `
-    <tr>
-      <td><input type="checkbox" class="row-check" data-id="${r.id}" ${selectedIntakeIds.has(r.id) ? 'checked' : ''} onchange="toggleCheck('${r.id}', this.checked)"/></td>
-      <td><strong>${esc(r.intake_id)}</strong></td>
-      <td>${esc(r.patient_name || r.patient_code || '—')}</td>
-      <td class="muted">${r.service_date || '—'}</td>
-      <td>${r.manipulation_type ? badge(r.manipulation_type) : '<span class="muted">—</span>'}</td>
-      <td>${r.therapeutic_exercises != null ? r.therapeutic_exercises : '<span class="muted">—</span>'}</td>
-      <td class="muted">${esc(r.diagnosis_codes || '—')}</td>
-      <td>${r.amount_billed != null ? '$' + Number(r.amount_billed).toFixed(2) : '<span class="muted">—</span>'}</td>
-      <td><span class="badge badge-${r.workflow_status}">${formatStage(r.workflow_status)}</span></td>
-      <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openIntakeModal(${JSON.stringify(r).replace(/'/g, "&#39;")})'>Edit</button></div></td>
-    </tr>
-  `).join('');
 }
 
 function esc(str) {
@@ -2603,7 +2698,7 @@ function filterByStage(stage, el) {
   document.querySelectorAll('.wf-stage').forEach(s => s.classList.remove('active'));
   if (el) el.classList.add('active');
   clearSelection();
-  loadIntakeRecords();
+  loadAllIntakeRecords();
 }
 
 // ---- CSV Upload ----
@@ -2645,7 +2740,7 @@ function processCSVFile(file) {
       document.getElementById('upload-result').classList.add('show');
 
       toast(`Imported ${result.inserted} records` + (result.duplicates ? `, ${result.duplicates} duplicates skipped` : ''), 'success');
-      await loadBulkPage();
+      await loadWorkflowTab();
     } catch(err) {
       toast('Upload failed: ' + err.message, 'error');
     }
@@ -2748,7 +2843,7 @@ async function batchAdvance(newStatus) {
     const result = await api('PUT', '/api/intake/batch-advance', { ids, new_status: newStatus });
     toast(`${result.updated} records moved to "${formatStage(newStatus)}"`, 'success');
     clearSelection();
-    await loadBulkPage();
+    await loadWorkflowTab();
   } catch(e) { toast('Batch update failed: ' + e.message, 'error'); }
 }
 
@@ -2788,7 +2883,7 @@ async function saveIntakeRecord() {
     await api('PUT', `/api/intake/${id}`, body);
     toast('Record updated!', 'success');
     closeModal('intake-modal');
-    await loadBulkPage();
+    await loadWorkflowTab();
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
@@ -2970,28 +3065,13 @@ async function deleteTask() {
 // ════════════════════════════════════
 // INTAKE IMAGES
 // ════════════════════════════════════
-function initImageDate() {
-  const d = document.getElementById('img-date');
-  if (!d.value) d.value = today();
-}
-
-function imgDateNav(offset) {
-  const d = document.getElementById('img-date');
-  const dt = new Date(d.value);
-  dt.setDate(dt.getDate() + offset);
-  d.value = dt.toISOString().split('T')[0];
-  loadIntakeImages();
-}
-
 async function loadIntakeImages() {
-  const date = document.getElementById('img-date').value;
+  const date = document.getElementById('intake-date').value;
   if (!date) return;
   try {
     const images = await api('GET', `/api/intake-images?date=${date}`);
     const grid = document.getElementById('img-grid');
-    const badge = document.getElementById('img-count-badge');
-    badge.textContent = `${images.length} image${images.length !== 1 ? 's' : ''}`;
-    badge.style.display = images.length ? 'inline-flex' : 'none';
+    document.getElementById('tab-images-count').textContent = images.length;
 
     if (!images.length) {
       grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;padding:40px"><div class="icon">📷</div><p>No images for this date.</p><small>Upload intake sheet photos above.</small></div>';
@@ -3058,7 +3138,7 @@ async function handleImageUpload(event) {
   if (!files.length) return;
   event.target.value = '';
 
-  const date = document.getElementById('img-date').value;
+  const date = document.getElementById('intake-date').value;
   if (!date) { toast('Please select a business date first', 'error'); return; }
 
   if (files.length > 20) { toast('Maximum 20 images per upload', 'error'); return; }

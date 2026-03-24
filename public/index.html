@@ -1057,6 +1057,7 @@
           <button class="btn btn-ghost btn-sm" onclick="dailyDateNav(1)">Next →</button>
           <button class="btn btn-ghost btn-sm" onclick="document.getElementById('intake-date').value=today();loadDailyPage()">Today</button>
           <button class="btn btn-primary" onclick="openVisitModal()">+ Log Visit</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportDailyPDF()">PDF Report</button>
         </div>
       </div>
 
@@ -1094,12 +1095,21 @@
 
       <!-- TAB: Images -->
       <div class="tab-panel" id="tab-images">
-        <div class="upload-zone" id="img-upload-zone" onclick="document.getElementById('img-file-input').click()">
-          <div class="uz-icon">📷</div>
-          <div class="uz-title">Drop intake sheet photos here or click to browse</div>
-          <div class="uz-sub">Accepts JPG, PNG, HEIC — up to 20 images at once</div>
-          <input type="file" id="img-file-input" accept="image/*" multiple onchange="handleImageUpload(event)" style="display:none"/>
+        <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+          <div class="upload-zone" id="img-upload-zone" onclick="document.getElementById('img-file-input').click()" style="flex:1;min-width:250px">
+            <div class="uz-icon">📷</div>
+            <div class="uz-title">Intake Sheet Photos</div>
+            <div class="uz-sub">Drop/paste images or click to browse (JPG, PNG, HEIC)</div>
+            <input type="file" id="img-file-input" accept="image/*,.heic,.heif" multiple onchange="handleImageUpload(event)" style="display:none"/>
+          </div>
+          <div class="upload-zone" id="eod-upload-zone" onclick="document.getElementById('eod-file-input').click()" style="flex:1;min-width:250px">
+            <div class="uz-icon">📸</div>
+            <div class="uz-title">End-of-Day Capture</div>
+            <div class="uz-sub">Upload a screenshot of your end-of-day screen</div>
+            <input type="file" id="eod-file-input" accept="image/*,.heic,.heif" multiple onchange="handleEodUpload(event)" style="display:none"/>
+          </div>
         </div>
+        <p style="font-size:12px;color:var(--ink2);margin-bottom:12px">Tip: You can also paste images from your clipboard (Ctrl+V / Cmd+V) while on this tab.</p>
         <div class="img-grid" id="img-grid">
           <div class="empty-state" style="grid-column:1/-1;padding:40px"><div class="icon">📷</div><p>No images for this date.</p><small>Upload intake sheet photos above.</small></div>
         </div>
@@ -2244,39 +2254,44 @@ async function loadDailyTabCounts(date) {
   try {
     const [images, intakeRecs] = await Promise.all([
       api('GET', `/api/intake-images?date=${date}`),
-      api('GET', `/api/intake?service_date=${date}`)
+      api('GET', `/api/visits?date=${date}`)
     ]);
     document.getElementById('tab-images-count').textContent = images.length;
     document.getElementById('tab-bulk-count').textContent = intakeRecs.length;
   } catch(e) { /* ignore */ }
 }
 
+function visitName(r) {
+  if (r.patients) return esc((r.patients.first_name || '') + ' ' + (r.patients.last_name || '')).trim() || esc(r.patients.patient_code || '—');
+  return esc(r.patient_name || '—');
+}
+
 async function loadIntakeRecordsForDate() {
   const date = document.getElementById('intake-date').value;
   if (!date) return;
   try {
-    const records = await api('GET', `/api/intake?service_date=${date}`);
+    const records = await api('GET', `/api/visits?date=${date}`);
     const tbody = document.getElementById('intake-tbody');
     if (!records.length) {
-      tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="icon">📤</div><p>No bulk records for this date.</p><small>Upload a CSV above.</small></div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="icon">📤</div><p>No visits for this date.</p><small>Upload a CSV or log visits above.</small></div></td></tr>';
       return;
     }
     tbody.innerHTML = records.map(r => `
       <tr>
         <td><input type="checkbox" class="row-check" data-id="${r.id}" ${selectedIntakeIds.has(r.id) ? 'checked' : ''} onchange="toggleCheck('${r.id}', this.checked)"/></td>
-        <td><strong>${esc(r.intake_id)}</strong></td>
-        <td>${esc(r.patient_name || r.patient_code || '—')}</td>
+        <td><strong>${esc(r.intake_id || '—')}</strong></td>
+        <td>${visitName(r)}</td>
         <td>${r.manipulation_type ? badge(r.manipulation_type) : '<span class="muted">—</span>'}</td>
         <td>${r.therapeutic_exercises != null ? r.therapeutic_exercises : '<span class="muted">—</span>'}</td>
         <td class="muted">${esc(r.diagnosis_codes || '—')}</td>
         <td>${r.amount_billed != null ? '$' + Number(r.amount_billed).toFixed(2) : '<span class="muted">—</span>'}</td>
-        <td><span class="badge badge-${r.workflow_status}">${formatStage(r.workflow_status)}</span></td>
+        <td><span class="badge badge-${r.workflow_status || 'intake'}">${formatStage(r.workflow_status || 'intake')}</span></td>
         <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openIntakeModal(${JSON.stringify(r).replace(/'/g, "&#39;")})'>Edit</button></div></td>
       </tr>
     `).join('');
   } catch(e) {
     document.getElementById('intake-tbody').innerHTML =
-      '<tr><td colspan="9"><div class="empty-state"><div class="icon">📤</div><p>No bulk records for this date.</p></div></td></tr>';
+      '<tr><td colspan="9"><div class="empty-state"><div class="icon">📤</div><p>No visits for this date.</p></div></td></tr>';
   }
 }
 
@@ -2287,8 +2302,8 @@ async function loadWorkflowTab() {
 async function loadAllIntakeRecords() {
   try {
     const url = currentStageFilter
-      ? `/api/intake?workflow_status=${currentStageFilter}`
-      : '/api/intake';
+      ? `/api/visits?workflow_status=${currentStageFilter}`
+      : '/api/visits';
     intakeRecords = await api('GET', url);
     renderWorkflowTable();
   } catch(e) {
@@ -2306,14 +2321,14 @@ function renderWorkflowTable() {
   tbody.innerHTML = intakeRecords.map(r => `
     <tr>
       <td><input type="checkbox" class="row-check" data-id="${r.id}" ${selectedIntakeIds.has(r.id) ? 'checked' : ''} onchange="toggleCheck('${r.id}', this.checked)"/></td>
-      <td><strong>${esc(r.intake_id)}</strong></td>
-      <td>${esc(r.patient_name || r.patient_code || '—')}</td>
-      <td class="muted">${r.service_date || '—'}</td>
+      <td><strong>${esc(r.intake_id || '—')}</strong></td>
+      <td>${visitName(r)}</td>
+      <td class="muted">${r.visit_date || '—'}</td>
       <td>${r.manipulation_type ? badge(r.manipulation_type) : '<span class="muted">—</span>'}</td>
       <td>${r.therapeutic_exercises != null ? r.therapeutic_exercises : '<span class="muted">—</span>'}</td>
       <td class="muted">${esc(r.diagnosis_codes || '—')}</td>
       <td>${r.amount_billed != null ? '$' + Number(r.amount_billed).toFixed(2) : '<span class="muted">—</span>'}</td>
-      <td><span class="badge badge-${r.workflow_status}">${formatStage(r.workflow_status)}</span></td>
+      <td><span class="badge badge-${r.workflow_status || 'intake'}">${formatStage(r.workflow_status || 'intake')}</span></td>
       <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openIntakeModal(${JSON.stringify(r).replace(/'/g, "&#39;")})'>Edit</button></div></td>
     </tr>
   `).join('');
@@ -2670,7 +2685,7 @@ let currentStageFilter = '';
 
 async function loadWorkflowCounts() {
   try {
-    const counts = await api('GET', '/api/intake/workflow-counts');
+    const counts = await api('GET', '/api/visits/workflow-counts');
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
     document.getElementById('wf-all').textContent = total;
     document.getElementById('wf-intake').textContent = counts.intake || 0;
@@ -2733,14 +2748,15 @@ function processCSVFile(file) {
       const batchId = 'batch_' + Date.now();
       toast(`Uploading ${records.length} records...`);
 
-      const result = await api('POST', '/api/intake/bulk', { records, batch_id: batchId });
+      const result = await api('POST', '/api/visits/bulk', { records, batch_id: batchId });
 
       document.getElementById('ur-inserted').textContent = result.inserted || 0;
       document.getElementById('ur-duplicates').textContent = result.duplicates || 0;
       document.getElementById('upload-result').classList.add('show');
 
       toast(`Imported ${result.inserted} records` + (result.duplicates ? `, ${result.duplicates} duplicates skipped` : ''), 'success');
-      await loadWorkflowTab();
+      await loadIntakeRecordsForDate();
+      loadDailyTabCounts(document.getElementById('intake-date').value);
     } catch(err) {
       toast('Upload failed: ' + err.message, 'error');
     }
@@ -2761,12 +2777,12 @@ function parseCSV(text) {
     const row = {};
     headers.forEach((h, idx) => { row[h] = vals[idx]?.trim() || null; });
 
-    // Map to expected fields
+    // Map to expected fields — CSV uses service_date, DB uses visit_date
     const rec = {
       intake_id: row.intake_id || `auto_${Date.now()}_${i}`,
       patient_code: row.patient_code || null,
       patient_name: row.patient_name || null,
-      service_date: row.service_date || null,
+      service_date: row.service_date || row.visit_date || null,
       manipulation_type: row.manipulation_type || null,
       therapeutic_exercises: row.therapeutic_exercises ? parseInt(row.therapeutic_exercises) : null,
       diagnosis_codes: row.diagnosis_codes || null,
@@ -2840,7 +2856,7 @@ async function batchAdvance(newStatus) {
   if (selectedIntakeIds.size === 0) return;
   try {
     const ids = Array.from(selectedIntakeIds);
-    const result = await api('PUT', '/api/intake/batch-advance', { ids, new_status: newStatus });
+    const result = await api('PUT', '/api/visits/batch-advance', { ids, new_status: newStatus });
     toast(`${result.updated} records moved to "${formatStage(newStatus)}"`, 'success');
     clearSelection();
     await loadWorkflowTab();
@@ -2880,7 +2896,7 @@ async function saveIntakeRecord() {
     notes: document.getElementById('ir-notes').value.trim() || null
   };
   try {
-    await api('PUT', `/api/intake/${id}`, body);
+    await api('PUT', `/api/visits/${id}`, body);
     toast('Record updated!', 'success');
     closeModal('intake-modal');
     await loadWorkflowTab();
@@ -3134,13 +3150,15 @@ async function deleteIntakeImage(id) {
 }
 
 async function handleImageUpload(event) {
-  const files = Array.from(event.target.files);
+  const files = Array.from(event.target.files || []);
   if (!files.length) return;
-  event.target.value = '';
+  if (event.target.value !== undefined) event.target.value = '';
+  await uploadImageFiles(files);
+}
 
+async function uploadImageFiles(files) {
   const date = document.getElementById('intake-date').value;
   if (!date) { toast('Please select a business date first', 'error'); return; }
-
   if (files.length > 20) { toast('Maximum 20 images per upload', 'error'); return; }
 
   toast(`Processing ${files.length} image${files.length !== 1 ? 's' : ''}...`);
@@ -3148,22 +3166,60 @@ async function handleImageUpload(event) {
   try {
     const images = [];
     for (const file of files) {
-      const dataUrl = await readFileAsDataURL(file);
-      images.push({ file_name: file.name, image_data: dataUrl });
+      const dataUrl = await fileToPreviewableDataURL(file);
+      images.push({ file_name: file.name || 'pasted-image.png', image_data: dataUrl });
     }
 
     const result = await api('POST', '/api/intake-images', { business_date: date, images });
     toast(`${result.inserted} image${result.inserted !== 1 ? 's' : ''} uploaded!`, 'success');
     loadIntakeImages();
+    loadDailyTabCounts(date);
   } catch(e) { toast('Upload failed: ' + e.message, 'error'); }
 }
 
-function readFileAsDataURL(file) {
+// Convert any image (including HEIC) to a previewable JPEG/PNG data URL
+function fileToPreviewableDataURL(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
     reader.onerror = reject;
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      // If it's HEIC or the browser can't display it, convert via canvas
+      const isHeic = file.name?.toLowerCase().match(/\.heic$/i) || file.type === 'image/heic' || file.type === 'image/heif';
+      if (isHeic) {
+        // Try to render through an Image element — modern browsers may support it
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          canvas.getContext('2d').drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => resolve(dataUrl); // Store raw if conversion fails
+        img.src = dataUrl;
+      } else {
+        resolve(dataUrl);
+      }
+    };
     reader.readAsDataURL(file);
+  });
+}
+
+// Clipboard paste handler for images
+function setupClipboardPaste() {
+  document.addEventListener('paste', async (e) => {
+    // Only handle paste when images tab is active and daily intake page is shown
+    if (!document.getElementById('tab-images')?.classList.contains('active')) return;
+    if (!document.getElementById('page-daily')?.classList.contains('active')) return;
+
+    const items = Array.from(e.clipboardData?.items || []);
+    const imageItems = items.filter(item => item.type.startsWith('image/'));
+    if (!imageItems.length) return;
+
+    e.preventDefault();
+    const files = imageItems.map(item => item.getAsFile()).filter(Boolean);
+    if (files.length) await uploadImageFiles(files);
   });
 }
 
@@ -3184,6 +3240,133 @@ function setupImageDragDrop() {
     document.getElementById('img-file-input').files = dt.files;
     handleImageUpload({ target: { files: dt.files, value: '' } });
   });
+
+  // Also set up drag-drop for end-of-day zone
+  const eodZone = document.getElementById('eod-upload-zone');
+  if (eodZone) {
+    eodZone.addEventListener('dragover', e => { e.preventDefault(); eodZone.classList.add('dragover'); });
+    eodZone.addEventListener('dragleave', () => eodZone.classList.remove('dragover'));
+    eodZone.addEventListener('drop', e => {
+      e.preventDefault();
+      eodZone.classList.remove('dragover');
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || f.name?.match(/\.heic$/i));
+      if (files.length) uploadImageFiles(files);
+    });
+  }
+}
+
+// End-of-day capture uses same upload flow
+async function handleEodUpload(event) {
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
+  event.target.value = '';
+  await uploadImageFiles(files);
+}
+
+// ════════════════════════════════════
+// DAILY PDF EXPORT
+// ════════════════════════════════════
+async function exportDailyPDF() {
+  const date = document.getElementById('intake-date').value;
+  if (!date) { toast('Select a date first', 'error'); return; }
+
+  toast('Generating PDF...');
+
+  try {
+    // Gather data
+    const [visits, images] = await Promise.all([
+      api('GET', `/api/visits?date=${date}`),
+      api('GET', `/api/intake-images?date=${date}`)
+    ]);
+
+    // Build a printable HTML document
+    let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Daily Report - ${date}</title>
+    <style>
+      body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #1a1a2e; font-size: 12px; }
+      h1 { font-size: 18px; margin-bottom: 4px; }
+      h2 { font-size: 14px; margin-top: 20px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+      .meta { color: #666; font-size: 12px; margin-bottom: 16px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+      th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; font-size: 11px; }
+      th { background: #f5f5f5; font-weight: 600; }
+      .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+      .badge-E1 { background: #dbeafe; color: #1d4ed8; }
+      .badge-E2 { background: #fef3c7; color: #92400e; }
+      .badge-new { background: #d1fae5; color: #065f46; }
+      .badge-existing { background: #e0e7ff; color: #3730a3; }
+      .img-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+      .img-row img { max-width: 280px; max-height: 200px; border: 1px solid #ddd; border-radius: 4px; }
+      .summary { display: flex; gap: 24px; margin: 12px 0; }
+      .summary-item { text-align: center; }
+      .summary-item .num { font-size: 24px; font-weight: 700; }
+      .summary-item .label { font-size: 11px; color: #666; }
+      @media print { body { padding: 0; } }
+    </style></head><body>`;
+
+    html += `<h1>Daily Intake Report</h1>`;
+    html += `<div class="meta">${date} &mdash; Generated ${new Date().toLocaleString()}</div>`;
+
+    // Summary
+    const e1 = visits.filter(v => v.manipulation_type === 'E1').length;
+    const e2 = visits.filter(v => v.manipulation_type === 'E2').length;
+    html += `<div class="summary">
+      <div class="summary-item"><div class="num">${visits.length}</div><div class="label">Total Visits</div></div>
+      <div class="summary-item"><div class="num">${e1}</div><div class="label">E1 Manip</div></div>
+      <div class="summary-item"><div class="num">${e2}</div><div class="label">E2 Manip</div></div>
+      <div class="summary-item"><div class="num">${images.length}</div><div class="label">Images</div></div>
+    </div>`;
+
+    // Visits table
+    html += `<h2>Visits (${visits.length})</h2>`;
+    if (visits.length) {
+      html += `<table><thead><tr><th>Patient</th><th>Status</th><th>Manipulation</th><th>Exercises</th><th>Dx Codes</th><th>Billed</th><th>Workflow</th><th>Notes</th></tr></thead><tbody>`;
+      visits.forEach(v => {
+        const name = v.patients ? (v.patients.first_name + ' ' + v.patients.last_name).trim() : (v.patient_name || '—');
+        html += `<tr>
+          <td>${esc(name)}</td>
+          <td>${v.patient_status ? '<span class="badge badge-' + v.patient_status + '">' + v.patient_status + '</span>' : '—'}</td>
+          <td>${v.manipulation_type ? '<span class="badge badge-' + v.manipulation_type + '">' + v.manipulation_type + '</span>' : '—'}</td>
+          <td>${v.therapeutic_exercises ?? '—'}</td>
+          <td>${esc(v.diagnosis_codes || '—')}</td>
+          <td>${v.amount_billed != null ? '$' + Number(v.amount_billed).toFixed(2) : '—'}</td>
+          <td>${v.workflow_status ? formatStage(v.workflow_status) : '—'}</td>
+          <td>${esc(v.notes || '')}</td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+    } else {
+      html += `<p>No visits recorded for this date.</p>`;
+    }
+
+    // Images
+    if (images.length) {
+      html += `<h2>Intake Images (${images.length})</h2>`;
+      // Load full image data for each
+      html += `<div class="img-row">`;
+      for (const img of images) {
+        try {
+          const full = await api('GET', `/api/intake-images/${img.id}`);
+          html += `<img src="${full.image_data}" alt="${esc(full.file_name)}"/>`;
+        } catch(e) {
+          html += `<span>[Image: ${esc(img.file_name)}]</span>`;
+        }
+      }
+      html += `</div>`;
+    }
+
+    html += `</body></html>`;
+
+    // Open print dialog in a new window
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => { win.print(); };
+
+    toast('PDF report ready — use Print dialog to save as PDF', 'success');
+  } catch(e) {
+    toast('Failed to generate PDF: ' + e.message, 'error');
+  }
 }
 
 // ════════════════════════════════════
@@ -3312,6 +3495,7 @@ function rptBar(label, value, max, color) {
 // ════════════════════════════════════
 setupDragDrop();
 setupImageDragDrop();
+setupClipboardPaste();
 checkSession();
 </script>
 </body>

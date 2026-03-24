@@ -329,18 +329,25 @@ app.put('/api/patients/:id', async (req, res) => {
 // VISITS (Daily Intake)
 // ============================================
 
-// Get all visits (optionally filter by date)
+// Get all visits (optionally filter by date, patient, workflow_status, batch_id)
 app.get('/api/visits', async (req, res) => {
   let query = supabase
     .from('visits')
     .select('*, patients(patient_code, first_name, last_name)')
-    .order('visit_date', { ascending: false });
+    .order('visit_date', { ascending: false })
+    .order('created_at', { ascending: true });
 
   if (req.query.date) {
     query = query.eq('visit_date', req.query.date);
   }
   if (req.query.patient_id) {
     query = query.eq('patient_id', req.query.patient_id);
+  }
+  if (req.query.workflow_status) {
+    query = query.eq('workflow_status', req.query.workflow_status);
+  }
+  if (req.query.batch_id) {
+    query = query.eq('batch_id', req.query.batch_id);
   }
 
   const { data, error } = await query;
@@ -453,39 +460,16 @@ app.put('/api/claims/:id', async (req, res) => {
 });
 
 // ============================================
-// INTAKE RECORDS (Bulk Upload + Workflow)
+// VISITS — BULK UPLOAD + WORKFLOW
 // ============================================
 
-// Get all intake records (optionally filter by workflow_status or batch_id)
-app.get('/api/intake', async (req, res) => {
-  let query = supabase
-    .from('intake_records')
-    .select('*')
-    .order('service_date', { ascending: false })
-    .order('intake_id', { ascending: true });
-
-  if (req.query.workflow_status) {
-    query = query.eq('workflow_status', req.query.workflow_status);
-  }
-  if (req.query.batch_id) {
-    query = query.eq('batch_id', req.query.batch_id);
-  }
-  if (req.query.service_date) {
-    query = query.eq('service_date', req.query.service_date);
-  }
-
-  const { data, error } = await query;
-  if (error) return dbError(res, error);
-  res.json(data);
-});
-
-// Get workflow counts (how many records at each stage)
-app.get('/api/intake/workflow-counts', async (req, res) => {
+// Get workflow counts (how many visits at each stage)
+app.get('/api/visits/workflow-counts', async (req, res) => {
   const stages = ['intake', 'entered_ebs', 'claim_created', 'submitted', 'processed'];
   const counts = {};
   for (const stage of stages) {
     const { count, error } = await supabase
-      .from('intake_records')
+      .from('visits')
       .select('*', { count: 'exact', head: true })
       .eq('workflow_status', stage);
     if (error) return dbError(res, error);
@@ -494,8 +478,8 @@ app.get('/api/intake/workflow-counts', async (req, res) => {
   res.json(counts);
 });
 
-// Bulk upload intake records
-app.post('/api/intake/bulk', async (req, res) => {
+// Bulk upload visits from CSV
+app.post('/api/visits/bulk', async (req, res) => {
   const { records, batch_id } = req.body;
   if (!records || !Array.isArray(records) || records.length === 0) {
     return res.status(400).json({ error: 'No records provided' });
@@ -506,17 +490,19 @@ app.post('/api/intake/bulk', async (req, res) => {
   }
 
   // Check for existing intake_ids to prevent duplicates
-  const incomingIds = records.map(r => r.intake_id);
-  const { data: existing, error: checkErr } = await supabase
-    .from('intake_records')
-    .select('intake_id')
-    .in('intake_id', incomingIds);
+  const incomingIds = records.map(r => r.intake_id).filter(Boolean);
+  let existingIds = new Set();
+  if (incomingIds.length > 0) {
+    const { data: existing, error: checkErr } = await supabase
+      .from('visits')
+      .select('intake_id')
+      .in('intake_id', incomingIds);
+    if (checkErr) return dbError(res, checkErr);
+    existingIds = new Set((existing || []).map(e => e.intake_id));
+  }
 
-  if (checkErr) return dbError(res, checkErr);
-
-  const existingIds = new Set((existing || []).map(e => e.intake_id));
-  const newRecords = records.filter(r => !existingIds.has(r.intake_id));
-  const duplicates = records.filter(r => existingIds.has(r.intake_id));
+  const newRecords = records.filter(r => !r.intake_id || !existingIds.has(r.intake_id));
+  const duplicates = records.filter(r => r.intake_id && existingIds.has(r.intake_id));
 
   if (newRecords.length === 0) {
     return res.json({
@@ -536,14 +522,20 @@ app.post('/api/intake/bulk', async (req, res) => {
         .eq('patient_code', rec.patient_code)
         .single();
       if (pat) rec.patient_id = pat.id;
+      delete rec.patient_code; // not a visits column
+    }
+    // Map service_date → visit_date
+    if (rec.service_date) {
+      rec.visit_date = rec.service_date;
+      delete rec.service_date;
     }
     rec.batch_id = batch_id || null;
   }
 
   const { data, error } = await supabase
-    .from('intake_records')
+    .from('visits')
     .insert(newRecords)
-    .select();
+    .select('*, patients(patient_code, first_name, last_name)');
 
   if (error) return dbError(res, error);
 
@@ -555,20 +547,8 @@ app.post('/api/intake/bulk', async (req, res) => {
   });
 });
 
-// Update single intake record
-app.put('/api/intake/:id', async (req, res) => {
-  const { data, error } = await supabase
-    .from('intake_records')
-    .update(req.body)
-    .eq('id', req.params.id)
-    .select()
-    .single();
-  if (error) return dbError(res, error);
-  res.json(data);
-});
-
 // Batch advance workflow status
-app.put('/api/intake/batch-advance', async (req, res) => {
+app.put('/api/visits/batch-advance', async (req, res) => {
   const { ids, new_status } = req.body;
   if (!ids || !Array.isArray(ids) || !new_status) {
     return res.status(400).json({ error: 'ids array and new_status are required' });
@@ -578,7 +558,7 @@ app.put('/api/intake/batch-advance', async (req, res) => {
     return res.status(400).json({ error: 'Invalid workflow status' });
   }
   const { data, error } = await supabase
-    .from('intake_records')
+    .from('visits')
     .update({ workflow_status: new_status })
     .in('id', ids)
     .select();

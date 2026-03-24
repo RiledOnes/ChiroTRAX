@@ -536,6 +536,153 @@
     .badge-submitted { background: rgba(67,160,71,0.15); color: #2e7d32; }
     .badge-processed { background: rgba(67,160,71,0.25); color: #1b5e20; }
 
+    /* ---- IMAGE GRID ---- */
+    .img-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .img-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      position: relative;
+      transition: box-shadow 0.15s;
+    }
+    .img-card:hover { box-shadow: var(--shadow); }
+    .img-card img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      cursor: pointer;
+      display: block;
+    }
+    .img-card .img-info {
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--ink2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .img-card .img-info .img-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 140px;
+    }
+    .img-card .img-delete {
+      background: none;
+      border: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .img-card .img-delete:hover { background: var(--danger-dim); }
+
+    /* Image Lightbox */
+    .lightbox {
+      position: fixed; inset: 0; z-index: 2000;
+      background: rgba(0,0,0,0.85);
+      display: none; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .lightbox.open { display: flex; }
+    .lightbox img {
+      max-width: 90vw;
+      max-height: 90vh;
+      border-radius: 8px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    }
+    .lightbox-close {
+      position: absolute; top: 20px; right: 28px;
+      background: none; border: none; color: white;
+      font-size: 28px; cursor: pointer;
+    }
+
+    /* ---- REPORT BARS ---- */
+    .rpt-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .rpt-bar-label {
+      font-size: 13px;
+      width: 120px;
+      text-align: right;
+      color: var(--ink2);
+      flex-shrink: 0;
+    }
+    .rpt-bar-track {
+      flex: 1;
+      height: 24px;
+      background: var(--surface2);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .rpt-bar-fill {
+      height: 100%;
+      border-radius: 6px;
+      min-width: 2px;
+      transition: width 0.4s ease;
+      display: flex;
+      align-items: center;
+      padding-left: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: white;
+    }
+    .rpt-bar-fill.green { background: var(--accent); }
+    .rpt-bar-fill.blue { background: #4f8ef7; }
+    .rpt-bar-fill.orange { background: var(--warn); }
+    .rpt-bar-fill.red { background: var(--danger); }
+    .rpt-bar-fill.purple { background: #8e44ad; }
+    .rpt-bar-value {
+      font-size: 13px;
+      font-weight: 600;
+      width: 50px;
+      color: var(--ink);
+    }
+
+    /* Visit chart bars */
+    .visit-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 120px;
+      padding-top: 8px;
+    }
+    .visit-chart-bar {
+      flex: 1;
+      min-width: 8px;
+      max-width: 28px;
+      background: var(--accent);
+      border-radius: 3px 3px 0 0;
+      position: relative;
+      transition: height 0.3s ease;
+      cursor: default;
+    }
+    .visit-chart-bar:hover { opacity: 0.8; }
+    .visit-chart-labels {
+      display: flex;
+      gap: 3px;
+      margin-top: 6px;
+    }
+    .visit-chart-labels span {
+      flex: 1;
+      min-width: 8px;
+      max-width: 28px;
+      font-size: 9px;
+      color: var(--ink3);
+      text-align: center;
+      overflow: hidden;
+    }
+
     /* ---- LOGIN SCREEN ---- */
     .login-screen {
       position: fixed; inset: 0; z-index: 1000;
@@ -680,12 +827,19 @@
       <div class="nav-item" data-page="diagnoses" onclick="showPage('diagnoses', this)">
         <span class="icon">🩺</span> Diagnoses
       </div>
+      <div class="nav-item" data-page="intake-images" onclick="showPage('intake-images', this)">
+        <span class="icon">📷</span> Intake Images
+      </div>
       <div class="nav-section">Billing</div>
       <div class="nav-item" data-page="claims" onclick="showPage('claims', this)">
         <span class="icon">💳</span> Claims
       </div>
       <div class="nav-item" data-page="bulk" onclick="showPage('bulk', this)">
         <span class="icon">📤</span> Bulk Upload
+      </div>
+      <div class="nav-section">Analytics</div>
+      <div class="nav-item" data-page="reports" onclick="showPage('reports', this)">
+        <span class="icon">📊</span> Reports
       </div>
     </nav>
     <div class="user-bar" id="user-bar">
@@ -1025,6 +1179,153 @@
       </div>
     </section>
 
+    <!-- ══════════════════════════════════ -->
+    <!-- INTAKE IMAGES                      -->
+    <!-- ══════════════════════════════════ -->
+    <section class="page" id="page-intake-images">
+      <div class="page-header">
+        <div>
+          <h2>Intake Images</h2>
+          <p>Upload photos of handwritten intake sheets by business day</p>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-head">
+          <div style="display:flex;align-items:center;gap:12px">
+            <label style="font-size:13px;color:var(--ink2)">Business Date:</label>
+            <input type="date" id="img-date" onchange="loadIntakeImages()" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
+            <span class="badge badge-active" id="img-count-badge" style="display:none">0 images</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="imgDateNav(-1)">← Prev Day</button>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('img-date').value=today();loadIntakeImages()">Today</button>
+            <button class="btn btn-ghost btn-sm" onclick="imgDateNav(1)">Next Day →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upload Zone -->
+      <div class="upload-zone" id="img-upload-zone" onclick="document.getElementById('img-file-input').click()">
+        <div class="uz-icon">📷</div>
+        <div class="uz-title">Drop intake sheet photos here or click to browse</div>
+        <div class="uz-sub">Accepts JPG, PNG, HEIC — up to 20 images at once</div>
+        <input type="file" id="img-file-input" accept="image/*" multiple onchange="handleImageUpload(event)" style="display:none"/>
+      </div>
+
+      <!-- Image Grid -->
+      <div class="img-grid" id="img-grid">
+        <div class="empty-state" style="grid-column:1/-1;padding:40px"><div class="icon">📷</div><p>No images for this date.</p><small>Select a date and upload intake sheet photos.</small></div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════ -->
+    <!-- REPORTS                             -->
+    <!-- ══════════════════════════════════ -->
+    <section class="page" id="page-reports">
+      <div class="page-header">
+        <div>
+          <h2>Reports</h2>
+          <p>Practice analytics and performance overview</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="date" id="rpt-from" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
+          <span style="color:var(--ink3)">to</span>
+          <input type="date" id="rpt-to" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
+          <button class="btn btn-primary btn-sm" onclick="loadReports()">Run Report</button>
+        </div>
+      </div>
+
+      <!-- Quick Presets -->
+      <div style="display:flex;gap:8px;margin-bottom:20px">
+        <button class="btn btn-ghost btn-sm" onclick="setReportRange(7)">Last 7 Days</button>
+        <button class="btn btn-ghost btn-sm" onclick="setReportRange(30)">Last 30 Days</button>
+        <button class="btn btn-ghost btn-sm" onclick="setReportRange(90)">Last 90 Days</button>
+        <button class="btn btn-ghost btn-sm" onclick="setReportRangeMonth()">This Month</button>
+        <button class="btn btn-ghost btn-sm" onclick="setReportRangeYear()">This Year</button>
+      </div>
+
+      <!-- Visit Stats -->
+      <div class="stats-row" id="rpt-visit-stats">
+        <div class="stat-card accent">
+          <div class="s-label">Total Visits</div>
+          <div class="s-value" id="rpt-total-visits">—</div>
+          <div class="s-sub" id="rpt-unique-patients">— unique patients</div>
+        </div>
+        <div class="stat-card green">
+          <div class="s-label">New Patients</div>
+          <div class="s-value" id="rpt-new-patients">—</div>
+          <div class="s-sub">in this period</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-label">Avg Exercises</div>
+          <div class="s-value" id="rpt-avg-exercises">—</div>
+          <div class="s-sub">per visit</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-label">Intake Images</div>
+          <div class="s-value" id="rpt-images">—</div>
+          <div class="s-sub" id="rpt-image-days">— days covered</div>
+        </div>
+      </div>
+
+      <!-- Revenue Stats -->
+      <div class="stats-row">
+        <div class="stat-card accent">
+          <div class="s-label">Total Billed</div>
+          <div class="s-value" id="rpt-billed">—</div>
+          <div class="s-sub" id="rpt-claims-count">— claims</div>
+        </div>
+        <div class="stat-card green">
+          <div class="s-label">Total Paid</div>
+          <div class="s-value" id="rpt-paid">—</div>
+          <div class="s-sub">collected</div>
+        </div>
+        <div class="stat-card warn">
+          <div class="s-label">Outstanding</div>
+          <div class="s-value" id="rpt-outstanding">—</div>
+          <div class="s-sub">billed − paid</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-label">Collection Rate</div>
+          <div class="s-value" id="rpt-collection-rate">—</div>
+          <div class="s-sub">paid / billed</div>
+        </div>
+      </div>
+
+      <!-- Manipulation Breakdown + Claims by Status -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Manipulation Breakdown</div></div>
+          <div style="padding:16px" id="rpt-manip-breakdown">
+            <div class="empty-state"><p>Run a report to see data.</p></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Claims by Status</div></div>
+          <div style="padding:16px" id="rpt-claims-breakdown">
+            <div class="empty-state"><p>Run a report to see data.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Visits by Date Chart -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-head"><div class="card-title">Visits by Date</div></div>
+        <div style="padding:16px;overflow-x:auto" id="rpt-visits-chart">
+          <div class="empty-state"><p>Run a report to see data.</p></div>
+        </div>
+      </div>
+
+      <!-- Patient Mix -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-head"><div class="card-title">Patient Directory Summary</div></div>
+        <div style="padding:16px" id="rpt-patient-mix">
+          <div class="empty-state"><p>Run a report to see data.</p></div>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 
@@ -1313,6 +1614,12 @@
   </div>
 </div>
 
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="Intake sheet" onclick="event.stopPropagation()"/>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -1563,6 +1870,8 @@ function showPage(page, el) {
   if (page === 'diagnoses') loadDiagnoses();
   if (page === 'claims') loadClaims();
   if (page === 'bulk') loadBulkPage();
+  if (page === 'intake-images') { initImageDate(); loadIntakeImages(); }
+  if (page === 'reports') initReports();
 }
 
 // ════════════════════════════════════
@@ -2289,9 +2598,270 @@ async function saveIntakeRecord() {
 }
 
 // ════════════════════════════════════
+// INTAKE IMAGES
+// ════════════════════════════════════
+function initImageDate() {
+  const d = document.getElementById('img-date');
+  if (!d.value) d.value = today();
+}
+
+function imgDateNav(offset) {
+  const d = document.getElementById('img-date');
+  const dt = new Date(d.value);
+  dt.setDate(dt.getDate() + offset);
+  d.value = dt.toISOString().split('T')[0];
+  loadIntakeImages();
+}
+
+async function loadIntakeImages() {
+  const date = document.getElementById('img-date').value;
+  if (!date) return;
+  try {
+    const images = await api('GET', `/api/intake-images?date=${date}`);
+    const grid = document.getElementById('img-grid');
+    const badge = document.getElementById('img-count-badge');
+    badge.textContent = `${images.length} image${images.length !== 1 ? 's' : ''}`;
+    badge.style.display = images.length ? 'inline-flex' : 'none';
+
+    if (!images.length) {
+      grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;padding:40px"><div class="icon">📷</div><p>No images for this date.</p><small>Upload intake sheet photos above.</small></div>';
+      return;
+    }
+
+    grid.innerHTML = images.map(img => `
+      <div class="img-card" id="img-card-${img.id}">
+        <img src="" data-id="${img.id}" onclick="openLightbox('${img.id}')" alt="${esc(img.file_name)}" loading="lazy"/>
+        <div class="img-info">
+          <span class="img-name" title="${esc(img.file_name)}">${esc(img.file_name)}</span>
+          <button class="img-delete" onclick="deleteIntakeImage('${img.id}')" title="Delete">✕</button>
+        </div>
+      </div>
+    `).join('');
+
+    // Load thumbnails lazily
+    images.forEach(img => loadImageThumb(img.id));
+  } catch(e) { toast('Failed to load images: ' + e.message, 'error'); }
+}
+
+const imageCache = {};
+
+async function loadImageThumb(id) {
+  if (imageCache[id]) {
+    document.querySelector(`img[data-id="${id}"]`).src = imageCache[id];
+    return;
+  }
+  try {
+    const data = await api('GET', `/api/intake-images/${id}`);
+    imageCache[id] = data.image_data;
+    const el = document.querySelector(`img[data-id="${id}"]`);
+    if (el) el.src = data.image_data;
+  } catch(e) { /* ignore */ }
+}
+
+function openLightbox(id) {
+  if (!imageCache[id]) return;
+  document.getElementById('lightbox-img').src = imageCache[id];
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+async function deleteIntakeImage(id) {
+  if (!confirm('Delete this image?')) return;
+  try {
+    await fetch(`/api/intake-images/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + authToken }
+    });
+    delete imageCache[id];
+    const card = document.getElementById('img-card-' + id);
+    if (card) card.remove();
+    toast('Image deleted', 'success');
+    loadIntakeImages();
+  } catch(e) { toast('Failed to delete: ' + e.message, 'error'); }
+}
+
+async function handleImageUpload(event) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+  event.target.value = '';
+
+  const date = document.getElementById('img-date').value;
+  if (!date) { toast('Please select a business date first', 'error'); return; }
+
+  if (files.length > 20) { toast('Maximum 20 images per upload', 'error'); return; }
+
+  toast(`Processing ${files.length} image${files.length !== 1 ? 's' : ''}...`);
+
+  try {
+    const images = [];
+    for (const file of files) {
+      const dataUrl = await readFileAsDataURL(file);
+      images.push({ file_name: file.name, image_data: dataUrl });
+    }
+
+    const result = await api('POST', '/api/intake-images', { business_date: date, images });
+    toast(`${result.inserted} image${result.inserted !== 1 ? 's' : ''} uploaded!`, 'success');
+    loadIntakeImages();
+  } catch(e) { toast('Upload failed: ' + e.message, 'error'); }
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Image upload drag & drop
+function setupImageDragDrop() {
+  const zone = document.getElementById('img-upload-zone');
+  if (!zone) return;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (!files.length) { toast('Please drop image files', 'error'); return; }
+    // Simulate file input
+    const dt = new DataTransfer();
+    files.forEach(f => dt.items.add(f));
+    document.getElementById('img-file-input').files = dt.files;
+    handleImageUpload({ target: { files: dt.files, value: '' } });
+  });
+}
+
+// ════════════════════════════════════
+// REPORTS
+// ════════════════════════════════════
+function initReports() {
+  const from = document.getElementById('rpt-from');
+  const to = document.getElementById('rpt-to');
+  if (!from.value) {
+    setReportRange(30);
+  } else {
+    loadReports();
+  }
+}
+
+function setReportRange(days) {
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - days);
+  document.getElementById('rpt-from').value = from.toISOString().split('T')[0];
+  document.getElementById('rpt-to').value = to.toISOString().split('T')[0];
+  loadReports();
+}
+
+function setReportRangeMonth() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  document.getElementById('rpt-from').value = from.toISOString().split('T')[0];
+  document.getElementById('rpt-to').value = now.toISOString().split('T')[0];
+  loadReports();
+}
+
+function setReportRangeYear() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), 0, 1);
+  document.getElementById('rpt-from').value = from.toISOString().split('T')[0];
+  document.getElementById('rpt-to').value = now.toISOString().split('T')[0];
+  loadReports();
+}
+
+async function loadReports() {
+  const from = document.getElementById('rpt-from').value;
+  const to = document.getElementById('rpt-to').value;
+  if (!from || !to) return;
+
+  try {
+    const rpt = await api('GET', `/api/reports/summary?from=${from}&to=${to}`);
+    renderReports(rpt);
+  } catch(e) { toast('Report failed: ' + e.message, 'error'); }
+}
+
+function renderReports(r) {
+  // Visit stats
+  document.getElementById('rpt-total-visits').textContent = r.visits.total;
+  document.getElementById('rpt-unique-patients').textContent = `${r.visits.uniquePatients} unique patients`;
+  document.getElementById('rpt-new-patients').textContent = r.patients.newInPeriod;
+  document.getElementById('rpt-avg-exercises').textContent = r.visits.avgExercises;
+  document.getElementById('rpt-images').textContent = r.images.total;
+  document.getElementById('rpt-image-days').textContent = `${r.images.daysWithImages} days covered`;
+
+  // Revenue stats
+  document.getElementById('rpt-billed').textContent = '$' + r.claims.totalBilled.toFixed(2);
+  document.getElementById('rpt-paid').textContent = '$' + r.claims.totalPaid.toFixed(2);
+  document.getElementById('rpt-outstanding').textContent = '$' + r.claims.outstanding.toFixed(2);
+  document.getElementById('rpt-claims-count').textContent = `${r.claims.total} claims`;
+  const collRate = r.claims.totalBilled > 0 ? ((r.claims.totalPaid / r.claims.totalBilled) * 100).toFixed(1) : '0.0';
+  document.getElementById('rpt-collection-rate').textContent = collRate + '%';
+
+  // Manipulation breakdown
+  const maxManip = Math.max(r.visits.e1, r.visits.e2, 1);
+  document.getElementById('rpt-manip-breakdown').innerHTML = `
+    ${rptBar('E1 — Spinal', r.visits.e1, maxManip, 'green')}
+    ${rptBar('E2 — Complex', r.visits.e2, maxManip, 'blue')}
+    <div style="margin-top:8px;font-size:12px;color:var(--ink3)">No manipulation: ${r.visits.total - r.visits.e1 - r.visits.e2} visits</div>
+  `;
+
+  // Claims by status
+  const statuses = ['pending', 'submitted', 'approved', 'paid', 'denied'];
+  const statusColors = { pending: 'orange', submitted: 'blue', approved: 'green', paid: 'green', denied: 'red' };
+  const maxClaim = Math.max(...statuses.map(s => r.claims.byStatus[s] || 0), 1);
+  document.getElementById('rpt-claims-breakdown').innerHTML = statuses.length ?
+    statuses.map(s => rptBar(s.charAt(0).toUpperCase() + s.slice(1), r.claims.byStatus[s] || 0, maxClaim, statusColors[s] || 'blue')).join('') +
+    (r.claims.total === 0 ? '<div style="text-align:center;color:var(--ink3);font-size:13px;margin-top:12px">No claims in this period</div>' : '') :
+    '<div class="empty-state"><p>No claims data.</p></div>';
+
+  // Visits by date chart
+  const dates = Object.keys(r.visits.byDate).sort();
+  if (dates.length > 0) {
+    const maxV = Math.max(...dates.map(d => r.visits.byDate[d]));
+    document.getElementById('rpt-visits-chart').innerHTML = `
+      <div class="visit-chart">${dates.map(d => {
+        const pct = (r.visits.byDate[d] / maxV) * 100;
+        return `<div class="visit-chart-bar" style="height:${Math.max(pct, 4)}%" title="${d}: ${r.visits.byDate[d]} visits"></div>`;
+      }).join('')}</div>
+      <div class="visit-chart-labels">${dates.map(d => `<span title="${d}">${d.slice(5)}</span>`).join('')}</div>
+      <div style="margin-top:8px;font-size:12px;color:var(--ink3)">${dates.length} days with visits</div>
+    `;
+  } else {
+    document.getElementById('rpt-visits-chart').innerHTML = '<div class="empty-state"><p>No visits in this period.</p></div>';
+  }
+
+  // Patient mix
+  document.getElementById('rpt-patient-mix').innerHTML = `
+    <div style="display:flex;gap:32px;flex-wrap:wrap">
+      <div><span style="font-size:24px;font-weight:700;color:var(--ink)">${r.patients.total}</span><br><span style="font-size:12px;color:var(--ink3)">Total Patients</span></div>
+      <div><span style="font-size:24px;font-weight:700;color:var(--accent)">${r.patients.insurance}</span><br><span style="font-size:12px;color:var(--ink3)">Insurance</span></div>
+      <div><span style="font-size:24px;font-weight:700;color:var(--accent2)">${r.patients.cash}</span><br><span style="font-size:12px;color:var(--ink3)">Cash</span></div>
+      <div><span style="font-size:24px;font-weight:700;color:var(--ink3)">${r.patients.total - r.patients.insurance - r.patients.cash}</span><br><span style="font-size:12px;color:var(--ink3)">Unset</span></div>
+    </div>
+  `;
+}
+
+function rptBar(label, value, max, color) {
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  return `
+    <div class="rpt-bar-row">
+      <div class="rpt-bar-label">${label}</div>
+      <div class="rpt-bar-track"><div class="rpt-bar-fill ${color}" style="width:${Math.max(pct, value > 0 ? 3 : 0)}%">${value > 0 && pct > 15 ? value : ''}</div></div>
+      <div class="rpt-bar-value">${value}</div>
+    </div>
+  `;
+}
+
+// ════════════════════════════════════
 // INIT
 // ════════════════════════════════════
 setupDragDrop();
+setupImageDragDrop();
 checkSession();
 </script>
 </body>

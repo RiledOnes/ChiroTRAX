@@ -683,6 +683,104 @@
       overflow: hidden;
     }
 
+    /* ---- TASKS ---- */
+    .task-board {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+    .task-column {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      min-height: 200px;
+    }
+    .task-col-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .task-col-header .col-count {
+      font-size: 11px;
+      font-weight: 500;
+      background: var(--surface2);
+      padding: 2px 8px;
+      border-radius: 10px;
+      color: var(--ink2);
+    }
+    .task-col-body {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .task-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: box-shadow 0.15s, border-color 0.15s;
+    }
+    .task-card:hover { border-color: var(--accent); box-shadow: var(--shadow); }
+    .task-card .task-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink);
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+    .task-card .task-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 11px;
+      color: var(--ink3);
+    }
+    .task-card .task-desc {
+      font-size: 12px;
+      color: var(--ink2);
+      margin-bottom: 8px;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .badge-low { background: var(--surface3); color: var(--ink3); }
+    .badge-normal { background: rgba(46,125,50,0.10); color: var(--accent); }
+    .badge-high { background: rgba(230,126,34,0.12); color: #c76b10; }
+    .badge-urgent { background: rgba(192,57,43,0.12); color: var(--danger); }
+    .badge-todo { background: var(--surface3); color: var(--ink2); }
+    .badge-in_progress { background: rgba(46,125,50,0.10); color: var(--accent); }
+    .badge-done { background: rgba(67,160,71,0.15); color: #1b5e20; }
+    .task-col-todo .task-col-header { border-top: 3px solid var(--ink3); border-radius: var(--radius) var(--radius) 0 0; }
+    .task-col-in_progress .task-col-header { border-top: 3px solid var(--accent); border-radius: var(--radius) var(--radius) 0 0; }
+    .task-col-done .task-col-header { border-top: 3px solid var(--accent2); border-radius: var(--radius) var(--radius) 0 0; }
+    .task-quick-actions {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+    }
+    .task-quick-actions button {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink2);
+      cursor: pointer;
+    }
+    .task-quick-actions button:hover { background: var(--surface2); color: var(--ink); }
+    .task-quick-actions .btn-move-done { color: var(--accent); border-color: var(--accent); }
+    .task-quick-actions .btn-move-done:hover { background: var(--accent-dim); }
+    .task-overdue { color: var(--danger) !important; font-weight: 500; }
+
     /* ---- LOGIN SCREEN ---- */
     .login-screen {
       position: fixed; inset: 0; z-index: 1000;
@@ -837,7 +935,10 @@
       <div class="nav-item" data-page="bulk" onclick="showPage('bulk', this)">
         <span class="icon">📤</span> Bulk Upload
       </div>
-      <div class="nav-section">Analytics</div>
+      <div class="nav-section">Workspace</div>
+      <div class="nav-item" data-page="tasks" onclick="showPage('tasks', this)">
+        <span class="icon">✅</span> Tasks
+      </div>
       <div class="nav-item" data-page="reports" onclick="showPage('reports', this)">
         <span class="icon">📊</span> Reports
       </div>
@@ -1216,6 +1317,44 @@
       <!-- Image Grid -->
       <div class="img-grid" id="img-grid">
         <div class="empty-state" style="grid-column:1/-1;padding:40px"><div class="icon">📷</div><p>No images for this date.</p><small>Select a date and upload intake sheet photos.</small></div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════ -->
+    <!-- TASKS                               -->
+    <!-- ══════════════════════════════════ -->
+    <section class="page" id="page-tasks">
+      <div class="page-header">
+        <div>
+          <h2>Tasks</h2>
+          <p>Track work assigned by Dina and others</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="task-filter-priority" onchange="loadTasks()" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
+            <option value="">All Priorities</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="normal">Normal</option>
+            <option value="low">Low</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" id="task-toggle-done" onclick="toggleShowDone()">Show Done</button>
+          <button class="btn btn-primary" onclick="openTaskModal()">+ New Task</button>
+        </div>
+      </div>
+
+      <div class="task-board" id="task-board">
+        <div class="task-column task-col-todo">
+          <div class="task-col-header">To Do <span class="col-count" id="task-count-todo">0</span></div>
+          <div class="task-col-body" id="task-body-todo"></div>
+        </div>
+        <div class="task-column task-col-in_progress">
+          <div class="task-col-header">In Progress <span class="col-count" id="task-count-in_progress">0</span></div>
+          <div class="task-col-body" id="task-body-in_progress"></div>
+        </div>
+        <div class="task-column task-col-done">
+          <div class="task-col-header">Done <span class="col-count" id="task-count-done">0</span></div>
+          <div class="task-col-body" id="task-body-done"></div>
+        </div>
       </div>
     </section>
 
@@ -1614,6 +1753,61 @@
   </div>
 </div>
 
+<!-- TASK MODAL -->
+<div class="modal-overlay" id="task-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="task-modal-title">New Task</h3>
+      <button class="modal-close" onclick="closeModal('task-modal')">✕</button>
+    </div>
+    <input type="hidden" id="task-edit-id"/>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Task Title *</label>
+        <input type="text" id="task-title" placeholder="e.g. File claims for Monday patients"/>
+      </div>
+      <div class="form-group full">
+        <label>Description</label>
+        <textarea id="task-desc" placeholder="Details, notes, instructions..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Assigned By</label>
+        <input type="text" id="task-assigned-by" placeholder="e.g. Dina" value="Dina"/>
+      </div>
+      <div class="form-group">
+        <label>Assigned To</label>
+        <input type="text" id="task-assigned-to" placeholder="e.g. Me"/>
+      </div>
+      <div class="form-group">
+        <label>Priority</label>
+        <select id="task-priority">
+          <option value="low">Low</option>
+          <option value="normal" selected>Normal</option>
+          <option value="high">High</option>
+          <option value="urgent">Urgent</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Due Date</label>
+        <input type="date" id="task-due"/>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="task-status">
+          <option value="todo">To Do</option>
+          <option value="in_progress">In Progress</option>
+          <option value="done">Done</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-ghost" id="task-delete-btn" onclick="deleteTask()" style="margin-right:auto;display:none">Delete</button>
+      <button class="btn btn-ghost" onclick="closeModal('task-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTask()">Save Task</button>
+    </div>
+  </div>
+</div>
+
 <!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
   <button class="lightbox-close" onclick="closeLightbox()">✕</button>
@@ -1871,6 +2065,7 @@ function showPage(page, el) {
   if (page === 'claims') loadClaims();
   if (page === 'bulk') loadBulkPage();
   if (page === 'intake-images') { initImageDate(); loadIntakeImages(); }
+  if (page === 'tasks') loadTasks();
   if (page === 'reports') initReports();
 }
 
@@ -2594,6 +2789,181 @@ async function saveIntakeRecord() {
     toast('Record updated!', 'success');
     closeModal('intake-modal');
     await loadBulkPage();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ════════════════════════════════════
+// TASKS
+// ════════════════════════════════════
+let allTasks = [];
+let showDoneTasks = false;
+
+async function loadTasks() {
+  try {
+    allTasks = await api('GET', '/api/tasks');
+    renderTaskBoard();
+  } catch(e) { toast('Failed to load tasks: ' + e.message, 'error'); }
+}
+
+function renderTaskBoard() {
+  const priorityFilter = document.getElementById('task-filter-priority')?.value || '';
+  let filtered = allTasks;
+  if (priorityFilter) filtered = filtered.filter(t => t.priority === priorityFilter);
+
+  const columns = { todo: [], in_progress: [], done: [] };
+  filtered.forEach(t => {
+    if (columns[t.status]) columns[t.status].push(t);
+  });
+
+  // Sort: urgent first, then high, normal, low; within same priority by due date
+  const priorityOrder = { urgent: 0, high: 1, normal: 2, low: 3 };
+  Object.values(columns).forEach(col => {
+    col.sort((a, b) => {
+      const pa = priorityOrder[a.priority] ?? 2;
+      const pb = priorityOrder[b.priority] ?? 2;
+      if (pa !== pb) return pa - pb;
+      if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+      if (a.due_date) return -1;
+      if (b.due_date) return 1;
+      return 0;
+    });
+  });
+
+  ['todo', 'in_progress', 'done'].forEach(status => {
+    const body = document.getElementById('task-body-' + status);
+    const count = document.getElementById('task-count-' + status);
+    const tasks = columns[status];
+    count.textContent = tasks.length;
+
+    if (status === 'done' && !showDoneTasks) {
+      body.innerHTML = tasks.length ?
+        `<div style="text-align:center;padding:16px;color:var(--ink3);font-size:12px">${tasks.length} completed task${tasks.length !== 1 ? 's' : ''} — click "Show Done" to view</div>` :
+        '<div style="text-align:center;padding:16px;color:var(--ink3);font-size:12px">Completed tasks appear here</div>';
+      return;
+    }
+
+    if (!tasks.length) {
+      body.innerHTML = `<div style="text-align:center;padding:20px;color:var(--ink3);font-size:12px">${
+        status === 'todo' ? 'No tasks — click + New Task' :
+        status === 'in_progress' ? 'Move tasks here when started' :
+        'Completed tasks appear here'
+      }</div>`;
+      return;
+    }
+
+    body.innerHTML = tasks.map(t => {
+      const isOverdue = t.due_date && t.status !== 'done' && t.due_date < today();
+      const dueSoon = t.due_date && t.status !== 'done' && !isOverdue && t.due_date <= addDays(today(), 2);
+      return `
+        <div class="task-card" onclick='openTaskModal(${JSON.stringify(t).replace(/'/g, "&#39;")})'>
+          <div class="task-title">${esc(t.title)}</div>
+          ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ''}
+          <div class="task-meta">
+            <span class="badge badge-${t.priority}">${t.priority}</span>
+            ${t.assigned_by ? `<span>from ${esc(t.assigned_by)}</span>` : ''}
+            ${t.due_date ? `<span class="${isOverdue ? 'task-overdue' : dueSoon ? 'task-overdue' : ''}">📅 ${t.due_date}${isOverdue ? ' (overdue)' : ''}</span>` : ''}
+          </div>
+          <div class="task-quick-actions" onclick="event.stopPropagation()">
+            ${status === 'todo' ? `<button onclick="quickMoveTask('${t.id}','in_progress')">Start →</button>` : ''}
+            ${status === 'in_progress' ? `<button onclick="quickMoveTask('${t.id}','todo')">← Back</button>` : ''}
+            ${status !== 'done' ? `<button class="btn-move-done" onclick="quickMoveTask('${t.id}','done')">✓ Done</button>` : ''}
+            ${status === 'done' ? `<button onclick="quickMoveTask('${t.id}','todo')">↩ Reopen</button>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  });
+}
+
+function addDays(dateStr, days) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
+function toggleShowDone() {
+  showDoneTasks = !showDoneTasks;
+  const btn = document.getElementById('task-toggle-done');
+  btn.textContent = showDoneTasks ? 'Hide Done' : 'Show Done';
+  renderTaskBoard();
+}
+
+async function quickMoveTask(id, newStatus) {
+  try {
+    await api('PUT', `/api/tasks/${id}`, { status: newStatus });
+    // Update local state
+    const task = allTasks.find(t => t.id === id);
+    if (task) {
+      task.status = newStatus;
+      if (newStatus === 'done') task.completed_at = new Date().toISOString();
+      else task.completed_at = null;
+    }
+    renderTaskBoard();
+    toast(newStatus === 'done' ? 'Task completed!' : 'Task moved', 'success');
+  } catch(e) { toast('Failed to update: ' + e.message, 'error'); }
+}
+
+function openTaskModal(task = null) {
+  clearForm(['task-edit-id', 'task-title', 'task-desc', 'task-assigned-to']);
+  document.getElementById('task-assigned-by').value = 'Dina';
+  document.getElementById('task-priority').value = 'normal';
+  document.getElementById('task-status').value = 'todo';
+  document.getElementById('task-due').value = '';
+  document.getElementById('task-modal-title').textContent = task ? 'Edit Task' : 'New Task';
+  document.getElementById('task-delete-btn').style.display = task ? '' : 'none';
+
+  if (task) {
+    document.getElementById('task-edit-id').value = task.id;
+    document.getElementById('task-title').value = task.title || '';
+    document.getElementById('task-desc').value = task.description || '';
+    document.getElementById('task-assigned-by').value = task.assigned_by || '';
+    document.getElementById('task-assigned-to').value = task.assigned_to || '';
+    document.getElementById('task-priority').value = task.priority || 'normal';
+    document.getElementById('task-status').value = task.status || 'todo';
+    document.getElementById('task-due').value = task.due_date || '';
+  }
+  document.getElementById('task-modal').classList.add('open');
+}
+
+async function saveTask() {
+  const editId = document.getElementById('task-edit-id').value;
+  const body = {
+    title: document.getElementById('task-title').value.trim(),
+    description: document.getElementById('task-desc').value.trim() || null,
+    assigned_by: document.getElementById('task-assigned-by').value.trim() || null,
+    assigned_to: document.getElementById('task-assigned-to').value.trim() || null,
+    priority: document.getElementById('task-priority').value,
+    status: document.getElementById('task-status').value,
+    due_date: document.getElementById('task-due').value || null
+  };
+
+  if (!body.title) { toast('Task title is required', 'error'); return; }
+
+  try {
+    if (editId) {
+      await api('PUT', `/api/tasks/${editId}`, body);
+      toast('Task updated!', 'success');
+    } else {
+      await api('POST', '/api/tasks', body);
+      toast('Task created!', 'success');
+    }
+    closeModal('task-modal');
+    loadTasks();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function deleteTask() {
+  const id = document.getElementById('task-edit-id').value;
+  if (!id) return;
+  if (!confirm('Delete this task?')) return;
+  try {
+    await fetch(`/api/tasks/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + authToken }
+    });
+    toast('Task deleted', 'success');
+    closeModal('task-modal');
+    loadTasks();
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 

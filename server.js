@@ -666,6 +666,84 @@ app.delete('/api/intake-images/:id', async (req, res) => {
 
 
 // ============================================
+// TASKS
+// ============================================
+
+// Get all tasks (optionally filter by status)
+app.get('/api/tasks', async (req, res) => {
+  let query = supabase
+    .from('tasks')
+    .select('*')
+    .order('status', { ascending: true })
+    .order('priority', { ascending: true })
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false });
+
+  if (req.query.status) {
+    query = query.eq('status', req.query.status);
+  }
+
+  const { data, error } = await query;
+  if (error) return dbError(res, error);
+  res.json(data);
+});
+
+// Create task
+app.post('/api/tasks', async (req, res) => {
+  const { title, description, assigned_by, assigned_to, priority, due_date } = req.body;
+  if (!title || !title.trim()) {
+    return res.status(400).json({ error: 'Task title is required' });
+  }
+  const record = {
+    title: title.trim(),
+    description: description?.trim() || null,
+    assigned_by: assigned_by?.trim() || null,
+    assigned_to: assigned_to?.trim() || null,
+    priority: priority || 'normal',
+    due_date: due_date || null,
+    status: 'todo',
+    created_by: req.user.email
+  };
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert([record])
+    .select()
+    .single();
+  if (error) return dbError(res, error);
+  res.json(data);
+});
+
+// Update task
+app.put('/api/tasks/:id', async (req, res) => {
+  const updates = { ...req.body };
+  // Auto-set completed_at when marking done
+  if (updates.status === 'done' && !updates.completed_at) {
+    updates.completed_at = new Date().toISOString();
+  }
+  if (updates.status && updates.status !== 'done') {
+    updates.completed_at = null;
+  }
+  const { data, error } = await supabase
+    .from('tasks')
+    .update(updates)
+    .eq('id', req.params.id)
+    .select()
+    .single();
+  if (error) return dbError(res, error);
+  res.json(data);
+});
+
+// Delete task
+app.delete('/api/tasks/:id', async (req, res) => {
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', req.params.id);
+  if (error) return dbError(res, error);
+  res.json({ ok: true });
+});
+
+// ============================================
 // REPORTS
 // ============================================
 

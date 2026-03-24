@@ -1420,6 +1420,7 @@
           <span style="color:var(--ink3)">to</span>
           <input type="date" id="rpt-to" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
           <button class="btn btn-primary btn-sm" onclick="loadReports()">Run Report</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportByPatientPDF()">Patient Report PDF</button>
         </div>
       </div>
 
@@ -3515,6 +3516,201 @@ async function exportDailyPDF() {
     toast('PDF report ready — use Print dialog to save as PDF', 'success');
   } catch(e) {
     toast('Failed to generate PDF: ' + e.message, 'error');
+  }
+}
+
+// ════════════════════════════════════
+// BY-PATIENT PDF REPORT
+// ════════════════════════════════════
+async function exportByPatientPDF() {
+  const from = document.getElementById('rpt-from').value;
+  const to = document.getElementById('rpt-to').value;
+  if (!from || !to) { toast('Select a date range first', 'error'); return; }
+
+  toast('Generating patient report...');
+
+  try {
+    const data = await api('GET', `/api/reports/by-patient?from=${from}&to=${to}`);
+    const patients = data.patients || [];
+    if (!patients.length) { toast('No patient visits found in this period', 'error'); return; }
+
+    const fromLabel = new Date(from + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const toLabel = new Date(to + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Patient Report ${from} to ${to}</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; font-size: 9px; }
+      @page { size: landscape; margin: 8mm; }
+      @media print { body { padding: 0; } .page-break { page-break-before: always; } }
+
+      .header { display: flex; justify-content: space-between; align-items: center; background: #1e3a5f; color: white; padding: 6px 12px; font-weight: 700; font-size: 11px; }
+      .header .status { background: #22c55e; color: white; padding: 2px 10px; border-radius: 3px; font-size: 9px; }
+
+      .summary-bar { display: flex; gap: 12px; margin: 8px 0; padding: 6px 12px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 9px; }
+      .summary-bar .stat { text-align: center; }
+      .summary-bar .stat-val { font-size: 14px; font-weight: 700; color: #1e3a5f; }
+      .summary-bar .stat-lbl { color: #64748b; font-size: 8px; }
+
+      table.patients { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 8px; }
+      table.patients th { background: #1e3a5f; color: white; padding: 4px 6px; text-align: left; font-weight: 600; font-size: 7.5px; white-space: nowrap; }
+      table.patients td { border-bottom: 1px solid #e2e8f0; padding: 4px 6px; vertical-align: top; line-height: 1.3; }
+      table.patients tr:nth-child(even) { background: #f8fafc; }
+      table.patients tr:hover { background: #eff6ff; }
+      .name { font-weight: 700; font-size: 8.5px; }
+      .code { color: #64748b; font-size: 7.5px; }
+      .dx-list { font-size: 7px; color: #475569; max-width: 140px; word-wrap: break-word; }
+      .visit-detail { font-size: 7px; color: #475569; }
+      .badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 7px; font-weight: 600; }
+      .badge-ins { background: #dbeafe; color: #1e40af; }
+      .badge-cash { background: #fef3c7; color: #92400e; }
+      .claim-pending { color: #d97706; }
+      .claim-submitted { color: #2563eb; }
+      .claim-approved { color: #16a34a; }
+      .claim-paid { color: #15803d; font-weight: 700; }
+      .claim-denied { color: #dc2626; }
+
+      .totals-row td { border-top: 2px solid #1e3a5f; font-weight: 700; font-size: 9px; padding: 6px; background: #f1f5f9; }
+
+      .footer { margin-top: 8px; text-align: center; font-size: 8px; color: #94a3b8; }
+    </style></head><body>`;
+
+    // Header
+    html += `<div class="header">
+      <span>PATIENT REPORT</span>
+      <span>${fromLabel} — ${toLabel}</span>
+      <span>${patients.length} Patients</span>
+    </div>`;
+
+    // Summary stats
+    const totalVisits = patients.reduce((s, p) => s + p.summary.visitCount, 0);
+    const totalBilled = patients.reduce((s, p) => s + p.summary.totalBilled, 0);
+    const totalPaid = patients.reduce((s, p) => s + p.summary.totalPaid, 0);
+    const totalOutstanding = totalBilled - totalPaid;
+    const totalClaims = patients.reduce((s, p) => s + p.summary.claimCount, 0);
+    const totalE1 = patients.reduce((s, p) => s + p.summary.e1, 0);
+    const totalE2 = patients.reduce((s, p) => s + p.summary.e2, 0);
+
+    html += `<div class="summary-bar">
+      <div class="stat"><div class="stat-val">${patients.length}</div><div class="stat-lbl">PATIENTS</div></div>
+      <div class="stat"><div class="stat-val">${totalVisits}</div><div class="stat-lbl">VISITS</div></div>
+      <div class="stat"><div class="stat-val">${totalE1}</div><div class="stat-lbl">E1 MANIP</div></div>
+      <div class="stat"><div class="stat-val">${totalE2}</div><div class="stat-lbl">E2 MANIP</div></div>
+      <div class="stat"><div class="stat-val">${totalClaims}</div><div class="stat-lbl">CLAIMS</div></div>
+      <div class="stat"><div class="stat-val">$${totalBilled.toLocaleString()}</div><div class="stat-lbl">BILLED</div></div>
+      <div class="stat"><div class="stat-val">$${totalPaid.toLocaleString()}</div><div class="stat-lbl">PAID</div></div>
+      <div class="stat"><div class="stat-val">$${totalOutstanding.toLocaleString()}</div><div class="stat-lbl">OUTSTANDING</div></div>
+    </div>`;
+
+    // Patient table
+    html += `<table class="patients">
+      <thead><tr>
+        <th>#</th>
+        <th>PATIENT</th>
+        <th>INSURANCE</th>
+        <th>VISITS</th>
+        <th>VISIT DATES</th>
+        <th>E1/E2</th>
+        <th>DIAGNOSES</th>
+        <th>CLAIMS</th>
+        <th>BILLED</th>
+        <th>PAID</th>
+        <th>BALANCE</th>
+        <th>STATUS</th>
+      </tr></thead><tbody>`;
+
+    patients.forEach((p, idx) => {
+      const pt = p.patient;
+      const s = p.summary;
+      const name = (pt.first_name + ' ' + pt.last_name).trim().toUpperCase();
+      const payBadge = pt.payment_type === 'insurance'
+        ? '<span class="badge badge-ins">INS</span>'
+        : pt.payment_type === 'cash'
+          ? '<span class="badge badge-cash">CASH</span>'
+          : '';
+
+      // Visit dates list
+      const visitDates = p.visits.map(v => v.visit_date).filter(Boolean);
+      const uniqueDates = [...new Set(visitDates)].sort();
+      const datesDisplay = uniqueDates.length <= 4
+        ? uniqueDates.join(', ')
+        : uniqueDates.slice(0, 3).join(', ') + ` +${uniqueDates.length - 3} more`;
+
+      // Visit breakdown
+      const manipBreak = [];
+      if (s.e1) manipBreak.push('E1:' + s.e1);
+      if (s.e2) manipBreak.push('E2:' + s.e2);
+
+      // Diagnoses
+      const dxDisplay = s.diagnoses.length
+        ? s.diagnoses.join(', ')
+        : '—';
+
+      // Claims status summary
+      const claimStatuses = {};
+      p.claims.forEach(c => {
+        claimStatuses[c.claim_status] = (claimStatuses[c.claim_status] || 0) + 1;
+      });
+      const claimDisplay = Object.keys(claimStatuses).length
+        ? Object.entries(claimStatuses).map(([st, ct]) =>
+            `<span class="claim-${st}">${ct} ${st}</span>`
+          ).join(', ')
+        : '—';
+
+      // Workflow statuses from visits
+      const wfStatuses = {};
+      p.visits.forEach(v => {
+        if (v.workflow_status) wfStatuses[v.workflow_status] = (wfStatuses[v.workflow_status] || 0) + 1;
+      });
+      const wfDisplay = Object.keys(wfStatuses).length
+        ? Object.entries(wfStatuses).map(([st, ct]) => `${ct} ${formatStage(st)}`).join(', ')
+        : '—';
+
+      html += `<tr>
+        <td>${idx + 1}</td>
+        <td><div class="name">${esc(name)}</div><div class="code">${esc(pt.patient_code)} ${payBadge}</div></td>
+        <td>${esc(pt.insurance_provider || '—')}<br/><span class="code">${esc(pt.insurance_id || '')}</span></td>
+        <td style="text-align:center;font-weight:700">${s.visitCount}</td>
+        <td class="visit-detail">${datesDisplay}</td>
+        <td style="text-align:center">${manipBreak.join(' / ') || '—'}</td>
+        <td class="dx-list">${esc(dxDisplay)}</td>
+        <td style="text-align:center">${claimDisplay}</td>
+        <td style="text-align:right;font-weight:600">$${s.totalBilled.toLocaleString()}</td>
+        <td style="text-align:right">$${s.totalPaid.toLocaleString()}</td>
+        <td style="text-align:right;font-weight:700;color:${s.outstanding > 0 ? '#dc2626' : '#16a34a'}">$${s.outstanding.toLocaleString()}</td>
+        <td class="visit-detail">${wfDisplay}</td>
+      </tr>`;
+    });
+
+    // Totals row
+    html += `<tr class="totals-row">
+      <td></td>
+      <td>TOTALS</td>
+      <td></td>
+      <td style="text-align:center">${totalVisits}</td>
+      <td></td>
+      <td style="text-align:center">${totalE1 + totalE2}</td>
+      <td></td>
+      <td style="text-align:center">${totalClaims}</td>
+      <td style="text-align:right">$${totalBilled.toLocaleString()}</td>
+      <td style="text-align:right">$${totalPaid.toLocaleString()}</td>
+      <td style="text-align:right">$${totalOutstanding.toLocaleString()}</td>
+      <td></td>
+    </tr>`;
+
+    html += `</tbody></table>`;
+    html += `<div class="footer">ChiroTRAX Patient Report &mdash; Generated ${new Date().toLocaleString()}</div>`;
+    html += `</body></html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => { win.print(); };
+
+    toast('Patient report ready — use Print dialog to save as PDF', 'success');
+  } catch(e) {
+    toast('Failed to generate patient report: ' + e.message, 'error');
   }
 }
 

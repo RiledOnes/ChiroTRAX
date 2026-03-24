@@ -3287,6 +3287,29 @@ async function handleEodUpload(event) {
 }
 
 // ════════════════════════════════════
+// BILLING CALCULATION
+// ════════════════════════════════════
+function calcBilled(v) {
+  // Office visit: A2=$225, RE3=$175, blank=$0
+  let total = 0;
+  if (v.office_visit === 'A2') total += 225;
+  else if (v.office_visit === 'RE3') total += 175;
+
+  // Manipulation: E1=$75, E2=$100, blank=$0
+  if (v.manipulation_type === 'E1') total += 75;
+  else if (v.manipulation_type === 'E2') total += 100;
+
+  // Therapeutic exercises: number * $75, or "TE" alone = $75
+  const te = v.therapeutic_exercises;
+  if (te != null && te !== '' && te !== 0) {
+    const n = typeof te === 'number' ? te : parseInt(String(te).replace(/\D/g, '')) || 1;
+    total += n * 75;
+  }
+
+  return total;
+}
+
+// ════════════════════════════════════
 // DAILY PDF EXPORT
 // ════════════════════════════════════
 async function exportDailyPDF() {
@@ -3435,10 +3458,11 @@ async function exportDailyPDF() {
 
     // Digitalized List
     html += `<div class="section-label complete">DIGITALIZED LIST</div>`;
+    let grandTotal = 0;
     if (visits.length) {
       html += `<table class="visits"><thead><tr>
-        <th>ID</th><th>SVC DATE</th><th>PAT NO</th><th>PATIENT NAME</th>
-        <th>E1/E2</th><th>TE</th><th>DIAGNOSIS</th><th>STATUS</th><th>NOTES</th>
+        <th>ID</th><th>SVC DATE</th><th>PAT NO</th><th>PATIENT NAME</th><th>A2/RE3</th>
+        <th>E1/E2</th><th>TE</th><th>DIAGNOSIS</th><th>BILLING</th><th>STATUS</th>
       </tr></thead><tbody>`;
       visits.forEach((v, i) => {
         const name = v.patients ? (v.patients.first_name + ' ' + v.patients.last_name).trim().toUpperCase() : (v.patient_name || '—').toUpperCase();
@@ -3446,22 +3470,25 @@ async function exportDailyPDF() {
         const intId = v.intake_id || String(i + 1).padStart(2, '0');
         const dx = Array.isArray(v.diagnosis_codes) ? v.diagnosis_codes.join(',') : (v.diagnosis_codes || '—');
         const te = v.therapeutic_exercises != null ? ('TE ' + v.therapeutic_exercises) : '—';
+        const billed = calcBilled(v);
+        grandTotal += billed;
         const isHighlight = v.new_patient || v.no_fault;
         html += `<tr${isHighlight ? ' class="highlight"' : ''}>
           <td>${esc(intId)}</td>
           <td>${v.visit_date || '—'}</td>
           <td>${esc(patCode)}</td>
           <td><strong>${esc(name)}</strong></td>
+          <td>${v.office_visit || ''}</td>
           <td>${v.manipulation_type || '—'}</td>
           <td>${te}</td>
           <td class="dx">${esc(dx)}</td>
+          <td><strong>$${billed}</strong></td>
           <td>${v.workflow_status ? formatStage(v.workflow_status) : '—'}</td>
-          <td style="font-size:6.5px">${esc(v.notes || '')}</td>
         </tr>`;
       });
       html += `</tbody></table>`;
     }
-    html += `<div class="total-row">TOTAL (SAME DAY) &nbsp; ${visits.length}</div>`;
+    html += `<div class="total-row">TOTAL (SAME DAY) &nbsp; ${visits.length} &nbsp;&nbsp; BILLED &nbsp; $${grandTotal.toLocaleString()}</div>`;
 
     // Charge Capture Report — below the list
     html += `<div class="capture-section">`;

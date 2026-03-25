@@ -3557,6 +3557,16 @@ async function openPatientDetail(patientId) {
     const diagnoses = (patient.diagnoses || []).sort((a, b) => (b.diagnosed_date || '').localeCompare(a.diagnosed_date || ''));
     const claims = allClaims.filter(c => c.patient_id === patientId).sort((a, b) => (b.claim_date || '').localeCompare(a.claim_date || ''));
 
+    // Fetch intake images for the patient's visit dates
+    const visitDates = [...new Set(visits.map(v => v.visit_date).filter(Boolean))];
+    let intakeImages = [];
+    if (visitDates.length) {
+      const minDate = visitDates.reduce((a, b) => a < b ? a : b);
+      const maxDate = visitDates.reduce((a, b) => a > b ? a : b);
+      const allImages = await api('GET', `/api/intake-images?from=${minDate}&to=${maxDate}`);
+      intakeImages = allImages.filter(img => visitDates.includes(img.business_date));
+    }
+
     const totalBilled = claims.reduce((s, c) => s + (parseFloat(c.amount_billed) || 0), 0);
     const totalPaid = claims.reduce((s, c) => s + (parseFloat(c.amount_paid) || 0), 0);
     const activeDx = diagnoses.filter(d => d.is_active);
@@ -3597,11 +3607,12 @@ async function openPatientDetail(patientId) {
       </div>
     </div>`;
 
-    // Tabs for Visit / Diagnosis / Claims
+    // Tabs for Visit / Diagnosis / Claims / Intake Sheets
     html += `<div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:0">
       <button class="btn btn-ghost" id="pd-tab-visits" onclick="switchPatientTab('visits')" style="border-radius:8px 8px 0 0;border-bottom:2px solid var(--accent);margin-bottom:-2px;font-weight:600">Visits (${visits.length})</button>
       <button class="btn btn-ghost" id="pd-tab-diagnoses" onclick="switchPatientTab('diagnoses')" style="border-radius:8px 8px 0 0;margin-bottom:-2px">Diagnoses (${diagnoses.length})</button>
       <button class="btn btn-ghost" id="pd-tab-claims" onclick="switchPatientTab('claims')" style="border-radius:8px 8px 0 0;margin-bottom:-2px">Claims (${claims.length})</button>
+      <button class="btn btn-ghost" id="pd-tab-intake" onclick="switchPatientTab('intake')" style="border-radius:8px 8px 0 0;margin-bottom:-2px">Intake Sheets (${intakeImages.length})</button>
     </div>`;
 
     // ── VISITS TAB ──
@@ -3674,14 +3685,47 @@ async function openPatientDetail(patientId) {
     }
     html += `</div>`;
 
+    // ── INTAKE SHEETS TAB ──
+    html += `<div id="pd-panel-intake" style="display:none;max-height:300px;overflow-y:auto">`;
+    if (intakeImages.length) {
+      html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;padding:10px">`;
+      intakeImages.forEach(img => {
+        html += `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface2);cursor:pointer" onclick="loadAndShowIntakeImage('${img.id}')">
+          <div style="padding:8px;text-align:center">
+            <div style="font-size:28px;margin-bottom:4px">📄</div>
+            <div style="font-size:11px;font-weight:600">${esc(img.file_name || 'intake.jpg')}</div>
+            <div style="font-size:10px;color:var(--ink3)">${img.business_date}</div>
+            <div style="font-size:10px;color:var(--ink3)">${img.image_tag === 'charge_capture' ? 'Charge Capture' : 'Intake Form'}</div>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<div style="text-align:center;padding:24px;color:var(--ink3)">No intake sheets found for this patient's visit dates</div>`;
+    }
+    html += `</div>`;
+
     body.innerHTML = html;
   } catch(e) {
     body.innerHTML = `<div style="text-align:center;padding:40px;color:#ef4444">Failed to load: ${esc(e.message)}</div>`;
   }
 }
 
+async function loadAndShowIntakeImage(imageId) {
+  try {
+    const img = await api('GET', `/api/intake-images/${imageId}`);
+    if (img.image_data) {
+      const win = window.open('', '_blank');
+      win.document.write(`<!DOCTYPE html><html><head><title>${esc(img.file_name || 'Intake Sheet')}</title>
+        <style>body{margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh}img{max-width:100%;max-height:100vh}</style>
+        </head><body><img src="${img.image_data}"/></body></html>`);
+      win.document.close();
+    }
+  } catch(e) { toast('Failed to load image: ' + e.message, 'error'); }
+}
+
 function switchPatientTab(tab) {
-  ['visits', 'diagnoses', 'claims'].forEach(t => {
+  ['visits', 'diagnoses', 'claims', 'intake'].forEach(t => {
     document.getElementById('pd-panel-' + t).style.display = t === tab ? '' : 'none';
     const btn = document.getElementById('pd-tab-' + t);
     btn.style.borderBottom = t === tab ? '2px solid var(--accent)' : 'none';
@@ -3696,7 +3740,7 @@ async function exportPatientPDF(patientId) {
   toast('Generating patient report...');
 
   try {
-    // Fetch patient with visits + diagnoses, and claims separately
+    // Fetch patient with visits + diagnoses, claims, and intake images
     const [patient, allClaims] = await Promise.all([
       api('GET', `/api/patients/${patientId}`),
       api('GET', '/api/claims')
@@ -3706,6 +3750,20 @@ async function exportPatientPDF(patientId) {
     const visits = (patient.visits || []).sort((a, b) => (a.visit_date || '').localeCompare(b.visit_date || ''));
     const diagnoses = (patient.diagnoses || []).sort((a, b) => (a.diagnosed_date || '').localeCompare(b.diagnosed_date || ''));
     const claims = allClaims.filter(c => c.patient_id === patientId).sort((a, b) => (a.claim_date || '').localeCompare(b.claim_date || ''));
+
+    // Fetch intake images for visit dates
+    const pdfVisitDates = [...new Set(visits.map(v => v.visit_date).filter(Boolean))];
+    let pdfIntakeImages = [];
+    if (pdfVisitDates.length) {
+      const minD = pdfVisitDates.reduce((a, b) => a < b ? a : b);
+      const maxD = pdfVisitDates.reduce((a, b) => a > b ? a : b);
+      const allImgs = await api('GET', `/api/intake-images?from=${minD}&to=${maxD}`);
+      const dateImgIds = allImgs.filter(img => pdfVisitDates.includes(img.business_date));
+      // Fetch full image data for each
+      for (const img of dateImgIds) {
+        try { const full = await api('GET', `/api/intake-images/${img.id}`); pdfIntakeImages.push(full); } catch(e) {}
+      }
+    }
 
     // Stats
     const totalVisits = visits.length;
@@ -3878,6 +3936,20 @@ async function exportPatientPDF(patientId) {
       });
       html += `</tbody></table>`;
       html += `<div class="totals">BILLED: $${totalBilled.toLocaleString()} &nbsp;&nbsp; PAID: $${totalPaid.toLocaleString()} &nbsp;&nbsp; OUTSTANDING: $${(totalBilled - totalPaid).toLocaleString()}</div>`;
+      html += `</div>`;
+    }
+
+    // ── INTAKE SHEETS ──
+    if (pdfIntakeImages.length) {
+      html += `<div class="section" style="page-break-before:always">`;
+      html += `<div class="section-title" style="background:#7c3aed">INTAKE SHEETS (${pdfIntakeImages.length})</div>`;
+      pdfIntakeImages.forEach((img, i) => {
+        if (i > 0) html += `<div style="page-break-before:always"></div>`;
+        html += `<div style="margin:8px 0;text-align:center">
+          <div style="font-size:9px;color:#64748b;margin-bottom:4px">${esc(img.file_name || 'intake.jpg')} — ${img.business_date} — ${img.image_tag === 'charge_capture' ? 'Charge Capture' : 'Intake Form'}</div>
+          <img src="${img.image_data}" style="max-width:100%;max-height:90vh;border:1px solid #e2e8f0;border-radius:4px"/>
+        </div>`;
+      });
       html += `</div>`;
     }
 

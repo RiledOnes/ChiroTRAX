@@ -2667,7 +2667,7 @@ async function loadClaims() {
     tbody.innerHTML = claims.map(c => `
       <tr>
         <td><strong>${c.patients?.patient_code || '—'}</strong> — ${c.patients?.last_name || ''}, ${c.patients?.first_name || ''}</td>
-        <td class="muted">${c.visits?.visit_date || '—'}</td>
+        <td class="muted">${c.claim_date || '—'}</td>
         <td>${badge(c.payment_type)}</td>
         <td>$${c.amount_billed != null ? Number(c.amount_billed).toFixed(2) : '—'}</td>
         <td>$${c.amount_paid != null ? Number(c.amount_paid).toFixed(2) : '—'}</td>
@@ -3922,7 +3922,7 @@ async function exportPatientPDF(patientId) {
         <th style="text-align:right">BILLED</th><th style="text-align:right">PAID</th><th>NOTES</th>
       </tr></thead><tbody>`;
       claims.forEach((c, i) => {
-        const visitDate = c.visits?.visit_date || '—';
+        const visitDate = c.claim_date || '—';
         html += `<tr>
           <td>${i + 1}</td>
           <td>${c.claim_date || '—'}</td>

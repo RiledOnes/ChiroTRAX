@@ -295,10 +295,19 @@ app.get('/api/patients', async (req, res) => {
 app.get('/api/patients/:id', async (req, res) => {
   const { data, error } = await supabase
     .from('patients')
-    .select('*, visits(*), diagnoses(*)')
+    .select('*, intake_records(*), diagnoses(*)')
     .eq('id', req.params.id)
     .single();
   if (error) return dbError(res, error);
+  // Map intake_records to visits for frontend compatibility
+  data.visits = (data.intake_records || []).map(r => ({
+    ...r,
+    visit_date: r.service_date,
+    patient_status: r.visit_status,
+    diagnosis_codes: Array.isArray(r.diagnosis_codes) ? r.diagnosis_codes.join(', ') : r.diagnosis_codes,
+    office_visit: r.cpt_office_visit
+  }));
+  delete data.intake_records;
   res.json(data);
 });
 
@@ -326,19 +335,19 @@ app.put('/api/patients/:id', async (req, res) => {
 });
 
 // ============================================
-// VISITS (Daily Intake)
+// VISITS (Daily Intake) — reads from intake_records
 // ============================================
 
 // Get all visits (optionally filter by date, patient, workflow_status, batch_id)
 app.get('/api/visits', async (req, res) => {
   let query = supabase
-    .from('visits')
+    .from('intake_records')
     .select('*, patients(patient_code, first_name, last_name)')
-    .order('visit_date', { ascending: false })
+    .order('service_date', { ascending: false })
     .order('created_at', { ascending: true });
 
   if (req.query.date) {
-    query = query.eq('visit_date', req.query.date);
+    query = query.eq('service_date', req.query.date);
   }
   if (req.query.patient_id) {
     query = query.eq('patient_id', req.query.patient_id);
@@ -352,29 +361,84 @@ app.get('/api/visits', async (req, res) => {
 
   const { data, error } = await query;
   if (error) return dbError(res, error);
-  res.json(data);
+  // Map intake_records fields to match frontend expectations
+  const mapped = (data || []).map(r => ({
+    ...r,
+    visit_date: r.service_date,
+    patient_status: r.visit_status,
+    diagnosis_codes: Array.isArray(r.diagnosis_codes) ? r.diagnosis_codes.join(', ') : r.diagnosis_codes,
+    office_visit: r.cpt_office_visit
+  }));
+  res.json(mapped);
 });
 
 // Create visit
 app.post('/api/visits', async (req, res) => {
+  // Map incoming frontend fields to intake_records columns
+  const body = { ...req.body };
+  if (body.visit_date) { body.service_date = body.visit_date; delete body.visit_date; }
+  if (body.patient_status) { body.visit_status = body.patient_status; delete body.patient_status; }
+  if (body.office_visit) { body.cpt_office_visit = body.office_visit; delete body.office_visit; }
+  // Auto-generate intake_id if not provided (MMDDYY_NN format)
+  if (!body.intake_id && body.service_date) {
+    const d = new Date(body.service_date + 'T12:00:00');
+    const prefix = String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + String(d.getFullYear()).slice(-2);
+    const { count } = await supabase.from('intake_records').select('*', { count: 'exact', head: true }).eq('service_date', body.service_date);
+    body.intake_id = `${prefix}_${String((count || 0) + 1).padStart(2, '0')}`;
+  }
+  if (!body.patient_name && body.patient_id) {
+    // Look up patient name for intake_records
+    const { data: pat } = await supabase.from('patients').select('first_name, last_name').eq('id', body.patient_id).single();
+    if (pat) body.patient_name = `${pat.first_name} ${pat.last_name}`.trim();
+  }
+  if (!body.patient_name) body.patient_name = 'Unknown';
+  // Convert diagnosis_codes string to array if needed
+  if (body.diagnosis_codes && typeof body.diagnosis_codes === 'string') {
+    body.diagnosis_codes = body.diagnosis_codes.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  // Strip fields that don't exist in intake_records
+  delete body.insurance_provider;
+  delete body.amount_billed;
+
   const { data, error } = await supabase
-    .from('visits')
-    .insert([req.body])
+    .from('intake_records')
+    .insert([body])
     .select('*, patients(patient_code, first_name, last_name)')
     .single();
   if (error) return dbError(res, error);
+  // Map back
+  data.visit_date = data.service_date;
+  data.patient_status = data.visit_status;
+  data.office_visit = data.cpt_office_visit;
+  if (Array.isArray(data.diagnosis_codes)) data.diagnosis_codes = data.diagnosis_codes.join(', ');
   res.json(data);
 });
 
 // Update visit
 app.put('/api/visits/:id', async (req, res) => {
+  const body = { ...req.body };
+  if (body.visit_date) { body.service_date = body.visit_date; delete body.visit_date; }
+  if (body.patient_status) { body.visit_status = body.patient_status; delete body.patient_status; }
+  if (body.office_visit) { body.cpt_office_visit = body.office_visit; delete body.office_visit; }
+  // Convert diagnosis_codes string to array if needed
+  if (body.diagnosis_codes && typeof body.diagnosis_codes === 'string') {
+    body.diagnosis_codes = body.diagnosis_codes.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  // Strip fields that don't exist in intake_records
+  delete body.insurance_provider;
+  delete body.amount_billed;
+
   const { data, error } = await supabase
-    .from('visits')
-    .update(req.body)
+    .from('intake_records')
+    .update(body)
     .eq('id', req.params.id)
     .select()
     .single();
   if (error) return dbError(res, error);
+  data.visit_date = data.service_date;
+  data.patient_status = data.visit_status;
+  data.office_visit = data.cpt_office_visit;
+  if (Array.isArray(data.diagnosis_codes)) data.diagnosis_codes = data.diagnosis_codes.join(', ');
   res.json(data);
 });
 
@@ -424,7 +488,7 @@ app.put('/api/diagnoses/:id', async (req, res) => {
 app.get('/api/claims', async (req, res) => {
   let query = supabase
     .from('claims')
-    .select('*, patients(patient_code, first_name, last_name), visits(visit_date)')
+    .select('*, patients(patient_code, first_name, last_name)')
     .order('claim_date', { ascending: false });
 
   if (req.query.status) {
@@ -463,13 +527,13 @@ app.put('/api/claims/:id', async (req, res) => {
 // VISITS — BULK UPLOAD + WORKFLOW
 // ============================================
 
-// Get workflow counts (how many visits at each stage)
+// Get workflow counts (how many records at each stage)
 app.get('/api/visits/workflow-counts', async (req, res) => {
   const stages = ['intake', 'entered_ebs', 'claim_created', 'submitted', 'processed'];
   const counts = {};
   for (const stage of stages) {
     const { count, error } = await supabase
-      .from('visits')
+      .from('intake_records')
       .select('*', { count: 'exact', head: true })
       .eq('workflow_status', stage);
     if (error) return dbError(res, error);
@@ -478,7 +542,7 @@ app.get('/api/visits/workflow-counts', async (req, res) => {
   res.json(counts);
 });
 
-// Bulk upload visits from CSV
+// Bulk upload intake records from CSV
 app.post('/api/visits/bulk', async (req, res) => {
   const { records, batch_id } = req.body;
   if (!records || !Array.isArray(records) || records.length === 0) {
@@ -494,7 +558,7 @@ app.post('/api/visits/bulk', async (req, res) => {
   let existingIds = new Set();
   if (incomingIds.length > 0) {
     const { data: existing, error: checkErr } = await supabase
-      .from('visits')
+      .from('intake_records')
       .select('intake_id')
       .in('intake_id', incomingIds);
     if (checkErr) return dbError(res, checkErr);
@@ -518,32 +582,45 @@ app.post('/api/visits/bulk', async (req, res) => {
     if (rec.patient_code) {
       const { data: pat } = await supabase
         .from('patients')
-        .select('id')
+        .select('id, first_name, last_name')
         .eq('patient_code', rec.patient_code)
         .single();
-      if (pat) rec.patient_id = pat.id;
-      delete rec.patient_code; // not a visits column
+      if (pat) {
+        rec.patient_id = pat.id;
+        if (!rec.patient_name) rec.patient_name = `${pat.first_name} ${pat.last_name}`.trim();
+      }
     }
-    // Map service_date → visit_date
-    if (rec.service_date) {
-      rec.visit_date = rec.service_date;
-      delete rec.service_date;
+    // Map visit_date → service_date if provided
+    if (rec.visit_date) {
+      rec.service_date = rec.visit_date;
+      delete rec.visit_date;
     }
+    // Ensure patient_name is set (required column)
+    if (!rec.patient_name) rec.patient_name = 'Unknown';
     rec.batch_id = batch_id || null;
   }
 
   const { data, error } = await supabase
-    .from('visits')
+    .from('intake_records')
     .insert(newRecords)
     .select('*, patients(patient_code, first_name, last_name)');
 
   if (error) return dbError(res, error);
 
+  // Map back for frontend
+  const mapped = (data || []).map(r => ({
+    ...r,
+    visit_date: r.service_date,
+    patient_status: r.visit_status,
+    diagnosis_codes: Array.isArray(r.diagnosis_codes) ? r.diagnosis_codes.join(', ') : r.diagnosis_codes,
+    office_visit: r.cpt_office_visit
+  }));
+
   res.json({
-    inserted: data.length,
+    inserted: mapped.length,
     duplicates: duplicates.length,
     duplicate_ids: duplicates.map(d => d.intake_id),
-    data
+    data: mapped
   });
 });
 
@@ -558,7 +635,7 @@ app.put('/api/visits/batch-advance', async (req, res) => {
     return res.status(400).json({ error: 'Invalid workflow status' });
   }
   const { data, error } = await supabase
-    .from('visits')
+    .from('intake_records')
     .update({ workflow_status: new_status })
     .in('id', ids)
     .select();
@@ -754,13 +831,13 @@ app.get('/api/reports/summary', async (req, res) => {
 
   try {
     const [visits, patients, claims, intakeImages] = await Promise.all([
-      supabase.from('visits').select('id, visit_date, patient_status, manipulation_type, therapeutic_exercises, patient_id').gte('visit_date', from).lte('visit_date', to),
+      supabase.from('intake_records').select('id, service_date, visit_status, manipulation_type, therapeutic_exercises, patient_id').gte('service_date', from).lte('service_date', to),
       supabase.from('patients').select('id, payment_type, created_at'),
       supabase.from('claims').select('id, claim_status, payment_type, amount_billed, amount_paid, claim_date').gte('claim_date', from).lte('claim_date', to),
       supabase.from('daily_intake_images').select('id, business_date').gte('business_date', from).lte('business_date', to)
     ]);
 
-    const v = visits.data || [];
+    const v = (visits.data || []).map(r => ({ ...r, visit_date: r.service_date, patient_status: r.visit_status }));
     const p = patients.data || [];
     const c = claims.data || [];
     const img = intakeImages.data || [];

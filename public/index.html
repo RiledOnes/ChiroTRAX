@@ -1856,6 +1856,23 @@
   </div>
 </div>
 
+<!-- PATIENT DETAIL MODAL -->
+<div class="modal-overlay" id="patient-detail-modal">
+  <div class="modal" style="width:780px;max-width:98vw;max-height:94vh">
+    <div class="modal-header">
+      <h3 id="patient-detail-title">Patient Details</h3>
+      <button class="modal-close" onclick="closeModal('patient-detail-modal')">✕</button>
+    </div>
+    <div id="patient-detail-body" style="padding:4px 0">
+      <div style="text-align:center;padding:40px;color:var(--ink3)">Loading...</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('patient-detail-modal')">Close</button>
+      <button class="btn btn-secondary" id="patient-detail-pdf-btn" onclick="">Export PDF</button>
+    </div>
+  </div>
+</div>
+
 <!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
   <button class="lightbox-close" onclick="closeLightbox()">✕</button>
@@ -2508,7 +2525,7 @@ function renderPatientRows(patients) {
   tbody.innerHTML = patients.map(p => `
     <tr>
       <td><strong>${p.patient_code}</strong></td>
-      <td>${p.last_name}, ${p.first_name}</td>
+      <td><a href="#" onclick="event.preventDefault();openPatientDetail('${p.id}')" style="color:var(--accent);text-decoration:none;font-weight:600">${p.last_name}, ${p.first_name}</a></td>
       <td class="muted">${p.date_of_birth || '—'}</td>
       <td class="muted">${p.phone || '—'}</td>
       <td class="muted">${p.insurance_provider || '—'}</td>
@@ -2650,7 +2667,7 @@ async function loadClaims() {
     tbody.innerHTML = claims.map(c => `
       <tr>
         <td><strong>${c.patients?.patient_code || '—'}</strong> — ${c.patients?.last_name || ''}, ${c.patients?.first_name || ''}</td>
-        <td class="muted">${c.visits?.visit_date || '—'}</td>
+        <td class="muted">${c.claim_date || '—'}</td>
         <td>${badge(c.payment_type)}</td>
         <td>$${c.amount_billed != null ? Number(c.amount_billed).toFixed(2) : '—'}</td>
         <td>$${c.amount_paid != null ? Number(c.amount_paid).toFixed(2) : '—'}</td>
@@ -3519,13 +3536,211 @@ async function exportDailyPDF() {
 }
 
 // ════════════════════════════════════
+// PATIENT DETAIL VIEW (IN-APP)
+// ════════════════════════════════════
+async function openPatientDetail(patientId) {
+  const body = document.getElementById('patient-detail-body');
+  body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--ink3)">Loading...</div>';
+  document.getElementById('patient-detail-modal').classList.add('open');
+  document.getElementById('patient-detail-pdf-btn').setAttribute('onclick', `exportPatientPDF("${patientId}")`);
+
+  try {
+    const [patient, allClaims] = await Promise.all([
+      api('GET', `/api/patients/${patientId}`),
+      api('GET', '/api/claims')
+    ]);
+
+    const name = `${patient.last_name}, ${patient.first_name}`;
+    document.getElementById('patient-detail-title').textContent = name;
+
+    const visits = (patient.visits || []).sort((a, b) => (b.visit_date || '').localeCompare(a.visit_date || ''));
+    const diagnoses = (patient.diagnoses || []).sort((a, b) => (b.diagnosed_date || '').localeCompare(a.diagnosed_date || ''));
+    const claims = allClaims.filter(c => c.patient_id === patientId).sort((a, b) => (b.claim_date || '').localeCompare(a.claim_date || ''));
+
+    // Fetch intake images for the patient's visit dates
+    const visitDates = [...new Set(visits.map(v => v.visit_date).filter(Boolean))];
+    let intakeImages = [];
+    if (visitDates.length) {
+      const minDate = visitDates.reduce((a, b) => a < b ? a : b);
+      const maxDate = visitDates.reduce((a, b) => a > b ? a : b);
+      const allImages = await api('GET', `/api/intake-images?from=${minDate}&to=${maxDate}`);
+      intakeImages = allImages.filter(img => visitDates.includes(img.business_date));
+    }
+
+    const totalBilled = claims.reduce((s, c) => s + (parseFloat(c.amount_billed) || 0), 0);
+    const totalPaid = claims.reduce((s, c) => s + (parseFloat(c.amount_paid) || 0), 0);
+    const activeDx = diagnoses.filter(d => d.is_active);
+
+    let html = '';
+
+    // Patient info bar
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 14px;padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:12px;font-size:13px">
+      <div><span style="color:var(--ink3);font-size:11px">Code</span><br><strong>${esc(patient.patient_code || '—')}</strong></div>
+      <div><span style="color:var(--ink3);font-size:11px">DOB</span><br><strong>${patient.date_of_birth || '—'}</strong></div>
+      <div><span style="color:var(--ink3);font-size:11px">Phone</span><br><strong>${esc(patient.phone || '—')}</strong></div>
+      <div><span style="color:var(--ink3);font-size:11px">Payment</span><br><strong>${patient.payment_type ? badge(patient.payment_type) : '—'}</strong></div>
+      <div><span style="color:var(--ink3);font-size:11px">Insurance</span><br><strong>${esc(patient.insurance_provider || '—')}</strong></div>
+      <div><span style="color:var(--ink3);font-size:11px">Member ID</span><br><strong>${esc(patient.insurance_id || '—')}</strong></div>
+    </div>`;
+
+    // Summary stats
+    html += `<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:80px;text-align:center;padding:8px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:20px;font-weight:700;color:var(--accent)">${visits.length}</div>
+        <div style="font-size:10px;color:var(--ink3)">VISITS</div>
+      </div>
+      <div style="flex:1;min-width:80px;text-align:center;padding:8px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:20px;font-weight:700;color:var(--accent)">${activeDx.length}</div>
+        <div style="font-size:10px;color:var(--ink3)">ACTIVE DX</div>
+      </div>
+      <div style="flex:1;min-width:80px;text-align:center;padding:8px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:20px;font-weight:700;color:var(--accent)">${claims.length}</div>
+        <div style="font-size:10px;color:var(--ink3)">CLAIMS</div>
+      </div>
+      <div style="flex:1;min-width:80px;text-align:center;padding:8px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:20px;font-weight:700;color:#22c55e">$${totalPaid.toLocaleString()}</div>
+        <div style="font-size:10px;color:var(--ink3)">PAID</div>
+      </div>
+      <div style="flex:1;min-width:80px;text-align:center;padding:8px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:20px;font-weight:700;color:${totalBilled - totalPaid > 0 ? '#ef4444' : '#22c55e'}">$${(totalBilled - totalPaid).toLocaleString()}</div>
+        <div style="font-size:10px;color:var(--ink3)">OUTSTANDING</div>
+      </div>
+    </div>`;
+
+    // Tabs for Visit / Diagnosis / Claims / Intake Sheets
+    html += `<div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:0">
+      <button class="btn btn-ghost" id="pd-tab-visits" onclick="switchPatientTab('visits')" style="border-radius:8px 8px 0 0;border-bottom:2px solid var(--accent);margin-bottom:-2px;font-weight:600">Visits (${visits.length})</button>
+      <button class="btn btn-ghost" id="pd-tab-diagnoses" onclick="switchPatientTab('diagnoses')" style="border-radius:8px 8px 0 0;margin-bottom:-2px">Diagnoses (${diagnoses.length})</button>
+      <button class="btn btn-ghost" id="pd-tab-claims" onclick="switchPatientTab('claims')" style="border-radius:8px 8px 0 0;margin-bottom:-2px">Claims (${claims.length})</button>
+      <button class="btn btn-ghost" id="pd-tab-intake" onclick="switchPatientTab('intake')" style="border-radius:8px 8px 0 0;margin-bottom:-2px">Intake Sheets (${intakeImages.length})</button>
+    </div>`;
+
+    // ── VISITS TAB ──
+    html += `<div id="pd-panel-visits" style="max-height:300px;overflow-y:auto">`;
+    if (visits.length) {
+      html += `<table style="width:100%;font-size:12px"><thead><tr>
+        <th style="padding:6px">Date</th><th style="padding:6px">Status</th><th style="padding:6px">Manip</th>
+        <th style="padding:6px">TE</th><th style="padding:6px">Dx Codes</th><th style="padding:6px">Workflow</th><th style="padding:6px">Notes</th>
+      </tr></thead><tbody>`;
+      visits.forEach(v => {
+        html += `<tr>
+          <td style="padding:5px 6px;white-space:nowrap">${v.visit_date || '—'}</td>
+          <td style="padding:5px 6px">${v.patient_status || '—'}</td>
+          <td style="padding:5px 6px;font-weight:600;text-align:center">${v.manipulation_type || '—'}</td>
+          <td style="padding:5px 6px;text-align:center">${v.therapeutic_exercises != null ? v.therapeutic_exercises : '—'}</td>
+          <td style="padding:5px 6px;font-size:11px;max-width:120px;word-wrap:break-word">${esc(String(v.diagnosis_codes || '—'))}</td>
+          <td style="padding:5px 6px">${v.workflow_status ? badge(v.workflow_status) : '—'}</td>
+          <td style="padding:5px 6px;font-size:11px;color:var(--ink3);max-width:120px;word-wrap:break-word">${esc(v.notes || '—')}</td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+    } else {
+      html += `<div style="text-align:center;padding:24px;color:var(--ink3)">No visits recorded</div>`;
+    }
+    html += `</div>`;
+
+    // ── DIAGNOSES TAB ──
+    html += `<div id="pd-panel-diagnoses" style="display:none;max-height:300px;overflow-y:auto">`;
+    if (diagnoses.length) {
+      html += `<table style="width:100%;font-size:12px"><thead><tr>
+        <th style="padding:6px">ICD-10</th><th style="padding:6px">Description</th><th style="padding:6px">Date</th><th style="padding:6px">Status</th>
+      </tr></thead><tbody>`;
+      diagnoses.forEach(d => {
+        const statusBadge = d.is_active
+          ? '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">Active</span>'
+          : '<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">Inactive</span>';
+        html += `<tr>
+          <td style="padding:5px 6px;font-weight:600">${esc(d.diagnosis_code || '—')}</td>
+          <td style="padding:5px 6px">${esc(d.diagnosis_description || '—')}</td>
+          <td style="padding:5px 6px">${d.diagnosed_date || '—'}</td>
+          <td style="padding:5px 6px">${statusBadge}</td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+    } else {
+      html += `<div style="text-align:center;padding:24px;color:var(--ink3)">No diagnoses recorded</div>`;
+    }
+    html += `</div>`;
+
+    // ── CLAIMS TAB ──
+    html += `<div id="pd-panel-claims" style="display:none;max-height:300px;overflow-y:auto">`;
+    if (claims.length) {
+      html += `<table style="width:100%;font-size:12px"><thead><tr>
+        <th style="padding:6px">Date</th><th style="padding:6px">Type</th><th style="padding:6px">Status</th>
+        <th style="padding:6px;text-align:right">Billed</th><th style="padding:6px;text-align:right">Paid</th><th style="padding:6px">Notes</th>
+      </tr></thead><tbody>`;
+      claims.forEach(c => {
+        html += `<tr>
+          <td style="padding:5px 6px">${c.claim_date || '—'}</td>
+          <td style="padding:5px 6px">${c.payment_type || '—'}</td>
+          <td style="padding:5px 6px">${badge(c.claim_status || 'pending')}</td>
+          <td style="padding:5px 6px;text-align:right;font-weight:600">$${(parseFloat(c.amount_billed) || 0).toLocaleString()}</td>
+          <td style="padding:5px 6px;text-align:right">$${(parseFloat(c.amount_paid) || 0).toLocaleString()}</td>
+          <td style="padding:5px 6px;font-size:11px;color:var(--ink3)">${esc(c.notes || '—')}</td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+    } else {
+      html += `<div style="text-align:center;padding:24px;color:var(--ink3)">No claims recorded</div>`;
+    }
+    html += `</div>`;
+
+    // ── INTAKE SHEETS TAB ──
+    html += `<div id="pd-panel-intake" style="display:none;max-height:300px;overflow-y:auto">`;
+    if (intakeImages.length) {
+      html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;padding:10px">`;
+      intakeImages.forEach(img => {
+        html += `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface2);cursor:pointer" onclick="loadAndShowIntakeImage('${img.id}')">
+          <div style="padding:8px;text-align:center">
+            <div style="font-size:28px;margin-bottom:4px">📄</div>
+            <div style="font-size:11px;font-weight:600">${esc(img.file_name || 'intake.jpg')}</div>
+            <div style="font-size:10px;color:var(--ink3)">${img.business_date}</div>
+            <div style="font-size:10px;color:var(--ink3)">${img.image_tag === 'charge_capture' ? 'Charge Capture' : 'Intake Form'}</div>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<div style="text-align:center;padding:24px;color:var(--ink3)">No intake sheets found for this patient's visit dates</div>`;
+    }
+    html += `</div>`;
+
+    body.innerHTML = html;
+  } catch(e) {
+    body.innerHTML = `<div style="text-align:center;padding:40px;color:#ef4444">Failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+async function loadAndShowIntakeImage(imageId) {
+  try {
+    const img = await api('GET', `/api/intake-images/${imageId}`);
+    if (img.image_data) {
+      const win = window.open('', '_blank');
+      win.document.write(`<!DOCTYPE html><html><head><title>${esc(img.file_name || 'Intake Sheet')}</title>
+        <style>body{margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh}img{max-width:100%;max-height:100vh}</style>
+        </head><body><img src="${img.image_data}"/></body></html>`);
+      win.document.close();
+    }
+  } catch(e) { toast('Failed to load image: ' + e.message, 'error'); }
+}
+
+function switchPatientTab(tab) {
+  ['visits', 'diagnoses', 'claims', 'intake'].forEach(t => {
+    document.getElementById('pd-panel-' + t).style.display = t === tab ? '' : 'none';
+    const btn = document.getElementById('pd-tab-' + t);
+    btn.style.borderBottom = t === tab ? '2px solid var(--accent)' : 'none';
+    btn.style.fontWeight = t === tab ? '600' : '400';
+  });
+}
+
+// ════════════════════════════════════
 // SINGLE PATIENT PDF REPORT
 // ════════════════════════════════════
 async function exportPatientPDF(patientId) {
   toast('Generating patient report...');
 
   try {
-    // Fetch patient with visits + diagnoses, and claims separately
+    // Fetch patient with visits + diagnoses, claims, and intake images
     const [patient, allClaims] = await Promise.all([
       api('GET', `/api/patients/${patientId}`),
       api('GET', '/api/claims')
@@ -3535,6 +3750,20 @@ async function exportPatientPDF(patientId) {
     const visits = (patient.visits || []).sort((a, b) => (a.visit_date || '').localeCompare(b.visit_date || ''));
     const diagnoses = (patient.diagnoses || []).sort((a, b) => (a.diagnosed_date || '').localeCompare(b.diagnosed_date || ''));
     const claims = allClaims.filter(c => c.patient_id === patientId).sort((a, b) => (a.claim_date || '').localeCompare(b.claim_date || ''));
+
+    // Fetch intake images for visit dates
+    const pdfVisitDates = [...new Set(visits.map(v => v.visit_date).filter(Boolean))];
+    let pdfIntakeImages = [];
+    if (pdfVisitDates.length) {
+      const minD = pdfVisitDates.reduce((a, b) => a < b ? a : b);
+      const maxD = pdfVisitDates.reduce((a, b) => a > b ? a : b);
+      const allImgs = await api('GET', `/api/intake-images?from=${minD}&to=${maxD}`);
+      const dateImgIds = allImgs.filter(img => pdfVisitDates.includes(img.business_date));
+      // Fetch full image data for each
+      for (const img of dateImgIds) {
+        try { const full = await api('GET', `/api/intake-images/${img.id}`); pdfIntakeImages.push(full); } catch(e) {}
+      }
+    }
 
     // Stats
     const totalVisits = visits.length;
@@ -3693,7 +3922,7 @@ async function exportPatientPDF(patientId) {
         <th style="text-align:right">BILLED</th><th style="text-align:right">PAID</th><th>NOTES</th>
       </tr></thead><tbody>`;
       claims.forEach((c, i) => {
-        const visitDate = c.visits?.visit_date || '—';
+        const visitDate = c.claim_date || '—';
         html += `<tr>
           <td>${i + 1}</td>
           <td>${c.claim_date || '—'}</td>
@@ -3707,6 +3936,20 @@ async function exportPatientPDF(patientId) {
       });
       html += `</tbody></table>`;
       html += `<div class="totals">BILLED: $${totalBilled.toLocaleString()} &nbsp;&nbsp; PAID: $${totalPaid.toLocaleString()} &nbsp;&nbsp; OUTSTANDING: $${(totalBilled - totalPaid).toLocaleString()}</div>`;
+      html += `</div>`;
+    }
+
+    // ── INTAKE SHEETS ──
+    if (pdfIntakeImages.length) {
+      html += `<div class="section" style="page-break-before:always">`;
+      html += `<div class="section-title" style="background:#7c3aed">INTAKE SHEETS (${pdfIntakeImages.length})</div>`;
+      pdfIntakeImages.forEach((img, i) => {
+        if (i > 0) html += `<div style="page-break-before:always"></div>`;
+        html += `<div style="margin:8px 0;text-align:center">
+          <div style="font-size:9px;color:#64748b;margin-bottom:4px">${esc(img.file_name || 'intake.jpg')} — ${img.business_date} — ${img.image_tag === 'charge_capture' ? 'Charge Capture' : 'Intake Form'}</div>
+          <img src="${img.image_data}" style="max-width:100%;max-height:90vh;border:1px solid #e2e8f0;border-radius:4px"/>
+        </div>`;
+      });
       html += `</div>`;
     }
 

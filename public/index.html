@@ -3396,9 +3396,10 @@ async function exportDailyPDF() {
 
       .main { display: flex; gap: 6px; margin-top: 4px; height: calc(100vh - 30px); }
 
-      /* Left column: intake form image (40%, 90% height) */
-      .col-left { width: 40%; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-      .col-left img { width: 100%; flex: 1; min-height: 0; object-fit: contain; object-position: top left; border: 1px solid #ccc; background: #f9f9f9; }
+      /* Left column: notes + intake form image (40%) */
+      .col-left { width: 40%; display: flex; flex-direction: column; gap: 3px; min-width: 0; overflow: hidden; }
+      .intake-img-wrap { flex: 1; min-height: 0; position: relative; border: 1px solid #ccc; background: #f9f9f9; overflow: hidden; }
+      .intake-img-wrap img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; object-position: top left; }
       .col-left .img-placeholder { flex: 1; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; color: #999; font-size: 9px; }
 
       /* Right column: notes + record count + digitalized list + charge capture (60%) */
@@ -3455,7 +3456,7 @@ async function exportDailyPDF() {
     html += `</div>`;
     html += `<div class="section-label purple complete">INTAKE FORM</div>`;
     if (intakeImageData.length) {
-      html += `<img src="${intakeImageData[0].image_data}" alt="Intake Form"/>`;
+      html += `<div class="intake-img-wrap"><img src="${intakeImageData[0].image_data}" alt="Intake Form"/></div>`;
     } else {
       html += `<div class="img-placeholder">No intake form</div>`;
     }

@@ -973,9 +973,6 @@
         <span class="icon">🩺</span> Diagnoses
       </div>
       <div class="nav-section">Billing</div>
-      <div class="nav-item" data-page="claims" onclick="showPage('claims', this)">
-        <span class="icon">💳</span> Claims
-      </div>
       <div class="nav-section">Workspace</div>
       <div class="nav-item" data-page="tasks" onclick="showPage('tasks', this)">
         <span class="icon">✅</span> Tasks
@@ -1018,9 +1015,9 @@
           <div class="s-sub">in directory</div>
         </div>
         <div class="stat-card warn">
-          <div class="s-label">Pending Claims</div>
+          <div class="s-label">Workflow Pending</div>
           <div class="s-value" id="stat-claims">—</div>
-          <div class="s-sub">awaiting action</div>
+          <div class="s-sub">intake records</div>
         </div>
         <div class="stat-card green">
           <div class="s-label">New This Month</div>
@@ -1327,48 +1324,7 @@
     <!-- ══════════════════════════════════ -->
     <!-- CLAIMS                             -->
     <!-- ══════════════════════════════════ -->
-    <section class="page" id="page-claims">
-      <div class="page-header">
-        <div>
-          <h2>Claims</h2>
-          <p>Billing and insurance tracking</p>
-        </div>
-        <button class="btn btn-primary" onclick="openClaimModal()">+ New Claim</button>
-      </div>
-
-      <div class="card">
-        <div class="toolbar">
-          <select id="claims-filter" onchange="loadClaims()" style="max-width:180px">
-            <option value="">All Claims</option>
-            <option value="pending">Pending</option>
-            <option value="submitted">Submitted</option>
-            <option value="approved">Approved</option>
-            <option value="paid">Paid</option>
-            <option value="denied">Denied</option>
-          </select>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Patient</th>
-                <th>Visit Date</th>
-                <th>Payment Type</th>
-                <th>Billed</th>
-                <th>Paid</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="claims-tbody">
-              <tr><td colspan="7"><div class="empty-state"><div class="icon">💳</div><p>No claims yet.</p></div></td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- Bulk Upload + Intake Images now merged into Daily Intake above -->
+    <!-- Claims tab removed — claims will be built into the workflow -->
 
     <!-- ══════════════════════════════════ -->
     <!-- TASKS                               -->
@@ -1711,65 +1667,7 @@
   </div>
 </div>
 
-<!-- CLAIM MODAL -->
-<div class="modal-overlay" id="claim-modal">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 id="claim-modal-title">New Claim</h3>
-      <button class="modal-close" onclick="closeModal('claim-modal')">✕</button>
-    </div>
-    <input type="hidden" id="cl-edit-id"/>
-    <div class="form-grid">
-      <div class="form-group">
-        <label>Patient *</label>
-        <select id="cl-patient-id">
-          <option value="">— Select Patient —</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Claim Date</label>
-        <input type="date" id="cl-date"/>
-      </div>
-      <div class="form-group">
-        <label>Payment Type</label>
-        <select id="cl-payment">
-          <option value="insurance">Insurance</option>
-          <option value="cash">Cash</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Insurance Provider</label>
-        <input type="text" id="cl-insurance" placeholder="BlueCross, etc."/>
-      </div>
-      <div class="form-group">
-        <label>Amount Billed ($)</label>
-        <input type="number" id="cl-billed" placeholder="0.00" step="0.01" min="0"/>
-      </div>
-      <div class="form-group">
-        <label>Amount Paid ($)</label>
-        <input type="number" id="cl-paid" placeholder="0.00" step="0.01" min="0"/>
-      </div>
-      <div class="form-group">
-        <label>Claim Status</label>
-        <select id="cl-status">
-          <option value="pending">Pending</option>
-          <option value="submitted">Submitted</option>
-          <option value="approved">Approved</option>
-          <option value="paid">Paid</option>
-          <option value="denied">Denied</option>
-        </select>
-      </div>
-      <div class="form-group full">
-        <label>Notes</label>
-        <textarea id="cl-notes" placeholder="Any notes about this claim..."></textarea>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('claim-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveClaim()">Save Claim</button>
-    </div>
-  </div>
-</div>
+<!-- Claim modal removed — claims will be built into workflow -->
 
 <!-- INTAKE RECORD MODAL -->
 <div class="modal-overlay" id="intake-modal">
@@ -2168,7 +2066,7 @@ function showPage(page, el) {
   if (page === 'daily') { setTodayDate(); loadDailyPage(); }
   if (page === 'patients') loadPatients();
   if (page === 'diagnoses') loadDiagnoses();
-  if (page === 'claims') loadClaims();
+  // claims tab removed
   if (page === 'tasks') loadTasks();
   if (page === 'reports') initReports();
 }
@@ -2247,29 +2145,6 @@ function openDiagnosisModal(dx = null) {
     document.getElementById('dx-active').value = dx.is_active ? 'true' : 'false';
   }
   document.getElementById('diagnosis-modal').classList.add('open');
-}
-
-function openClaimModal(claim = null) {
-  populatePatientSelects();
-  clearForm(['cl-edit-id','cl-insurance','cl-notes']);
-  document.getElementById('cl-date').value = today();
-  document.getElementById('cl-billed').value = '';
-  document.getElementById('cl-paid').value = '';
-  document.getElementById('cl-payment').value = 'insurance';
-  document.getElementById('cl-status').value = 'pending';
-  document.getElementById('claim-modal-title').textContent = claim ? 'Edit Claim' : 'New Claim';
-  if (claim) {
-    document.getElementById('cl-edit-id').value = claim.id;
-    document.getElementById('cl-patient-id').value = claim.patient_id || '';
-    document.getElementById('cl-date').value = claim.claim_date || '';
-    document.getElementById('cl-payment').value = claim.payment_type || 'insurance';
-    document.getElementById('cl-insurance').value = claim.insurance_provider || '';
-    document.getElementById('cl-billed').value = claim.amount_billed || '';
-    document.getElementById('cl-paid').value = claim.amount_paid || '';
-    document.getElementById('cl-status').value = claim.claim_status || 'pending';
-    document.getElementById('cl-notes').value = claim.notes || '';
-  }
-  document.getElementById('claim-modal').classList.add('open');
 }
 
 function clearForm(ids) {
@@ -2421,7 +2296,7 @@ function badge(val, type) {
 
 async function populatePatientSelects() {
   if (allPatients.length === 0) await loadPatientsData();
-  ['visit-patient-id','dx-patient-id','cl-patient-id'].forEach(id => {
+  ['visit-patient-id','dx-patient-id'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
     const cur = sel.value;
@@ -2466,15 +2341,15 @@ async function loadDashboard() {
   document.getElementById('today-label').textContent = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
   try {
-    const [visits, patients, claims] = await Promise.all([
+    const [visits, patients, wfCounts] = await Promise.all([
       api('GET', `/api/visits?date=${today()}`),
       api('GET', '/api/patients'),
-      api('GET', '/api/claims?status=pending')
+      api('GET', '/api/visits/workflow-counts')
     ]);
     allPatients = patients;
     document.getElementById('stat-today').textContent = visits.length;
     document.getElementById('stat-patients').textContent = patients.length;
-    document.getElementById('stat-claims').textContent = claims.length;
+    document.getElementById('stat-claims').textContent = (wfCounts.intake || 0) + (wfCounts.entered_ebs || 0);
     const mo = today().substring(0,7);
     document.getElementById('stat-new').textContent = patients.filter(p => p.created_at?.startsWith(mo)).length;
     renderVisitRows('dashboard-tbody', visits, true);
@@ -2701,58 +2576,6 @@ async function saveDiagnosis() {
     }
     closeModal('diagnosis-modal');
     loadDiagnoses();
-  } catch(e) { toast('Error: ' + e.message, 'error'); }
-}
-
-// ════════════════════════════════════
-// CLAIMS
-// ════════════════════════════════════
-async function loadClaims() {
-  const status = document.getElementById('claims-filter')?.value || '';
-  try {
-    const claims = await api('GET', `/api/claims${status ? '?status=' + status : ''}`);
-    const tbody = document.getElementById('claims-tbody');
-    if (!claims.length) {
-      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">💳</div><p>No claims found.</p></div></td></tr>`;
-      return;
-    }
-    tbody.innerHTML = claims.map(c => `
-      <tr>
-        <td><strong>${c.patients?.patient_code || '—'}</strong> — ${c.patients?.last_name || ''}, ${c.patients?.first_name || ''}</td>
-        <td class="muted">${c.claim_date || '—'}</td>
-        <td>${badge(c.payment_type)}</td>
-        <td>$${c.amount_billed != null ? Number(c.amount_billed).toFixed(2) : '—'}</td>
-        <td>$${c.amount_paid != null ? Number(c.amount_paid).toFixed(2) : '—'}</td>
-        <td>${badge(c.claim_status)}</td>
-        <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openClaimModal(${JSON.stringify(c)})'>Edit</button></div></td>
-      </tr>
-    `).join('');
-  } catch(e) { toast('Failed to load claims: ' + e.message, 'error'); }
-}
-
-async function saveClaim() {
-  const editId = document.getElementById('cl-edit-id').value;
-  const body = {
-    patient_id: document.getElementById('cl-patient-id').value,
-    claim_date: document.getElementById('cl-date').value,
-    payment_type: document.getElementById('cl-payment').value,
-    insurance_provider: document.getElementById('cl-insurance').value.trim() || null,
-    amount_billed: parseFloat(document.getElementById('cl-billed').value) || null,
-    amount_paid: parseFloat(document.getElementById('cl-paid').value) || null,
-    claim_status: document.getElementById('cl-status').value,
-    notes: document.getElementById('cl-notes').value.trim() || null
-  };
-  if (!body.patient_id) { toast('Patient is required.', 'error'); return; }
-  try {
-    if (editId) {
-      await api('PUT', `/api/claims/${editId}`, body);
-      toast('Claim updated!', 'success');
-    } else {
-      await api('POST', '/api/claims', body);
-      toast('Claim created!', 'success');
-    }
-    closeModal('claim-modal');
-    loadClaims();
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 

@@ -347,7 +347,8 @@ app.get('/api/visits', async (req, res) => {
     .order('created_at', { ascending: true });
 
   if (req.query.date) {
-    query = query.eq('service_date', req.query.date);
+    // Show records where the sheet_date (intake day) OR service_date matches
+    query = query.or(`sheet_date.eq.${req.query.date},service_date.eq.${req.query.date}`);
   }
   if (req.query.patient_id) {
     query = query.eq('patient_id', req.query.patient_id);

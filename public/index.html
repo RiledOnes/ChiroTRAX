@@ -889,6 +889,25 @@
       background: none; border: none; color: var(--danger);
       cursor: pointer; font-size: 11px; font-weight: 600;
     }
+
+    /* Searchable select */
+    .search-select { position: relative; display: inline-block; }
+    .search-select input {
+      width: 100%; padding: 8px 10px; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--ink); font-size: 13px; outline: none;
+    }
+    .search-select input:focus { border-color: var(--accent); }
+    .search-select .ss-list {
+      display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 200px;
+      overflow-y: auto; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 0 0 8px 8px; z-index: 200; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .search-select.open .ss-list { display: block; }
+    .search-select .ss-item {
+      padding: 6px 10px; cursor: pointer; font-size: 13px; color: var(--ink);
+    }
+    .search-select .ss-item:hover, .search-select .ss-item.active { background: var(--accent-dim); color: var(--accent); }
+    .search-select .ss-item.ss-empty { color: var(--ink3); cursor: default; font-style: italic; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 </head>
@@ -1292,9 +1311,11 @@
 
       <div class="card">
         <div class="toolbar">
-          <select id="dx-filter" onchange="loadDiagnoses()" style="max-width:180px">
-            <option value="">All Patients</option>
-          </select>
+          <div class="search-select" id="ss-dx-filter" style="max-width:220px">
+            <input type="text" id="dx-filter-search" placeholder="Filter by patient..." autocomplete="off" oninput="filterSearchSelect('ss-dx-filter')" onfocus="openSearchSelect('ss-dx-filter')"/>
+            <input type="hidden" id="dx-filter"/>
+            <div class="ss-list"></div>
+          </div>
           <select id="dx-active-filter" onchange="loadDiagnoses()" style="max-width:160px">
             <option value="">Active & Inactive</option>
             <option value="true">Active Only</option>
@@ -1306,7 +1327,8 @@
             <thead>
               <tr>
                 <th>Patient</th>
-                <th>ICD Code</th>
+                <th>Category</th>
+                <th>ICD-10 Codes</th>
                 <th>Description</th>
                 <th>Date</th>
                 <th>Status</th>
@@ -1374,9 +1396,11 @@
           <p>Practice analytics and performance overview</p>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <select id="rpt-patient" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px;max-width:200px">
-            <option value="">All Patients</option>
-          </select>
+          <div class="search-select" id="ss-rpt-patient" style="max-width:220px">
+            <input type="text" id="rpt-patient-search" placeholder="All Patients" autocomplete="off" oninput="filterSearchSelect('ss-rpt-patient')" onfocus="openSearchSelect('ss-rpt-patient')"/>
+            <input type="hidden" id="rpt-patient"/>
+            <div class="ss-list"></div>
+          </div>
           <input type="date" id="rpt-from" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
           <span style="color:var(--ink3)">to</span>
           <input type="date" id="rpt-to" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
@@ -1524,9 +1548,11 @@
     <div class="form-grid">
       <div class="form-group">
         <label>Patient *</label>
-        <select id="visit-patient-id">
-          <option value="">— Select Patient —</option>
-        </select>
+        <div class="search-select" id="ss-visit-patient">
+          <input type="text" id="visit-patient-search" placeholder="Type to search patients..." autocomplete="off" oninput="filterSearchSelect('ss-visit-patient')" onfocus="openSearchSelect('ss-visit-patient')"/>
+          <input type="hidden" id="visit-patient-id"/>
+          <div class="ss-list"></div>
+        </div>
       </div>
       <div class="form-group">
         <label>Intake Date *</label>
@@ -1636,9 +1662,11 @@
     <div class="form-grid">
       <div class="form-group">
         <label>Patient *</label>
-        <select id="dx-patient-id">
-          <option value="">— Select Patient —</option>
-        </select>
+        <div class="search-select" id="ss-dx-patient">
+          <input type="text" id="dx-patient-search" placeholder="Type to search patients..." autocomplete="off" oninput="filterSearchSelect('ss-dx-patient')" onfocus="openSearchSelect('ss-dx-patient')"/>
+          <input type="hidden" id="dx-patient-id"/>
+          <div class="ss-list"></div>
+        </div>
       </div>
       <div class="form-group">
         <label>ICD-10 Code</label>
@@ -2090,16 +2118,17 @@ function closeModal(id) {
 
 function openVisitModal(visit = null) {
   populatePatientSelects();
-  clearForm(['visit-edit-id','visit-patient-id','visit-status','visit-manip','visit-notes']);
+  clearForm(['visit-edit-id','visit-status','visit-manip','visit-notes']);
+  setSearchSelectValue('ss-visit-patient', '', '');
   document.getElementById('visit-exercises').value = '';
-  // Default intake date from the daily intake date picker, or today
   const intakeDate = document.getElementById('intake-date')?.value || today();
   document.getElementById('visit-date').value = intakeDate;
   document.getElementById('visit-service-date').value = '';
   document.getElementById('visit-modal-title').textContent = visit ? 'Edit Visit' : 'Log Visit';
   if (visit) {
     document.getElementById('visit-edit-id').value = visit.id;
-    document.getElementById('visit-patient-id').value = visit.patient_id || '';
+    const patLabel = visit.patients ? `${visit.patients.patient_code} — ${visit.patients.last_name}, ${visit.patients.first_name}` : (visit.patient_name || '');
+    setSearchSelectValue('ss-visit-patient', visit.patient_id || '', patLabel);
     document.getElementById('visit-date').value = visit.sheet_date || visit.visit_date || '';
     document.getElementById('visit-service-date').value = visit.is_backdated ? (visit.visit_date || '') : '';
     document.getElementById('visit-status').value = visit.patient_status || '';
@@ -2133,12 +2162,14 @@ function openPatientModal(patient = null) {
 function openDiagnosisModal(dx = null) {
   populatePatientSelects();
   clearForm(['dx-edit-id','dx-code','dx-desc']);
+  setSearchSelectValue('ss-dx-patient', '', '');
   document.getElementById('dx-date').value = today();
   document.getElementById('dx-active').value = 'true';
   document.getElementById('dx-modal-title').textContent = dx ? 'Edit Diagnosis' : 'Add Diagnosis';
   if (dx) {
     document.getElementById('dx-edit-id').value = dx.id;
-    document.getElementById('dx-patient-id').value = dx.patient_id || '';
+    const patLabel = dx._patient ? `${dx._patient.patient_code} — ${dx._patient.last_name}, ${dx._patient.first_name}` : '';
+    setSearchSelectValue('ss-dx-patient', dx.patient_id || '', patLabel);
     document.getElementById('dx-code').value = dx.diagnosis_code || '';
     document.getElementById('dx-desc').value = dx.diagnosis_description || '';
     document.getElementById('dx-date').value = dx.diagnosed_date || '';
@@ -2296,16 +2327,81 @@ function badge(val, type) {
 
 async function populatePatientSelects() {
   if (allPatients.length === 0) await loadPatientsData();
-  ['visit-patient-id','dx-patient-id'].forEach(id => {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">— Select Patient —</option>';
-    allPatients.forEach(p => {
-      sel.innerHTML += `<option value="${p.id}">${p.patient_code} — ${p.last_name}, ${p.first_name}</option>`;
-    });
-    if (cur) sel.value = cur;
+  // Populate all searchable select dropdowns
+  const ssIds = ['ss-visit-patient', 'ss-dx-patient', 'ss-dx-filter', 'ss-rpt-patient'];
+  ssIds.forEach(ssId => {
+    const wrap = document.getElementById(ssId);
+    if (!wrap) return;
+    wrap._patients = allPatients;
+    // For filter dropdowns, add an "All" option
+    const isFilter = ssId === 'ss-dx-filter' || ssId === 'ss-rpt-patient';
+    wrap._allowEmpty = isFilter;
+    wrap._emptyLabel = isFilter ? 'All Patients' : '— Select Patient —';
+    // Set the onSelect callback
+    if (ssId === 'ss-dx-filter') wrap._onSelect = () => loadDiagnoses();
+    if (ssId === 'ss-rpt-patient') wrap._onSelect = () => loadReports();
   });
+}
+
+function openSearchSelect(ssId) {
+  const wrap = document.getElementById(ssId);
+  if (!wrap) return;
+  wrap.classList.add('open');
+  filterSearchSelect(ssId);
+  // Close on outside click
+  setTimeout(() => {
+    const close = (e) => { if (!wrap.contains(e.target)) { wrap.classList.remove('open'); document.removeEventListener('mousedown', close); } };
+    document.addEventListener('mousedown', close);
+  }, 0);
+}
+
+function filterSearchSelect(ssId) {
+  const wrap = document.getElementById(ssId);
+  if (!wrap) return;
+  const input = wrap.querySelector('input[type="text"]');
+  const list = wrap.querySelector('.ss-list');
+  const q = (input.value || '').toLowerCase();
+  const patients = wrap._patients || allPatients;
+
+  let html = '';
+  if (wrap._allowEmpty) {
+    html += `<div class="ss-item" onclick="selectSearchItem('${ssId}','','${wrap._emptyLabel || 'All Patients'}')">${wrap._emptyLabel || 'All Patients'}</div>`;
+  }
+  const filtered = patients.filter(p =>
+    p.first_name.toLowerCase().includes(q) ||
+    p.last_name.toLowerCase().includes(q) ||
+    p.patient_code.toLowerCase().includes(q)
+  );
+  if (filtered.length) {
+    filtered.slice(0, 50).forEach(p => {
+      const label = `${p.patient_code} — ${p.last_name}, ${p.first_name}`;
+      html += `<div class="ss-item" onclick="selectSearchItem('${ssId}','${p.id}',\`${label.replace(/`/g, '')}\`)">${esc(label)}</div>`;
+    });
+    if (filtered.length > 50) html += `<div class="ss-item ss-empty">+${filtered.length - 50} more...</div>`;
+  } else {
+    html += `<div class="ss-item ss-empty">No patients found</div>`;
+  }
+  list.innerHTML = html;
+}
+
+function selectSearchItem(ssId, value, label) {
+  const wrap = document.getElementById(ssId);
+  if (!wrap) return;
+  const input = wrap.querySelector('input[type="text"]');
+  const hidden = wrap.querySelector('input[type="hidden"]');
+  input.value = value ? label : '';
+  hidden.value = value;
+  wrap.classList.remove('open');
+  if (wrap._onSelect) wrap._onSelect();
+}
+
+function setSearchSelectValue(ssId, value, label) {
+  const wrap = document.getElementById(ssId);
+  if (!wrap) return;
+  const input = wrap.querySelector('input[type="text"]');
+  const hidden = wrap.querySelector('input[type="hidden"]');
+  input.value = label || '';
+  hidden.value = value || '';
 }
 
 // ════════════════════════════════════
@@ -2432,14 +2528,6 @@ async function loadPatients() {
   try {
     await loadPatientsData();
     renderPatientRows(allPatients);
-    // populate filter dropdown in diagnoses
-    const dxFilter = document.getElementById('dx-filter');
-    if (dxFilter) {
-      dxFilter.innerHTML = '<option value="">All Patients</option>';
-      allPatients.forEach(p => {
-        dxFilter.innerHTML += `<option value="${p.id}">${p.patient_code} — ${p.last_name}, ${p.first_name}</option>`;
-      });
-    }
   } catch(e) { toast('Failed to load patients: ' + e.message, 'error'); }
 }
 
@@ -2512,24 +2600,51 @@ async function loadDiagnoses() {
 
   try {
     if (allPatients.length === 0) await loadPatientsData();
-
-    // populate the filter dropdown
-    const dxFilter = document.getElementById('dx-filter');
-    if (dxFilter && dxFilter.options.length <= 1) {
-      allPatients.forEach(p => {
-        dxFilter.innerHTML += `<option value="${p.id}">${p.patient_code} — ${p.last_name}, ${p.first_name}</option>`;
-      });
-    }
+    await populatePatientSelects();
 
     const patientsToQuery = patientFilter
       ? allPatients.filter(p => p.id === patientFilter)
       : allPatients;
 
+    // Fetch diagnoses table + intake_records for full ICD-10 codes
     const allDx = [];
     for (const p of patientsToQuery) {
-      const dx = await api('GET', `/api/diagnoses/${p.id}`);
-      dx.forEach(d => d._patient = p);
-      allDx.push(...dx);
+      const [dx, visits] = await Promise.all([
+        api('GET', `/api/diagnoses/${p.id}`),
+        api('GET', `/api/visits?patient_id=${p.id}`)
+      ]);
+
+      // Build unique ICD-10 code set from intake_records
+      const codeSet = new Set();
+      const categories = new Set();
+      visits.forEach(v => {
+        if (v.diagnosis_category) categories.add(v.diagnosis_category);
+        const codes = typeof v.diagnosis_codes === 'string' ? v.diagnosis_codes.split(',').map(s => s.trim()) : (v.diagnosis_codes || []);
+        codes.forEach(c => { if (c) codeSet.add(c); });
+      });
+
+      if (dx.length) {
+        // Merge diagnosis table entries with full code list
+        dx.forEach(d => {
+          d._patient = p;
+          d._allCodes = Array.from(codeSet);
+          d._categories = Array.from(categories).join(', ');
+        });
+        allDx.push(...dx);
+      } else if (codeSet.size > 0) {
+        // No diagnoses table entry, but codes exist in intake_records
+        allDx.push({
+          id: null,
+          patient_id: p.id,
+          diagnosis_code: Array.from(codeSet)[0],
+          diagnosis_description: Array.from(categories).join(', ') || 'From intake records',
+          diagnosed_date: visits[0]?.visit_date || null,
+          is_active: true,
+          _patient: p,
+          _allCodes: Array.from(codeSet),
+          _categories: Array.from(categories).join(', ')
+        });
+      }
     }
 
     const filtered = activeFilter
@@ -2538,19 +2653,22 @@ async function loadDiagnoses() {
 
     const tbody = document.getElementById('diagnoses-tbody');
     if (!filtered.length) {
-      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="icon">🩺</div><p>No diagnoses found.</p></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">🩺</div><p>No diagnoses found.</p></div></td></tr>`;
       return;
     }
-    tbody.innerHTML = filtered.map(d => `
-      <tr>
+    tbody.innerHTML = filtered.map(d => {
+      const allCodes = (d._allCodes || []).join(', ') || d.diagnosis_code || '—';
+      const category = d._categories || '—';
+      return `<tr>
         <td><strong>${d._patient?.patient_code}</strong> — ${d._patient?.last_name}, ${d._patient?.first_name}</td>
-        <td class="muted">${d.diagnosis_code || '—'}</td>
-        <td>${d.diagnosis_description}</td>
+        <td>${badge(category)}</td>
+        <td style="font-size:12px;max-width:200px;word-wrap:break-word">${esc(allCodes)}</td>
+        <td>${esc(d.diagnosis_description || '—')}</td>
         <td class="muted">${d.diagnosed_date || '—'}</td>
         <td>${d.is_active ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-inactive">Resolved</span>'}</td>
-        <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openDiagnosisModal(${JSON.stringify(d)})'>Edit</button></div></td>
-      </tr>
-    `).join('');
+        <td><div class="actions">${d.id ? `<button class="btn btn-secondary btn-xs" onclick='openDiagnosisModal(${JSON.stringify(d)})'>Edit</button>` : ''}</div></td>
+      </tr>`;
+    }).join('');
   } catch(e) { toast('Failed to load diagnoses: ' + e.message, 'error'); }
 }
 
@@ -3840,14 +3958,7 @@ async function exportPatientPDF(patientId) {
 // REPORTS
 // ════════════════════════════════════
 async function initReports() {
-  // Populate patient filter dropdown
-  if (allPatients.length === 0) await loadPatientsData();
-  const sel = document.getElementById('rpt-patient');
-  if (sel && sel.options.length <= 1) {
-    allPatients.forEach(p => {
-      sel.innerHTML += `<option value="${p.id}">${p.patient_code} — ${p.last_name}, ${p.first_name}</option>`;
-    });
-  }
+  await populatePatientSelects();
   const from = document.getElementById('rpt-from');
   const to = document.getElementById('rpt-to');
   if (!from.value) {

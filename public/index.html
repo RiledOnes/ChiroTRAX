@@ -802,6 +802,13 @@
     .badge-normal { background: rgba(46,125,50,0.10); color: var(--accent); }
     .badge-high { background: rgba(230,126,34,0.12); color: #c76b10; }
     .badge-urgent { background: rgba(192,57,43,0.12); color: var(--danger); }
+    .badge-cat-report { background: rgba(142,68,173,0.12); color: #8e44ad; }
+    .badge-cat-data_entry { background: rgba(41,128,185,0.12); color: #2980b9; }
+    .badge-cat-correction { background: rgba(230,126,34,0.12); color: #c76b10; }
+    .badge-cat-review { background: rgba(46,125,50,0.12); color: #2e7d32; }
+    .badge-cat-other { background: var(--surface3); color: var(--ink3); }
+    .task-overdue { color: var(--danger); font-weight: 600; }
+    .task-due-soon { color: #c76b10; font-weight: 500; }
     .badge-todo { background: var(--surface3); color: var(--ink2); }
     .badge-in_progress { background: rgba(46,125,50,0.10); color: var(--accent); }
     .badge-done { background: rgba(67,160,71,0.15); color: #1b5e20; }
@@ -1445,6 +1452,14 @@
             <option value="normal">Normal</option>
             <option value="low">Low</option>
           </select>
+          <select id="task-filter-category" onchange="loadTasks()" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
+            <option value="">All Categories</option>
+            <option value="report">Report</option>
+            <option value="data_entry">Data Entry</option>
+            <option value="correction">Correction</option>
+            <option value="review">Review</option>
+            <option value="other">Other</option>
+          </select>
           <button class="btn btn-ghost btn-sm" id="task-toggle-done" onclick="toggleShowDone()">Show Done</button>
           <button class="btn btn-primary" onclick="openTaskModal()">+ New Task</button>
         </div>
@@ -1871,7 +1886,7 @@
       </div>
       <div class="form-group">
         <label>Assigned To</label>
-        <input type="text" id="task-assigned-to" placeholder="e.g. Me"/>
+        <input type="text" id="task-assigned-to" placeholder="e.g. Michelle" value="Michelle"/>
       </div>
       <div class="form-group">
         <label>Priority</label>
@@ -1893,6 +1908,42 @@
           <option value="in_progress">In Progress</option>
           <option value="done">Done</option>
         </select>
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <select id="task-category" onchange="toggleTaskReportFields()">
+          <option value="">— None —</option>
+          <option value="report">Report</option>
+          <option value="data_entry">Data Entry</option>
+          <option value="correction">Correction</option>
+          <option value="review">Review</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group" id="task-report-type-group" style="display:none">
+        <label>Report Type</label>
+        <select id="task-report-type">
+          <option value="">— Select —</option>
+          <option value="patient_visits">Patient Visits</option>
+          <option value="claims_by_diagnosis">Claims by Diagnosis</option>
+          <option value="outstanding_claims">Outstanding Claims</option>
+          <option value="payment_summary">Payment Summary</option>
+          <option value="daily_intake">Daily Intake</option>
+          <option value="denials">Denials</option>
+          <option value="status_activity">Status Activity</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Related Patient</label>
+        <div class="search-select" id="ss-task-patient">
+          <input type="text" id="task-patient-search" placeholder="Type to search patients..." autocomplete="off" oninput="filterSearchSelect('ss-task-patient')" onfocus="openSearchSelect('ss-task-patient')"/>
+          <input type="hidden" id="task-patient-id"/>
+          <div class="ss-list"></div>
+        </div>
+      </div>
+      <div class="form-group full">
+        <label>Notes</label>
+        <textarea id="task-notes" placeholder="Additional notes..."></textarea>
       </div>
     </div>
     <div class="modal-footer">
@@ -2408,7 +2459,7 @@ function badge(val, type) {
 async function populatePatientSelects() {
   if (allPatients.length === 0) await loadPatientsData();
   // Populate all searchable select dropdowns
-  const ssIds = ['ss-visit-patient', 'ss-dx-patient', 'ss-dx-filter', 'ss-rpt-patient', 'ss-billing-patient'];
+  const ssIds = ['ss-visit-patient', 'ss-dx-patient', 'ss-dx-filter', 'ss-rpt-patient', 'ss-billing-patient', 'ss-task-patient'];
   ssIds.forEach(ssId => {
     const wrap = document.getElementById(ssId);
     if (!wrap) return;
@@ -3134,8 +3185,10 @@ async function loadTasks() {
 
 function renderTaskBoard() {
   const priorityFilter = document.getElementById('task-filter-priority')?.value || '';
+  const categoryFilter = document.getElementById('task-filter-category')?.value || '';
   let filtered = allTasks;
   if (priorityFilter) filtered = filtered.filter(t => t.priority === priorityFilter);
+  if (categoryFilter) filtered = filtered.filter(t => t.task_category === categoryFilter);
 
   const columns = { todo: [], in_progress: [], done: [] };
   filtered.forEach(t => {
@@ -3187,8 +3240,9 @@ function renderTaskBoard() {
           ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ''}
           <div class="task-meta">
             <span class="badge badge-${t.priority}">${t.priority}</span>
-            ${t.assigned_by ? `<span>from ${esc(t.assigned_by)}</span>` : ''}
-            ${t.due_date ? `<span class="${isOverdue ? 'task-overdue' : dueSoon ? 'task-overdue' : ''}">📅 ${t.due_date}${isOverdue ? ' (overdue)' : ''}</span>` : ''}
+            ${t.task_category ? `<span class="badge badge-cat-${t.task_category}">${t.task_category.replace('_', ' ')}</span>` : ''}
+            ${t.assigned_by ? `<span style="font-size:11px;color:var(--ink3)">from ${esc(t.assigned_by)}</span>` : ''}
+            ${t.due_date ? `<span class="${isOverdue ? 'task-overdue' : dueSoon ? 'task-due-soon' : ''}" style="font-size:11px">📅 ${t.due_date}${isOverdue ? ' (overdue)' : ''}</span>` : ''}
           </div>
           <div class="task-quick-actions" onclick="event.stopPropagation()">
             ${status === 'todo' ? `<button onclick="quickMoveTask('${t.id}','in_progress')">Start →</button>` : ''}
@@ -3231,11 +3285,17 @@ async function quickMoveTask(id, newStatus) {
 }
 
 function openTaskModal(task = null) {
-  clearForm(['task-edit-id', 'task-title', 'task-desc', 'task-assigned-to']);
+  clearForm(['task-edit-id', 'task-title', 'task-desc', 'task-assigned-to', 'task-notes']);
   document.getElementById('task-assigned-by').value = 'Dina';
+  document.getElementById('task-assigned-to').value = 'Michelle';
   document.getElementById('task-priority').value = 'normal';
   document.getElementById('task-status').value = 'todo';
   document.getElementById('task-due').value = '';
+  document.getElementById('task-category').value = '';
+  document.getElementById('task-report-type').value = '';
+  document.getElementById('task-notes').value = '';
+  setSearchSelectValue('ss-task-patient', '', '');
+  toggleTaskReportFields();
   document.getElementById('task-modal-title').textContent = task ? 'Edit Task' : 'New Task';
   document.getElementById('task-delete-btn').style.display = task ? '' : 'none';
 
@@ -3248,12 +3308,38 @@ function openTaskModal(task = null) {
     document.getElementById('task-priority').value = task.priority || 'normal';
     document.getElementById('task-status').value = task.status || 'todo';
     document.getElementById('task-due').value = task.due_date || '';
+    document.getElementById('task-category').value = task.task_category || '';
+    document.getElementById('task-report-type').value = task.report_type || '';
+    document.getElementById('task-notes').value = task.notes || '';
+    toggleTaskReportFields();
+    // Populate related patient
+    if (task.related_patient_id) {
+      const pat = allPatients.find(p => p.id === task.related_patient_id);
+      const patLabel = pat ? `${pat.patient_code} — ${pat.last_name}, ${pat.first_name}` : (task.related_patient_code || task.related_patient_id);
+      setSearchSelectValue('ss-task-patient', task.related_patient_id, patLabel);
+    } else {
+      setSearchSelectValue('ss-task-patient', '', '');
+    }
   }
   document.getElementById('task-modal').classList.add('open');
 }
 
+function toggleTaskReportFields() {
+  const cat = document.getElementById('task-category').value;
+  document.getElementById('task-report-type-group').style.display = cat === 'report' ? '' : 'none';
+}
+
 async function saveTask() {
   const editId = document.getElementById('task-edit-id').value;
+  const taskCategory = document.getElementById('task-category').value || null;
+  const reportType = (taskCategory === 'report' ? document.getElementById('task-report-type').value : null) || null;
+  const relatedPatientId = document.getElementById('task-patient-id').value || null;
+  // Look up patient code from allPatients if we have an id
+  let relatedPatientCode = null;
+  if (relatedPatientId) {
+    const pat = allPatients.find(p => p.id === relatedPatientId);
+    if (pat) relatedPatientCode = pat.patient_code;
+  }
   const body = {
     title: document.getElementById('task-title').value.trim(),
     description: document.getElementById('task-desc').value.trim() || null,
@@ -3261,7 +3347,13 @@ async function saveTask() {
     assigned_to: document.getElementById('task-assigned-to').value.trim() || null,
     priority: document.getElementById('task-priority').value,
     status: document.getElementById('task-status').value,
-    due_date: document.getElementById('task-due').value || null
+    due_date: document.getElementById('task-due').value || null,
+    task_category: taskCategory,
+    report_type: reportType,
+    report_params: reportType ? {} : null,
+    related_patient_id: relatedPatientId,
+    related_patient_code: relatedPatientCode,
+    notes: document.getElementById('task-notes').value.trim() || null
   };
 
   if (!body.title) { toast('Task title is required', 'error'); return; }

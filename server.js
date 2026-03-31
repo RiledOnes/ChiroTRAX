@@ -1132,6 +1132,16 @@ function computeSubtotals(records, reportType) {
       else if (days <= 90) totals.aging['61-90']++;
       else totals.aging['90+']++;
     }
+  } else if (reportType === 'reconciliation') {
+    totals.total_records = records.length;
+    totals.on_intake = records.filter(r => r.on_intake).length;
+    totals.in_charge_capture = records.filter(r => r.in_charge_capture).length;
+    totals.has_claim = records.filter(r => r.claim_number).length;
+    totals.in_billing = records.filter(r => r.in_billing_report).length;
+    totals.missing_capture = records.filter(r => !r.in_charge_capture).length;
+    totals.missing_claim = records.filter(r => !r.claim_number).length;
+    totals.missing_billing = records.filter(r => !r.in_billing_report).length;
+    totals.total_billing_amount = records.reduce((s, r) => s + (r.billing_amount || 0), 0);
   } else {
     totals.new_patients = records.filter(r => r.new_patient).length;
     totals.returning_patients = records.filter(r => r.returning_patient).length;
@@ -1261,6 +1271,52 @@ app.post('/api/reports/run', async (req, res) => {
           diagnosis_category: h.intake_records?.diagnosis_category || null,
           manipulation_type: h.intake_records?.manipulation_type || null
         }));
+        break;
+      }
+
+      case 'reconciliation': {
+        // Cross-reference intake_records, charge_capture images, and billing_reports
+        let irQuery = supabase.from('intake_records')
+          .select('id, intake_id, service_date, sheet_date, patient_id, patient_name, patient_code, manipulation_type, therapeutic_exercises, diagnosis_category, workflow_status, claim_number, cpt_manipulation, cpt_te')
+          .order('service_date', { ascending: true });
+        irQuery = applyIntakeFilters(irQuery, filters);
+        const { data: irData, error: irErr } = await irQuery;
+        if (irErr) return dbError(res, irErr);
+
+        // Get charge capture images (grouped by date)
+        const serviceDates = [...new Set((irData || []).map(r => r.service_date).filter(Boolean))];
+        let ccDates = new Set();
+        if (serviceDates.length) {
+          const minD = serviceDates.reduce((a, b) => a < b ? a : b);
+          const maxD = serviceDates.reduce((a, b) => a > b ? a : b);
+          const { data: ccImages } = await supabase.from('daily_intake_images')
+            .select('business_date')
+            .eq('image_tag', 'charge_capture')
+            .gte('business_date', minD).lte('business_date', maxD);
+          ccDates = new Set((ccImages || []).map(i => i.business_date));
+        }
+
+        // Get billing reports for matching
+        const { data: brData } = await supabase.from('billing_reports')
+          .select('patient_id, service_date, charge, claim_number');
+        const brMap = {};
+        (brData || []).forEach(br => {
+          const key = `${br.patient_id}_${br.service_date}`;
+          brMap[key] = br;
+        });
+
+        records = (irData || []).map(r => {
+          const brKey = `${r.patient_id}_${r.service_date}`;
+          const br = brMap[brKey];
+          return {
+            ...r,
+            on_intake: true,
+            in_charge_capture: ccDates.has(r.service_date),
+            claim_number: r.claim_number || br?.claim_number || null,
+            in_billing_report: !!br,
+            billing_amount: br ? parseFloat(br.charge) || 0 : null
+          };
+        });
         break;
       }
 

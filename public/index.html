@@ -890,6 +890,7 @@
       cursor: pointer; font-size: 11px; font-weight: 600;
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 </head>
 <body>
 
@@ -3218,30 +3219,26 @@ async function uploadImageFiles(files, tag) {
 }
 
 // Convert any image (including HEIC) to a previewable JPEG/PNG data URL
-function fileToPreviewableDataURL(file) {
+async function fileToPreviewableDataURL(file) {
+  const isHeic = file.name?.toLowerCase().match(/\.heic$/i) || file.type === 'image/heic' || file.type === 'image/heif';
+  if (isHeic && typeof heic2any !== 'undefined') {
+    try {
+      const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+      const convertedBlob = Array.isArray(blob) ? blob[0] : blob;
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(convertedBlob);
+      });
+    } catch(e) {
+      console.warn('HEIC conversion failed, trying raw:', e);
+    }
+  }
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = reject;
-    reader.onload = () => {
-      const dataUrl = reader.result;
-      // If it's HEIC or the browser can't display it, convert via canvas
-      const isHeic = file.name?.toLowerCase().match(/\.heic$/i) || file.type === 'image/heic' || file.type === 'image/heif';
-      if (isHeic) {
-        // Try to render through an Image element — modern browsers may support it
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          canvas.getContext('2d').drawImage(img, 0, 0);
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
-        };
-        img.onerror = () => resolve(dataUrl); // Store raw if conversion fails
-        img.src = dataUrl;
-      } else {
-        resolve(dataUrl);
-      }
-    };
+    reader.onload = () => resolve(reader.result);
     reader.readAsDataURL(file);
   });
 }
@@ -3272,7 +3269,7 @@ function setupImageDragDrop() {
   zone.addEventListener('drop', e => {
     e.preventDefault();
     zone.classList.remove('dragover');
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || f.name?.match(/\.heic$/i));
     if (!files.length) { toast('Please drop image files', 'error'); return; }
     // Simulate file input
     const dt = new DataTransfer();
@@ -3383,22 +3380,20 @@ async function exportDailyPDF() {
 
       .main { display: flex; gap: 6px; margin-top: 4px; height: calc(100vh - 30px); }
 
-      /* Left column: notes + intake image (33%) */
-      .col-left { width: 33%; display: flex; flex-direction: column; gap: 3px; min-width: 0; align-items: stretch; }
+      /* Left column: notes (25%) */
+      .col-left { width: 25%; display: flex; flex-direction: column; gap: 3px; min-width: 0; align-items: stretch; }
 
-      /* Right column: record count + digitalized list + charge capture (67%) */
-      .col-right { width: 67%; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      /* Right column: record count + digitalized list + images (75%) */
+      .col-right { width: 75%; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 
       .section-label { background: #2563eb; color: white; padding: 2px 8px; font-weight: 700; font-size: 8px; display: block; flex-shrink: 0; }
       .section-label.green { background: #16a34a; }
+      .section-label.purple { background: #7c3aed; }
       .section-label.complete::after { content: 'COMPLETE'; float: right; }
 
-      .notes-box { border: 1px solid #ccc; padding: 3px 6px; font-size: 7px; line-height: 1.3; flex-shrink: 0; }
-
-      .intake-img { width: 100%; object-fit: contain; object-position: top left; border: 1px solid #ccc; background: #f9f9f9; max-height: 400px; }
+      .notes-box { border: 1px solid #ccc; padding: 3px 6px; font-size: 7px; line-height: 1.3; flex: 1; }
 
       /* Right column top: record count inline + digitalized list */
-      .right-top { display: flex; flex-direction: column; flex: 1; min-height: 0; }
       .count-row { display: flex; gap: 6px; flex-shrink: 0; }
       .count-box { border: 1px solid #ccc; padding: 3px 6px; font-size: 8px; flex: 1; }
       .count-box table { width: 100%; border-collapse: collapse; }
@@ -3408,15 +3403,17 @@ async function exportDailyPDF() {
       table.visits { width: 100%; border-collapse: collapse; font-size: 7.5px; }
       table.visits th { background: #2563eb; color: white; padding: 1px 2px; text-align: left; font-weight: 600; font-size: 7px; white-space: nowrap; }
       table.visits td { border: 1px solid #ddd; padding: 0px 2px; font-size: 7.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; line-height: 1.2; }
-      table.visits td.dx { white-space: normal; font-size: 6.5px; max-width: 90px; }
+      table.visits td.dx { white-space: normal; font-size: 6.5px; max-width: 120px; }
       table.visits tr:nth-child(even) { background: #f8fafc; }
       table.visits .highlight { background: #bfdbfe; font-weight: 600; }
 
       .total-row { text-align: right; font-weight: 700; font-size: 9px; padding: 2px 6px; border-top: 2px solid #333; flex-shrink: 0; }
 
-      /* Bottom charge capture */
-      .capture-section { flex: 1; margin-top: 3px; display: flex; flex-direction: column; min-height: 0; }
-      .capture-img { width: 100%; flex: 1; min-height: 0; object-fit: contain; object-position: top left; border: 1px solid #ccc; background: #f9f9f9; }
+      /* Bottom images row: intake form + charge capture side by side */
+      .images-row { display: flex; gap: 6px; flex: 1; min-height: 0; margin-top: 3px; }
+      .img-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+      .img-panel img { width: 100%; flex: 1; min-height: 0; object-fit: contain; object-position: top left; border: 1px solid #ccc; background: #f9f9f9; }
+      .img-placeholder { flex: 1; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; color: #999; font-size: 9px; }
     </style></head><body>`;
 
     // ── HEADER BAR ──
@@ -3428,10 +3425,8 @@ async function exportDailyPDF() {
 
     html += `<div class="main">`;
 
-    // ═══ LEFT COLUMN (33%): Notes + Intake Form Image ═══
+    // ═══ LEFT COLUMN (25%): Notes ═══
     html += `<div class="col-left">`;
-
-    // Notes
     const notesVisits = visits.filter(v => v.notes && v.notes.trim());
     html += `<div class="section-label complete">NOTES</div>`;
     html += `<div class="notes-box">`;
@@ -3442,17 +3437,9 @@ async function exportDailyPDF() {
       });
     } else { html += `&nbsp;`; }
     html += `</div>`;
-
-    // Intake Form Image — fills remaining height
-    html += `<div class="section-label complete">INTAKE FORM</div>`;
-    if (intakeImageData.length) {
-      html += `<img class="intake-img" src="${intakeImageData[0].image_data}" alt="Intake Form"/>`;
-    } else {
-      html += `<div style="flex:1;border:1px solid #ccc;display:flex;align-items:center;justify-content:center;color:#999;font-size:9px">No intake form</div>`;
-    }
     html += `</div>`;
 
-    // ═══ RIGHT COLUMN (67%): Record Count + Digitalized List + Charge Capture ═══
+    // ═══ RIGHT COLUMN (75%): Record Count + Digitalized List + Images ═══
     html += `<div class="col-right">`;
 
     // Record Count Check — inline row
@@ -3485,7 +3472,9 @@ async function exportDailyPDF() {
         const name = v.patients ? (v.patients.first_name + ' ' + v.patients.last_name).trim().toUpperCase() : (v.patient_name || '—').toUpperCase();
         const patCode = v.patients?.patient_code || '—';
         const intId = v.intake_id || String(i + 1).padStart(2, '0');
-        const dx = Array.isArray(v.diagnosis_codes) ? v.diagnosis_codes.join(',') : (v.diagnosis_codes || '—');
+        const dxCat = v.diagnosis_category || '';
+        const dxCodes = Array.isArray(v.diagnosis_codes) ? v.diagnosis_codes.join(', ') : (v.diagnosis_codes || '');
+        const dx = dxCat ? (dxCat + ': ' + dxCodes) : (dxCodes || '—');
         const te = v.therapeutic_exercises != null ? ('TE ' + v.therapeutic_exercises) : '—';
         const billed = calcBilled(v);
         grandTotal += billed;
@@ -3507,16 +3496,30 @@ async function exportDailyPDF() {
     }
     html += `<div class="total-row">TOTAL (SAME DAY) &nbsp; ${visits.length} &nbsp;&nbsp; BILLED &nbsp; $${grandTotal.toLocaleString()}</div>`;
 
-    // Charge Capture Report — below the list
-    html += `<div class="capture-section">`;
-    html += `<div class="section-label">CHARGE CAPTURE REPORT - End of Day Summary</div>`;
-    if (captureImageData.length) {
-      html += `<img class="capture-img" src="${captureImageData[0].image_data}" alt="Charge Capture"/>`;
+    // Images row — Intake Form + Charge Capture side by side in the lower area
+    html += `<div class="images-row">`;
+
+    // Intake Form
+    html += `<div class="img-panel">`;
+    html += `<div class="section-label purple complete">INTAKE FORM</div>`;
+    if (intakeImageData.length) {
+      html += `<img src="${intakeImageData[0].image_data}" alt="Intake Form"/>`;
     } else {
-      html += `<div style="height:80px;border:1px solid #ccc;display:flex;align-items:center;justify-content:center;color:#999;font-size:9px">No capture image</div>`;
+      html += `<div class="img-placeholder">No intake form</div>`;
     }
-    html += `<div class="total-row">TOTAL &nbsp; ${visits.length}</div>`;
     html += `</div>`;
+
+    // Charge Capture
+    html += `<div class="img-panel">`;
+    html += `<div class="section-label complete">CHARGE CAPTURE REPORT</div>`;
+    if (captureImageData.length) {
+      html += `<img src="${captureImageData[0].image_data}" alt="Charge Capture"/>`;
+    } else {
+      html += `<div class="img-placeholder">No capture image</div>`;
+    }
+    html += `</div>`;
+
+    html += `</div>`; // end images-row
 
     html += `</div>`; // end col-right
     html += `</div>`; // end main

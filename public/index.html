@@ -3380,20 +3380,21 @@ async function exportDailyPDF() {
 
       .main { display: flex; gap: 6px; margin-top: 4px; height: calc(100vh - 30px); }
 
-      /* Left column: notes (25%) */
-      .col-left { width: 25%; display: flex; flex-direction: column; gap: 3px; min-width: 0; align-items: stretch; }
+      /* Left column: intake form image (40%, 90% height) */
+      .col-left { width: 40%; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .col-left img { width: 100%; flex: 1; min-height: 0; object-fit: contain; object-position: top left; border: 1px solid #ccc; background: #f9f9f9; }
+      .col-left .img-placeholder { flex: 1; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; color: #999; font-size: 9px; }
 
-      /* Right column: record count + digitalized list + images (75%) */
-      .col-right { width: 75%; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      /* Right column: notes + record count + digitalized list + charge capture (60%) */
+      .col-right { width: 60%; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 
       .section-label { background: #2563eb; color: white; padding: 2px 8px; font-weight: 700; font-size: 8px; display: block; flex-shrink: 0; }
       .section-label.green { background: #16a34a; }
       .section-label.purple { background: #7c3aed; }
       .section-label.complete::after { content: 'COMPLETE'; float: right; }
 
-      .notes-box { border: 1px solid #ccc; padding: 3px 6px; font-size: 7px; line-height: 1.3; flex: 1; }
+      .notes-box { border: 1px solid #ccc; padding: 3px 6px; font-size: 7px; line-height: 1.3; flex-shrink: 0; }
 
-      /* Right column top: record count inline + digitalized list */
       .count-row { display: flex; gap: 6px; flex-shrink: 0; }
       .count-box { border: 1px solid #ccc; padding: 3px 6px; font-size: 8px; flex: 1; }
       .count-box table { width: 100%; border-collapse: collapse; }
@@ -3409,11 +3410,10 @@ async function exportDailyPDF() {
 
       .total-row { text-align: right; font-weight: 700; font-size: 9px; padding: 2px 6px; border-top: 2px solid #333; flex-shrink: 0; }
 
-      /* Bottom images row: intake form + charge capture side by side */
-      .images-row { display: flex; gap: 6px; flex: 1; min-height: 0; margin-top: 3px; }
-      .img-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-      .img-panel img { width: 100%; flex: 1; min-height: 0; object-fit: contain; object-position: top left; border: 1px solid #ccc; background: #f9f9f9; }
-      .img-placeholder { flex: 1; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; color: #999; font-size: 9px; }
+      /* Charge capture at bottom of right column */
+      .capture-section { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 3px; }
+      .capture-section img { width: 100%; flex: 1; min-height: 0; object-fit: contain; object-position: top left; border: 1px solid #ccc; background: #f9f9f9; }
+      .capture-placeholder { flex: 1; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; color: #999; font-size: 9px; }
     </style></head><body>`;
 
     // ── HEADER BAR ──
@@ -3425,8 +3425,20 @@ async function exportDailyPDF() {
 
     html += `<div class="main">`;
 
-    // ═══ LEFT COLUMN (25%): Notes ═══
+    // ═══ LEFT COLUMN (40%): Intake Form Image ═══
     html += `<div class="col-left">`;
+    html += `<div class="section-label purple complete">INTAKE FORM</div>`;
+    if (intakeImageData.length) {
+      html += `<img src="${intakeImageData[0].image_data}" alt="Intake Form"/>`;
+    } else {
+      html += `<div class="img-placeholder">No intake form</div>`;
+    }
+    html += `</div>`;
+
+    // ═══ RIGHT COLUMN (60%): Notes + Record Count + Digitalized List + Charge Capture ═══
+    html += `<div class="col-right">`;
+
+    // Notes row
     const notesVisits = visits.filter(v => v.notes && v.notes.trim());
     html += `<div class="section-label complete">NOTES</div>`;
     html += `<div class="notes-box">`;
@@ -3437,10 +3449,6 @@ async function exportDailyPDF() {
       });
     } else { html += `&nbsp;`; }
     html += `</div>`;
-    html += `</div>`;
-
-    // ═══ RIGHT COLUMN (75%): Record Count + Digitalized List + Images ═══
-    html += `<div class="col-right">`;
 
     // Record Count Check — inline row
     html += `<div class="section-label green complete">RECORD COUNT CHECK</div>`;
@@ -3496,30 +3504,15 @@ async function exportDailyPDF() {
     }
     html += `<div class="total-row">TOTAL (SAME DAY) &nbsp; ${visits.length} &nbsp;&nbsp; BILLED &nbsp; $${grandTotal.toLocaleString()}</div>`;
 
-    // Images row — Intake Form + Charge Capture side by side in the lower area
-    html += `<div class="images-row">`;
-
-    // Intake Form
-    html += `<div class="img-panel">`;
-    html += `<div class="section-label purple complete">INTAKE FORM</div>`;
-    if (intakeImageData.length) {
-      html += `<img src="${intakeImageData[0].image_data}" alt="Intake Form"/>`;
-    } else {
-      html += `<div class="img-placeholder">No intake form</div>`;
-    }
-    html += `</div>`;
-
-    // Charge Capture
-    html += `<div class="img-panel">`;
+    // Charge Capture — fills remaining space at bottom of right column
+    html += `<div class="capture-section">`;
     html += `<div class="section-label complete">CHARGE CAPTURE REPORT</div>`;
     if (captureImageData.length) {
       html += `<img src="${captureImageData[0].image_data}" alt="Charge Capture"/>`;
     } else {
-      html += `<div class="img-placeholder">No capture image</div>`;
+      html += `<div class="capture-placeholder">No capture image</div>`;
     }
     html += `</div>`;
-
-    html += `</div>`; // end images-row
 
     html += `</div>`; // end col-right
     html += `</div>`; // end main

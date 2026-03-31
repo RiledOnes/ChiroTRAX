@@ -3425,20 +3425,8 @@ async function exportDailyPDF() {
 
     html += `<div class="main">`;
 
-    // ═══ LEFT COLUMN (40%): Intake Form Image ═══
+    // ═══ LEFT COLUMN (40%): Notes + Intake Form Image ═══
     html += `<div class="col-left">`;
-    html += `<div class="section-label purple complete">INTAKE FORM</div>`;
-    if (intakeImageData.length) {
-      html += `<img src="${intakeImageData[0].image_data}" alt="Intake Form"/>`;
-    } else {
-      html += `<div class="img-placeholder">No intake form</div>`;
-    }
-    html += `</div>`;
-
-    // ═══ RIGHT COLUMN (60%): Notes + Record Count + Digitalized List + Charge Capture ═══
-    html += `<div class="col-right">`;
-
-    // Notes row
     const notesVisits = visits.filter(v => v.notes && v.notes.trim());
     html += `<div class="section-label complete">NOTES</div>`;
     html += `<div class="notes-box">`;
@@ -3449,6 +3437,16 @@ async function exportDailyPDF() {
       });
     } else { html += `&nbsp;`; }
     html += `</div>`;
+    html += `<div class="section-label purple complete">INTAKE FORM</div>`;
+    if (intakeImageData.length) {
+      html += `<img src="${intakeImageData[0].image_data}" alt="Intake Form"/>`;
+    } else {
+      html += `<div class="img-placeholder">No intake form</div>`;
+    }
+    html += `</div>`;
+
+    // ═══ RIGHT COLUMN (60%): Record Count + Digitalized List + Charge Capture ═══
+    html += `<div class="col-right">`;
 
     // Record Count Check — inline row
     html += `<div class="section-label green complete">RECORD COUNT CHECK</div>`;

@@ -1698,6 +1698,11 @@
           <div style="font-weight:600;font-size:13px">Status Activity</div>
           <div style="font-size:11px;color:var(--ink3)">Workflow audit trail</div>
         </div>
+        <div class="rb-type-card" data-type="reconciliation" onclick="selectReportType('reconciliation',this)">
+          <div style="font-size:20px;margin-bottom:4px">🔍</div>
+          <div style="font-weight:600;font-size:13px">Reconciliation</div>
+          <div style="font-size:11px;color:var(--ink3)">Cross-check intake vs billing</div>
+        </div>
       </div>
 
       <!-- Filters bar -->
@@ -4643,6 +4648,16 @@ function renderToolReport(result, reportType, groupBy) {
   if (s.aging) {
     html += `<div style="font-size:11px;color:var(--ink3)">Aging: 0-30d: ${s.aging['0-30'] || 0} | 31-60d: ${s.aging['31-60'] || 0} | 61-90d: ${s.aging['61-90'] || 0} | 90+d: ${s.aging['90+'] || 0}</div>`;
   }
+  // Reconciliation-specific summary
+  if (s.missing_capture != null) {
+    html += `<div><strong style="color:#16a34a">${s.in_charge_capture || 0}</strong> <span style="color:var(--ink3)">in capture</span></div>`;
+    html += `<div><strong style="color:${s.missing_capture > 0 ? '#dc2626' : '#16a34a'}">${s.missing_capture}</strong> <span style="color:var(--ink3)">missing capture</span></div>`;
+    html += `<div><strong>${s.has_claim || 0}</strong> <span style="color:var(--ink3)">have claim #</span></div>`;
+    html += `<div><strong style="color:${s.missing_claim > 0 ? '#dc2626' : '#16a34a'}">${s.missing_claim}</strong> <span style="color:var(--ink3)">no claim #</span></div>`;
+    html += `<div><strong>${s.in_billing || 0}</strong> <span style="color:var(--ink3)">in billing</span></div>`;
+    html += `<div><strong style="color:${s.missing_billing > 0 ? '#dc2626' : '#16a34a'}">${s.missing_billing}</strong> <span style="color:var(--ink3)">not in billing</span></div>`;
+    if (s.total_billing_amount) html += `<div><strong>$${Number(s.total_billing_amount).toLocaleString()}</strong> <span style="color:var(--ink3)">billed</span></div>`;
+  }
   html += `</div>`;
 
   // Groups
@@ -4744,6 +4759,18 @@ function getReportColumns(type) {
         { key: 'new_status', label: 'To', render: r => sl(r.new_status) },
         { key: 'changed_by', label: 'By' }
       ];
+    case 'reconciliation':
+      return [
+        { key: 'patient_name', label: 'Patient' },
+        { key: 'patient_code', label: 'Code' },
+        { key: 'service_date', label: 'Date' },
+        { key: 'on_intake', label: 'On Intake', render: r => r.on_intake ? '<span style="color:#16a34a;font-weight:700">✓</span>' : '<span style="color:#dc2626;font-weight:700">✗</span>' },
+        { key: 'in_charge_capture', label: 'In Charge Capture', render: r => r.in_charge_capture ? '<span style="color:#16a34a;font-weight:700">✓</span>' : '<span style="color:#dc2626;font-weight:700">✗</span>' },
+        { key: 'claim_number', label: 'Claim #', render: r => r.claim_number || '<span style="color:#dc2626;font-weight:700">✗</span>' },
+        { key: 'in_billing_report', label: 'In Billing Report', render: r => r.in_billing_report ? '<span style="color:#16a34a;font-weight:700">✓</span>' : '<span style="color:#dc2626;font-weight:700">✗</span>' },
+        { key: 'billing_amount', label: 'Billing Amount', align: 'right', render: r => r.billing_amount != null ? '$' + Number(r.billing_amount).toFixed(2) : '—' },
+        { key: 'workflow_status', label: 'Status', render: r => sl(r.workflow_status) }
+      ];
     default: return base;
   }
 }
@@ -4799,7 +4826,8 @@ function selectReportType(type, el) {
   const defaults = {
     patient_visits: 'patient', claims_by_diagnosis: 'diagnosis_category',
     outstanding_claims: 'workflow_status', payment_summary: 'month',
-    daily_intake: 'service_date', denials: 'patient', status_activity: 'service_date'
+    daily_intake: 'service_date', denials: 'patient', status_activity: 'service_date',
+    reconciliation: 'patient'
   };
   gb.value = defaults[type] || 'none';
   // Update hidden select

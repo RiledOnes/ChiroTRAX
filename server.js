@@ -834,14 +834,18 @@ app.get('/api/reports/summary', async (req, res) => {
   const to = req.query.to || new Date().toISOString().split('T')[0];
 
   try {
+    let visitQuery = supabase.from('intake_records').select('id, service_date, sheet_date, visit_status, manipulation_type, therapeutic_exercises, patient_id, patient_name, patient_code, is_backdated, new_patient, returning_patient, no_fault, workflow_status, diagnosis_category, cpt_manipulation, cpt_te').gte('service_date', from).lte('service_date', to);
+    if (req.query.patient_id) {
+      visitQuery = visitQuery.eq('patient_id', req.query.patient_id);
+    }
     const [visits, patients, claims, intakeImages] = await Promise.all([
-      supabase.from('intake_records').select('id, service_date, visit_status, manipulation_type, therapeutic_exercises, patient_id').gte('service_date', from).lte('service_date', to),
-      supabase.from('patients').select('id, payment_type, created_at'),
+      visitQuery,
+      supabase.from('patients').select('id, patient_code, first_name, last_name, payment_type, created_at'),
       supabase.from('claims').select('id, claim_status, payment_type, amount_billed, amount_paid, claim_date').gte('claim_date', from).lte('claim_date', to),
       supabase.from('daily_intake_images').select('id, business_date').gte('business_date', from).lte('business_date', to)
     ]);
 
-    const v = (visits.data || []).map(r => ({ ...r, visit_date: r.service_date, patient_status: r.visit_status }));
+    const v = visits.data || [];
     const p = patients.data || [];
     const c = claims.data || [];
     const img = intakeImages.data || [];
@@ -849,14 +853,40 @@ app.get('/api/reports/summary', async (req, res) => {
     // Visit stats
     const totalVisits = v.length;
     const uniquePatientVisits = new Set(v.map(x => x.patient_id)).size;
-    const newPatientVisits = v.filter(x => x.patient_status === 'new').length;
+    const newPatientVisits = v.filter(x => x.new_patient).length;
+    const returningVisits = v.filter(x => x.returning_patient).length;
     const e1Count = v.filter(x => x.manipulation_type === 'E1').length;
     const e2Count = v.filter(x => x.manipulation_type === 'E2').length;
     const avgExercises = v.length ? (v.reduce((sum, x) => sum + (x.therapeutic_exercises || 0), 0) / v.length).toFixed(1) : 0;
+    const backdatedCount = v.filter(x => x.is_backdated).length;
+    const noFaultCount = v.filter(x => x.no_fault).length;
 
     // Visits by date
     const visitsByDate = {};
-    v.forEach(x => { visitsByDate[x.visit_date] = (visitsByDate[x.visit_date] || 0) + 1; });
+    v.forEach(x => { visitsByDate[x.service_date] = (visitsByDate[x.service_date] || 0) + 1; });
+
+    // Workflow pipeline counts
+    const workflowCounts = {};
+    v.forEach(x => { const s = x.workflow_status || 'intake'; workflowCounts[s] = (workflowCounts[s] || 0) + 1; });
+
+    // Diagnosis category breakdown
+    const dxCategories = {};
+    v.forEach(x => { const cat = x.diagnosis_category || 'Unset'; dxCategories[cat] = (dxCategories[cat] || 0) + 1; });
+
+    // Top patients by visit count
+    const patientVisitMap = {};
+    v.forEach(x => {
+      const key = x.patient_id || x.patient_name;
+      if (!patientVisitMap[key]) patientVisitMap[key] = { name: x.patient_name || '—', code: x.patient_code || '—', visits: 0, e1: 0, e2: 0 };
+      patientVisitMap[key].visits++;
+      if (x.manipulation_type === 'E1') patientVisitMap[key].e1++;
+      if (x.manipulation_type === 'E2') patientVisitMap[key].e2++;
+    });
+    const topPatients = Object.values(patientVisitMap).sort((a, b) => b.visits - a.visits).slice(0, 15);
+
+    // Visits by sheet_date (intake days)
+    const visitsBySheetDate = {};
+    v.forEach(x => { if (x.sheet_date) visitsBySheetDate[x.sheet_date] = (visitsBySheetDate[x.sheet_date] || 0) + 1; });
 
     // Claim stats
     const totalBilled = c.reduce((sum, x) => sum + (parseFloat(x.amount_billed) || 0), 0);
@@ -880,11 +910,18 @@ app.get('/api/reports/summary', async (req, res) => {
         total: totalVisits,
         uniquePatients: uniquePatientVisits,
         newPatients: newPatientVisits,
+        returning: returningVisits,
         e1: e1Count,
         e2: e2Count,
         avgExercises: parseFloat(avgExercises),
-        byDate: visitsByDate
+        backdated: backdatedCount,
+        noFault: noFaultCount,
+        byDate: visitsByDate,
+        bySheetDate: visitsBySheetDate
       },
+      workflow: workflowCounts,
+      dxCategories,
+      topPatients,
       claims: {
         total: c.length,
         totalBilled,

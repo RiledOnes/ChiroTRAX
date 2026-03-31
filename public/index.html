@@ -1417,7 +1417,10 @@
           <h2>Reports</h2>
           <p>Practice analytics and performance overview</p>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="rpt-patient" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px;max-width:200px">
+            <option value="">All Patients</option>
+          </select>
           <input type="date" id="rpt-from" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
           <span style="color:var(--ink3)">to</span>
           <input type="date" id="rpt-to" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
@@ -1426,7 +1429,7 @@
       </div>
 
       <!-- Quick Presets -->
-      <div style="display:flex;gap:8px;margin-bottom:20px">
+      <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="setReportRange(7)">Last 7 Days</button>
         <button class="btn btn-ghost btn-sm" onclick="setReportRange(30)">Last 30 Days</button>
         <button class="btn btn-ghost btn-sm" onclick="setReportRange(90)">Last 90 Days</button>
@@ -1444,17 +1447,27 @@
         <div class="stat-card green">
           <div class="s-label">New Patients</div>
           <div class="s-value" id="rpt-new-patients">—</div>
-          <div class="s-sub">in this period</div>
+          <div class="s-sub" id="rpt-returning-patients">— returning</div>
         </div>
         <div class="stat-card">
-          <div class="s-label">Avg Exercises</div>
+          <div class="s-label">E1 / E2</div>
+          <div class="s-value" id="rpt-e1e2">—</div>
+          <div class="s-sub">manipulations</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-label">Avg TE</div>
           <div class="s-value" id="rpt-avg-exercises">—</div>
           <div class="s-sub">per visit</div>
         </div>
+        <div class="stat-card warn">
+          <div class="s-label">Backdated</div>
+          <div class="s-value" id="rpt-backdated">—</div>
+          <div class="s-sub" id="rpt-no-fault">— no-fault</div>
+        </div>
         <div class="stat-card">
-          <div class="s-label">Intake Images</div>
+          <div class="s-label">Images</div>
           <div class="s-value" id="rpt-images">—</div>
-          <div class="s-sub" id="rpt-image-days">— days covered</div>
+          <div class="s-sub" id="rpt-image-days">— days</div>
         </div>
       </div>
 
@@ -1482,8 +1495,8 @@
         </div>
       </div>
 
-      <!-- Manipulation Breakdown + Claims by Status -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px">
+      <!-- Row: Manipulation + Workflow Pipeline + Diagnosis Categories -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:4px">
         <div class="card">
           <div class="card-head"><div class="card-title">Manipulation Breakdown</div></div>
           <div style="padding:16px" id="rpt-manip-breakdown">
@@ -1491,8 +1504,30 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><div class="card-title">Workflow Pipeline</div></div>
+          <div style="padding:16px" id="rpt-workflow-breakdown">
+            <div class="empty-state"><p>Run a report to see data.</p></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Diagnosis Categories</div></div>
+          <div style="padding:16px" id="rpt-dx-breakdown">
+            <div class="empty-state"><p>Run a report to see data.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Claims by Status -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+        <div class="card">
           <div class="card-head"><div class="card-title">Claims by Status</div></div>
           <div style="padding:16px" id="rpt-claims-breakdown">
+            <div class="empty-state"><p>Run a report to see data.</p></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Patient Directory Summary</div></div>
+          <div style="padding:16px" id="rpt-patient-mix">
             <div class="empty-state"><p>Run a report to see data.</p></div>
           </div>
         </div>
@@ -1500,16 +1535,16 @@
 
       <!-- Visits by Date Chart -->
       <div class="card" style="margin-top:16px">
-        <div class="card-head"><div class="card-title">Visits by Date</div></div>
+        <div class="card-head"><div class="card-title">Visits by Service Date</div></div>
         <div style="padding:16px;overflow-x:auto" id="rpt-visits-chart">
           <div class="empty-state"><p>Run a report to see data.</p></div>
         </div>
       </div>
 
-      <!-- Patient Mix -->
+      <!-- Top Patients Table -->
       <div class="card" style="margin-top:16px">
-        <div class="card-head"><div class="card-title">Patient Directory Summary</div></div>
-        <div style="padding:16px" id="rpt-patient-mix">
+        <div class="card-head"><div class="card-title">Top Patients by Visit Count</div></div>
+        <div style="padding:0" id="rpt-top-patients">
           <div class="empty-state"><p>Run a report to see data.</p></div>
         </div>
       </div>
@@ -3981,7 +4016,15 @@ async function exportPatientPDF(patientId) {
 // ════════════════════════════════════
 // REPORTS
 // ════════════════════════════════════
-function initReports() {
+async function initReports() {
+  // Populate patient filter dropdown
+  if (allPatients.length === 0) await loadPatientsData();
+  const sel = document.getElementById('rpt-patient');
+  if (sel && sel.options.length <= 1) {
+    allPatients.forEach(p => {
+      sel.innerHTML += `<option value="${p.id}">${p.patient_code} — ${p.last_name}, ${p.first_name}</option>`;
+    });
+  }
   const from = document.getElementById('rpt-from');
   const to = document.getElementById('rpt-to');
   if (!from.value) {
@@ -4022,7 +4065,10 @@ async function loadReports() {
   if (!from || !to) return;
 
   try {
-    const rpt = await api('GET', `/api/reports/summary?from=${from}&to=${to}`);
+    let url = `/api/reports/summary?from=${from}&to=${to}`;
+    const patientId = document.getElementById('rpt-patient')?.value;
+    if (patientId) url += `&patient_id=${patientId}`;
+    const rpt = await api('GET', url);
     renderReports(rpt);
   } catch(e) { toast('Report failed: ' + e.message, 'error'); }
 }
@@ -4031,10 +4077,14 @@ function renderReports(r) {
   // Visit stats
   document.getElementById('rpt-total-visits').textContent = r.visits.total;
   document.getElementById('rpt-unique-patients').textContent = `${r.visits.uniquePatients} unique patients`;
-  document.getElementById('rpt-new-patients').textContent = r.patients.newInPeriod;
+  document.getElementById('rpt-new-patients').textContent = r.visits.newPatients;
+  document.getElementById('rpt-returning-patients').textContent = `${r.visits.returning} returning`;
+  document.getElementById('rpt-e1e2').textContent = `${r.visits.e1} / ${r.visits.e2}`;
   document.getElementById('rpt-avg-exercises').textContent = r.visits.avgExercises;
+  document.getElementById('rpt-backdated').textContent = r.visits.backdated;
+  document.getElementById('rpt-no-fault').textContent = `${r.visits.noFault} no-fault`;
   document.getElementById('rpt-images').textContent = r.images.total;
-  document.getElementById('rpt-image-days').textContent = `${r.images.daysWithImages} days covered`;
+  document.getElementById('rpt-image-days').textContent = `${r.images.daysWithImages} days`;
 
   // Revenue stats
   document.getElementById('rpt-billed').textContent = '$' + r.claims.totalBilled.toFixed(2);
@@ -4047,35 +4097,34 @@ function renderReports(r) {
   // Manipulation breakdown
   const maxManip = Math.max(r.visits.e1, r.visits.e2, 1);
   document.getElementById('rpt-manip-breakdown').innerHTML = `
-    ${rptBar('E1 — Spinal', r.visits.e1, maxManip, 'green')}
-    ${rptBar('E2 — Complex', r.visits.e2, maxManip, 'blue')}
+    ${rptBar('E1 — Spinal (98940)', r.visits.e1, maxManip, 'green')}
+    ${rptBar('E2 — Complex (98941)', r.visits.e2, maxManip, 'blue')}
     <div style="margin-top:8px;font-size:12px;color:var(--ink3)">No manipulation: ${r.visits.total - r.visits.e1 - r.visits.e2} visits</div>
   `;
+
+  // Workflow pipeline
+  const wfStages = ['intake', 'entered_ebs', 'claim_created', 'submitted', 'processed'];
+  const wfLabels = { intake: 'Intake', entered_ebs: 'Entered EBS', claim_created: 'Claim Created', submitted: 'Submitted', processed: 'Processed' };
+  const wfColors = { intake: 'orange', entered_ebs: 'blue', claim_created: 'blue', submitted: 'green', processed: 'green' };
+  const maxWf = Math.max(...wfStages.map(s => r.workflow[s] || 0), 1);
+  document.getElementById('rpt-workflow-breakdown').innerHTML = wfStages.map(s =>
+    rptBar(wfLabels[s], r.workflow[s] || 0, maxWf, wfColors[s])
+  ).join('');
+
+  // Diagnosis categories
+  const dxCats = Object.entries(r.dxCategories).sort((a, b) => b[1] - a[1]);
+  const maxDx = dxCats.length ? Math.max(...dxCats.map(d => d[1])) : 1;
+  document.getElementById('rpt-dx-breakdown').innerHTML = dxCats.length
+    ? dxCats.map(([cat, cnt]) => rptBar(cat, cnt, maxDx, 'blue')).join('')
+    : '<div style="text-align:center;color:var(--ink3);font-size:13px">No diagnosis data</div>';
 
   // Claims by status
   const statuses = ['pending', 'submitted', 'approved', 'paid', 'denied'];
   const statusColors = { pending: 'orange', submitted: 'blue', approved: 'green', paid: 'green', denied: 'red' };
   const maxClaim = Math.max(...statuses.map(s => r.claims.byStatus[s] || 0), 1);
-  document.getElementById('rpt-claims-breakdown').innerHTML = statuses.length ?
+  document.getElementById('rpt-claims-breakdown').innerHTML =
     statuses.map(s => rptBar(s.charAt(0).toUpperCase() + s.slice(1), r.claims.byStatus[s] || 0, maxClaim, statusColors[s] || 'blue')).join('') +
-    (r.claims.total === 0 ? '<div style="text-align:center;color:var(--ink3);font-size:13px;margin-top:12px">No claims in this period</div>' : '') :
-    '<div class="empty-state"><p>No claims data.</p></div>';
-
-  // Visits by date chart
-  const dates = Object.keys(r.visits.byDate).sort();
-  if (dates.length > 0) {
-    const maxV = Math.max(...dates.map(d => r.visits.byDate[d]));
-    document.getElementById('rpt-visits-chart').innerHTML = `
-      <div class="visit-chart">${dates.map(d => {
-        const pct = (r.visits.byDate[d] / maxV) * 100;
-        return `<div class="visit-chart-bar" style="height:${Math.max(pct, 4)}%" title="${d}: ${r.visits.byDate[d]} visits"></div>`;
-      }).join('')}</div>
-      <div class="visit-chart-labels">${dates.map(d => `<span title="${d}">${d.slice(5)}</span>`).join('')}</div>
-      <div style="margin-top:8px;font-size:12px;color:var(--ink3)">${dates.length} days with visits</div>
-    `;
-  } else {
-    document.getElementById('rpt-visits-chart').innerHTML = '<div class="empty-state"><p>No visits in this period.</p></div>';
-  }
+    (r.claims.total === 0 ? '<div style="text-align:center;color:var(--ink3);font-size:13px;margin-top:12px">No claims in this period</div>' : '');
 
   // Patient mix
   document.getElementById('rpt-patient-mix').innerHTML = `
@@ -4084,8 +4133,56 @@ function renderReports(r) {
       <div><span style="font-size:24px;font-weight:700;color:var(--accent)">${r.patients.insurance}</span><br><span style="font-size:12px;color:var(--ink3)">Insurance</span></div>
       <div><span style="font-size:24px;font-weight:700;color:var(--accent2)">${r.patients.cash}</span><br><span style="font-size:12px;color:var(--ink3)">Cash</span></div>
       <div><span style="font-size:24px;font-weight:700;color:var(--ink3)">${r.patients.total - r.patients.insurance - r.patients.cash}</span><br><span style="font-size:12px;color:var(--ink3)">Unset</span></div>
+      <div><span style="font-size:24px;font-weight:700;color:var(--accent)">${r.patients.newInPeriod}</span><br><span style="font-size:12px;color:var(--ink3)">New This Period</span></div>
     </div>
   `;
+
+  // Visits by date chart
+  const dates = Object.keys(r.visits.byDate).sort();
+  if (dates.length > 0) {
+    const maxV = Math.max(...dates.map(d => r.visits.byDate[d]));
+    document.getElementById('rpt-visits-chart').innerHTML = `
+      <div class="visit-chart">${dates.map(d => {
+        const pct = (r.visits.byDate[d] / maxV) * 100;
+        return `<div class="visit-chart-bar" style="height:${Math.max(pct, 4)}%" title="${d}: ${r.visits.byDate[d]} visits"><span class="bar-tip">${r.visits.byDate[d]}</span></div>`;
+      }).join('')}</div>
+      <div class="visit-chart-labels">${dates.map(d => `<span title="${d}">${d.slice(5)}</span>`).join('')}</div>
+      <div style="margin-top:8px;font-size:12px;color:var(--ink3)">${dates.length} days &bull; ${r.visits.total} total visits</div>
+    `;
+  } else {
+    document.getElementById('rpt-visits-chart').innerHTML = '<div class="empty-state"><p>No visits in this period.</p></div>';
+  }
+
+  // Top patients table
+  const tp = r.topPatients || [];
+  if (tp.length) {
+    let tbl = `<table style="width:100%;font-size:13px"><thead><tr>
+      <th style="padding:8px 12px">#</th>
+      <th style="padding:8px 12px">Patient</th>
+      <th style="padding:8px 12px">Code</th>
+      <th style="padding:8px 12px;text-align:center">Visits</th>
+      <th style="padding:8px 12px;text-align:center">E1</th>
+      <th style="padding:8px 12px;text-align:center">E2</th>
+      <th style="padding:8px 12px">Distribution</th>
+    </tr></thead><tbody>`;
+    const maxPv = tp[0].visits;
+    tp.forEach((p, i) => {
+      const pct = maxPv > 0 ? (p.visits / maxPv * 100) : 0;
+      tbl += `<tr>
+        <td style="padding:6px 12px;color:var(--ink3)">${i + 1}</td>
+        <td style="padding:6px 12px;font-weight:600">${esc(p.name)}</td>
+        <td style="padding:6px 12px;color:var(--ink3)">${esc(p.code)}</td>
+        <td style="padding:6px 12px;text-align:center;font-weight:700">${p.visits}</td>
+        <td style="padding:6px 12px;text-align:center">${p.e1}</td>
+        <td style="padding:6px 12px;text-align:center">${p.e2}</td>
+        <td style="padding:6px 12px"><div style="background:var(--surface2);border-radius:4px;height:16px;overflow:hidden"><div style="background:var(--accent);height:100%;width:${pct}%;border-radius:4px"></div></div></td>
+      </tr>`;
+    });
+    tbl += `</tbody></table>`;
+    document.getElementById('rpt-top-patients').innerHTML = tbl;
+  } else {
+    document.getElementById('rpt-top-patients').innerHTML = '<div class="empty-state" style="padding:20px"><p>No visit data in this period.</p></div>';
+  }
 }
 
 function rptBar(label, value, max, color) {

@@ -421,6 +421,8 @@ app.post('/api/visits', async (req, res) => {
 // Update visit
 app.put('/api/visits/:id', async (req, res) => {
   const body = { ...req.body };
+  const changedBy = body.changed_by || req.user?.email || 'system';
+  delete body.changed_by;
   if (body.visit_date) { body.service_date = body.visit_date; delete body.visit_date; }
   if (body.patient_status) { body.visit_status = body.patient_status; delete body.patient_status; }
   if (body.office_visit) { body.cpt_office_visit = body.office_visit; delete body.office_visit; }
@@ -438,6 +440,14 @@ app.put('/api/visits/:id', async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
+
+  // Update changed_by on status history entries that don't have it set
+  if (!error && data) {
+    await supabase.from('intake_status_history')
+      .update({ changed_by: changedBy })
+      .eq('intake_record_id', req.params.id)
+      .is('changed_by', null);
+  }
   if (error) return dbError(res, error);
   data.visit_date = data.service_date;
   data.patient_status = data.visit_status;
@@ -525,6 +535,20 @@ app.put('/api/claims/:id', async (req, res) => {
     .single();
   if (error) return dbError(res, error);
   res.json(data);
+});
+
+// ============================================
+// STATUS HISTORY
+// ============================================
+
+app.get('/api/intake/:id/status-history', async (req, res) => {
+  const { data, error } = await supabase
+    .from('intake_status_history')
+    .select('*')
+    .eq('intake_record_id', req.params.id)
+    .order('changed_at', { ascending: false });
+  if (error) return dbError(res, error);
+  res.json(data || []);
 });
 
 // ============================================
@@ -695,11 +719,11 @@ app.post('/api/visits/bulk', async (req, res) => {
 
 // Batch advance workflow status
 app.put('/api/visits/batch-advance', async (req, res) => {
-  const { ids, new_status } = req.body;
+  const { ids, new_status, changed_by } = req.body;
   if (!ids || !Array.isArray(ids) || !new_status) {
     return res.status(400).json({ error: 'ids array and new_status are required' });
   }
-  const validStatuses = ['intake', 'entered_ebs', 'claim_created', 'submitted', 'processed'];
+  const validStatuses = ['intake', 'entered_ebs', 'claim_created', 'submitted', 'processed', 'payment_received', 'payment_partial', 'denied', 'denied_resubmitted', 'closed', 'already_entered'];
   if (!validStatuses.includes(new_status)) {
     return res.status(400).json({ error: 'Invalid workflow status' });
   }
@@ -709,6 +733,16 @@ app.put('/api/visits/batch-advance', async (req, res) => {
     .in('id', ids)
     .select();
   if (error) return dbError(res, error);
+
+  // Tag status history with changed_by
+  const user = changed_by || req.user?.email || 'system';
+  for (const id of ids) {
+    await supabase.from('intake_status_history')
+      .update({ changed_by: user })
+      .eq('intake_record_id', id)
+      .is('changed_by', null);
+  }
+
   res.json({ updated: data.length, data });
 });
 

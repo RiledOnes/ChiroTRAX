@@ -421,6 +421,8 @@ app.post('/api/visits', async (req, res) => {
 // Update visit
 app.put('/api/visits/:id', async (req, res) => {
   const body = { ...req.body };
+  const changedBy = body.changed_by || req.user?.email || 'system';
+  delete body.changed_by;
   if (body.visit_date) { body.service_date = body.visit_date; delete body.visit_date; }
   if (body.patient_status) { body.visit_status = body.patient_status; delete body.patient_status; }
   if (body.office_visit) { body.cpt_office_visit = body.office_visit; delete body.office_visit; }
@@ -438,6 +440,14 @@ app.put('/api/visits/:id', async (req, res) => {
     .eq('id', req.params.id)
     .select()
     .single();
+
+  // Update changed_by on status history entries that don't have it set
+  if (!error && data) {
+    await supabase.from('intake_status_history')
+      .update({ changed_by: changedBy })
+      .eq('intake_record_id', req.params.id)
+      .is('changed_by', null);
+  }
   if (error) return dbError(res, error);
   data.visit_date = data.service_date;
   data.patient_status = data.visit_status;
@@ -525,6 +535,20 @@ app.put('/api/claims/:id', async (req, res) => {
     .single();
   if (error) return dbError(res, error);
   res.json(data);
+});
+
+// ============================================
+// STATUS HISTORY
+// ============================================
+
+app.get('/api/intake/:id/status-history', async (req, res) => {
+  const { data, error } = await supabase
+    .from('intake_status_history')
+    .select('*')
+    .eq('intake_record_id', req.params.id)
+    .order('changed_at', { ascending: false });
+  if (error) return dbError(res, error);
+  res.json(data || []);
 });
 
 // ============================================
@@ -695,11 +719,11 @@ app.post('/api/visits/bulk', async (req, res) => {
 
 // Batch advance workflow status
 app.put('/api/visits/batch-advance', async (req, res) => {
-  const { ids, new_status } = req.body;
+  const { ids, new_status, changed_by } = req.body;
   if (!ids || !Array.isArray(ids) || !new_status) {
     return res.status(400).json({ error: 'ids array and new_status are required' });
   }
-  const validStatuses = ['intake', 'entered_ebs', 'claim_created', 'submitted', 'processed'];
+  const validStatuses = ['intake', 'entered_ebs', 'claim_created', 'submitted', 'processed', 'payment_received', 'payment_partial', 'denied', 'denied_resubmitted', 'closed', 'already_entered'];
   if (!validStatuses.includes(new_status)) {
     return res.status(400).json({ error: 'Invalid workflow status' });
   }
@@ -709,6 +733,16 @@ app.put('/api/visits/batch-advance', async (req, res) => {
     .in('id', ids)
     .select();
   if (error) return dbError(res, error);
+
+  // Tag status history with changed_by
+  const user = changed_by || req.user?.email || 'system';
+  for (const id of ids) {
+    await supabase.from('intake_status_history')
+      .update({ changed_by: user })
+      .eq('intake_record_id', id)
+      .is('changed_by', null);
+  }
+
   res.json({ updated: data.length, data });
 });
 
@@ -1009,6 +1043,249 @@ app.get('/api/reports/summary', async (req, res) => {
     console.error('Report error:', e);
     res.status(500).json({ error: 'Failed to generate report' });
   }
+});
+
+// ============================================
+// REPORTING ENGINE
+// ============================================
+
+// Helper: group records by a key and compute subtotals
+function groupRecords(records, groupBy, reportType) {
+  if (groupBy === 'none' || !groupBy) {
+    return [{ label: 'All', subtotals: computeSubtotals(records, reportType), records }];
+  }
+
+  const grouped = {};
+  for (const rec of records) {
+    let key;
+    switch (groupBy) {
+      case 'patient':
+        key = rec.patient_name || (rec.patient_last_name ? `${rec.patient_last_name}, ${rec.patient_first_name}` : null) || rec.patient_id || 'Unknown';
+        break;
+      case 'service_date':
+        key = rec.service_date || 'No date';
+        break;
+      case 'week': {
+        const d = rec.service_date ? new Date(rec.service_date) : null;
+        if (d && !isNaN(d)) {
+          const day = d.getUTCDay();
+          const monday = new Date(d);
+          monday.setUTCDate(d.getUTCDate() - ((day + 6) % 7));
+          key = monday.toISOString().slice(0, 10);
+        } else {
+          key = 'No date';
+        }
+        break;
+      }
+      case 'month':
+        key = rec.service_date ? rec.service_date.slice(0, 7) : 'No date';
+        break;
+      case 'diagnosis_category':
+        key = rec.diagnosis_category || 'Uncategorized';
+        break;
+      case 'manipulation_type':
+        key = rec.manipulation_type || 'None';
+        break;
+      case 'workflow_status':
+        key = rec.workflow_status || 'Unknown';
+        break;
+      case 'insurance_name':
+        key = rec.insurance_name || 'Unknown';
+        break;
+      default:
+        key = 'All';
+    }
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(rec);
+  }
+
+  return Object.entries(grouped)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, recs]) => ({
+      label,
+      subtotals: computeSubtotals(recs, reportType),
+      records: recs
+    }));
+}
+
+// Helper: compute subtotals for a set of records
+function computeSubtotals(records, reportType) {
+  const totals = { count: records.length };
+
+  if (reportType === 'payment_summary') {
+    totals.total_charge = records.reduce((s, r) => s + (parseFloat(r.charge) || 0), 0);
+    totals.total_approved = records.reduce((s, r) => s + (parseFloat(r.approved) || 0), 0);
+    totals.total_pri_ins = records.reduce((s, r) => s + (parseFloat(r.pri_ins_received) || 0), 0);
+    totals.total_sec_ins = records.reduce((s, r) => s + (parseFloat(r.sec_ins_received) || 0), 0);
+    totals.total_patient = records.reduce((s, r) => s + (parseFloat(r.patient_received) || 0), 0);
+    totals.total_received = totals.total_pri_ins + totals.total_sec_ins + totals.total_patient;
+    totals.total_outstanding = totals.total_charge - totals.total_received;
+  } else if (reportType === 'outstanding_claims') {
+    const now = new Date();
+    totals.aging = { '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 };
+    for (const r of records) {
+      const sd = r.service_date ? new Date(r.service_date) : null;
+      if (!sd || isNaN(sd)) continue;
+      const days = Math.floor((now - sd) / (1000 * 60 * 60 * 24));
+      if (days <= 30) totals.aging['0-30']++;
+      else if (days <= 60) totals.aging['31-60']++;
+      else if (days <= 90) totals.aging['61-90']++;
+      else totals.aging['90+']++;
+    }
+  } else {
+    totals.new_patients = records.filter(r => r.new_patient).length;
+    totals.returning_patients = records.filter(r => r.returning_patient).length;
+    totals.no_fault = records.filter(r => r.no_fault).length;
+    const uniquePatients = new Set(records.map(r => r.patient_id).filter(Boolean));
+    totals.unique_patients = uniquePatients.size;
+  }
+  return totals;
+}
+
+// Helper: apply common date and field filters to a supabase query
+function applyIntakeFilters(query, filters) {
+  if (!filters) return query;
+  if (filters.from) query = query.gte('service_date', filters.from);
+  if (filters.to) query = query.lte('service_date', filters.to);
+  if (filters.patient_id) query = query.eq('patient_id', filters.patient_id);
+  if (filters.diagnosis_category) query = query.eq('diagnosis_category', filters.diagnosis_category);
+  if (filters.workflow_status) query = query.eq('workflow_status', filters.workflow_status);
+  if (filters.manipulation_type) query = query.eq('manipulation_type', filters.manipulation_type);
+  return query;
+}
+
+// POST /api/reports/run — unified report runner
+app.post('/api/reports/run', async (req, res) => {
+  try {
+    const { report_type, filters = {}, group_by = 'none' } = req.body;
+    if (!report_type) return res.status(400).json({ error: 'report_type is required' });
+
+    let records = [];
+
+    switch (report_type) {
+      case 'patient_visits': {
+        let query = supabase.from('intake_records').select('*').order('service_date', { ascending: false });
+        query = applyIntakeFilters(query, filters);
+        const { data, error } = await query;
+        if (error) return dbError(res, error);
+        records = data || [];
+        break;
+      }
+
+      case 'claims_by_diagnosis': {
+        let query = supabase.from('intake_records').select('*').order('service_date', { ascending: false });
+        query = applyIntakeFilters(query, filters);
+        const { data, error } = await query;
+        if (error) return dbError(res, error);
+        records = data || [];
+        // Default group_by to diagnosis_category if none specified
+        if (group_by === 'none') {
+          const groups = groupRecords(records, 'diagnosis_category', report_type);
+          const summary = computeSubtotals(records, report_type);
+          return res.json({ summary, groups });
+        }
+        break;
+      }
+
+      case 'outstanding_claims': {
+        let query = supabase.from('intake_records').select('*')
+          .not('workflow_status', 'in', '("closed","payment_received")')
+          .order('service_date', { ascending: true });
+        if (filters.from) query = query.gte('service_date', filters.from);
+        if (filters.to) query = query.lte('service_date', filters.to);
+        if (filters.patient_id) query = query.eq('patient_id', filters.patient_id);
+        if (filters.diagnosis_category) query = query.eq('diagnosis_category', filters.diagnosis_category);
+        if (filters.manipulation_type) query = query.eq('manipulation_type', filters.manipulation_type);
+        const { data, error } = await query;
+        if (error) return dbError(res, error);
+        records = data || [];
+        break;
+      }
+
+      case 'payment_summary': {
+        let query = supabase.from('billing_reports').select('*').order('service_date', { ascending: false });
+        if (filters.from) query = query.gte('service_date', filters.from);
+        if (filters.to) query = query.lte('service_date', filters.to);
+        if (filters.patient_id) query = query.eq('patient_id', filters.patient_id);
+        const { data, error } = await query;
+        if (error) return dbError(res, error);
+        records = data || [];
+        break;
+      }
+
+      case 'daily_intake': {
+        let query = supabase.from('intake_records').select('*').order('service_date', { ascending: false });
+        query = applyIntakeFilters(query, filters);
+        const { data, error } = await query;
+        if (error) return dbError(res, error);
+        records = data || [];
+        // Default group_by to service_date if none specified
+        if (group_by === 'none') {
+          const groups = groupRecords(records, 'service_date', report_type);
+          const summary = computeSubtotals(records, report_type);
+          return res.json({ summary, groups });
+        }
+        break;
+      }
+
+      case 'denials': {
+        let query = supabase.from('intake_records').select('*')
+          .in('workflow_status', ['denied', 'denied_resubmitted'])
+          .order('service_date', { ascending: false });
+        if (filters.from) query = query.gte('service_date', filters.from);
+        if (filters.to) query = query.lte('service_date', filters.to);
+        if (filters.patient_id) query = query.eq('patient_id', filters.patient_id);
+        if (filters.diagnosis_category) query = query.eq('diagnosis_category', filters.diagnosis_category);
+        if (filters.manipulation_type) query = query.eq('manipulation_type', filters.manipulation_type);
+        const { data, error } = await query;
+        if (error) return dbError(res, error);
+        records = data || [];
+        break;
+      }
+
+      case 'status_activity': {
+        let query = supabase.from('intake_status_history')
+          .select('*, intake_records(patient_id, patient_name, patient_code, service_date, diagnosis_category, manipulation_type, workflow_status)')
+          .order('changed_at', { ascending: false });
+        if (filters.from) query = query.gte('changed_at', filters.from);
+        if (filters.to) query = query.lte('changed_at', filters.to + 'T23:59:59');
+        const { data, error } = await query;
+        if (error) return dbError(res, error);
+        // Flatten joined data for grouping convenience
+        records = (data || []).map(h => ({
+          ...h,
+          patient_id: h.intake_records?.patient_id || null,
+          patient_name: h.intake_records?.patient_name || null,
+          patient_code: h.intake_records?.patient_code || null,
+          service_date: h.intake_records?.service_date || null,
+          diagnosis_category: h.intake_records?.diagnosis_category || null,
+          manipulation_type: h.intake_records?.manipulation_type || null
+        }));
+        break;
+      }
+
+      default:
+        return res.status(400).json({ error: `Unknown report_type: ${report_type}` });
+    }
+
+    const groups = groupRecords(records, group_by, report_type);
+    const summary = computeSubtotals(records, report_type);
+    res.json({ summary, groups });
+  } catch (e) {
+    console.error('Report engine error:', e);
+    res.status(500).json({ error: 'Failed to generate report' });
+  }
+});
+
+// GET /api/intake/:id/status-history — status history for a single intake record
+app.get('/api/intake/:id/status-history', async (req, res) => {
+  const { data, error } = await supabase
+    .from('intake_status_history')
+    .select('*')
+    .eq('intake_record_id', req.params.id)
+    .order('changed_at', { ascending: false });
+  if (error) return dbError(res, error);
+  res.json(data);
 });
 
 // SPA fallback — serve index.html for non-API routes

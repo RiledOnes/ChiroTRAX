@@ -528,6 +528,71 @@ app.put('/api/claims/:id', async (req, res) => {
 });
 
 // ============================================
+// BILLING REPORTS
+// ============================================
+
+app.get('/api/billing-reports', async (req, res) => {
+  let query = supabase
+    .from('billing_reports')
+    .select('*')
+    .order('service_date', { ascending: false });
+
+  if (req.query.period) query = query.eq('report_period', req.query.period);
+  if (req.query.patient_id) query = query.eq('patient_id', req.query.patient_id);
+
+  const { data, error } = await query;
+  if (error) return dbError(res, error);
+  res.json(data);
+});
+
+app.get('/api/billing-reports/periods', async (req, res) => {
+  const { data, error } = await supabase.from('billing_reports').select('report_period');
+  if (error) return dbError(res, error);
+  const periods = [...new Set((data || []).map(d => d.report_period).filter(Boolean))].sort().reverse();
+  res.json(periods);
+});
+
+app.post('/api/billing-reports/upload', async (req, res) => {
+  const { records, report_period } = req.body;
+  if (!records || !Array.isArray(records) || records.length === 0) {
+    return res.status(400).json({ error: 'No records provided' });
+  }
+
+  // Try to match patients by name
+  for (const rec of records) {
+    if (!rec.patient_id && rec.patient_last_name && rec.patient_first_name) {
+      const { data: pat } = await supabase
+        .from('patients')
+        .select('id')
+        .ilike('last_name', rec.patient_last_name.trim())
+        .ilike('first_name', rec.patient_first_name.trim())
+        .single();
+      if (pat) rec.patient_id = pat.id;
+    }
+    if (report_period) rec.report_period = report_period;
+  }
+
+  const { data, error } = await supabase
+    .from('billing_reports')
+    .insert(records)
+    .select();
+  if (error) return dbError(res, error);
+
+  // Auto-update intake_records with claim_number where possible
+  for (const br of (data || [])) {
+    if (br.claim_number && br.patient_id && br.service_date) {
+      await supabase.from('intake_records')
+        .update({ claim_number: br.claim_number })
+        .eq('patient_id', br.patient_id)
+        .eq('service_date', br.service_date)
+        .is('claim_number', null);
+    }
+  }
+
+  res.json({ inserted: (data || []).length, data });
+});
+
+// ============================================
 // VISITS — BULK UPLOAD + WORKFLOW
 // ============================================
 

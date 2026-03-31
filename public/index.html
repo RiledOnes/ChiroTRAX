@@ -992,6 +992,10 @@
         <span class="icon">🩺</span> Diagnoses
       </div>
       <div class="nav-section">Billing</div>
+      <div class="nav-section">Billing</div>
+      <div class="nav-item" data-page="billing" onclick="showPage('billing', this)">
+        <span class="icon">💰</span> Billing
+      </div>
       <div class="nav-section">Workspace</div>
       <div class="nav-item" data-page="tasks" onclick="showPage('tasks', this)">
         <span class="icon">✅</span> Tasks
@@ -1346,7 +1350,83 @@
     <!-- ══════════════════════════════════ -->
     <!-- CLAIMS                             -->
     <!-- ══════════════════════════════════ -->
-    <!-- Claims tab removed — claims will be built into the workflow -->
+    <!-- ══════════════════════════════════ -->
+    <!-- BILLING                            -->
+    <!-- ══════════════════════════════════ -->
+    <section class="page" id="page-billing">
+      <div class="page-header">
+        <div>
+          <h2>Billing</h2>
+          <p>Insurance billing reports and payment tracking</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="billing-period-filter" onchange="loadBillingReports()" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
+            <option value="">All Periods</option>
+          </select>
+          <div class="search-select" id="ss-billing-patient" style="max-width:200px">
+            <input type="text" id="billing-patient-search" placeholder="All Patients" autocomplete="off" oninput="filterSearchSelect('ss-billing-patient')" onfocus="openSearchSelect('ss-billing-patient')"/>
+            <input type="hidden" id="billing-patient-filter"/>
+            <div class="ss-list"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('billing-csv-input').click()">Upload Billing CSV</button>
+          <input type="file" id="billing-csv-input" accept=".csv" onchange="handleBillingUpload(event)" style="display:none"/>
+        </div>
+      </div>
+
+      <!-- Billing summary stats -->
+      <div class="stats-row">
+        <div class="stat-card accent">
+          <div class="s-label">Total Charged</div>
+          <div class="s-value" id="bill-total-charged">—</div>
+          <div class="s-sub" id="bill-record-count">— records</div>
+        </div>
+        <div class="stat-card green">
+          <div class="s-label">Approved</div>
+          <div class="s-value" id="bill-total-approved">—</div>
+          <div class="s-sub">by insurance</div>
+        </div>
+        <div class="stat-card green">
+          <div class="s-label">Insurance Received</div>
+          <div class="s-value" id="bill-ins-received">—</div>
+          <div class="s-sub">pri + sec</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-label">Patient Received</div>
+          <div class="s-value" id="bill-patient-received">—</div>
+          <div class="s-sub">copay/cash</div>
+        </div>
+        <div class="stat-card warn">
+          <div class="s-label">Outstanding</div>
+          <div class="s-value" id="bill-outstanding">—</div>
+          <div class="s-sub">charged − received</div>
+        </div>
+      </div>
+
+      <!-- Billing records table -->
+      <div class="card" style="margin-top:4px">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>Service Date</th>
+                <th>Insurance</th>
+                <th>Claim #</th>
+                <th style="text-align:right">Charged</th>
+                <th style="text-align:right">Approved</th>
+                <th style="text-align:right">Ins Paid</th>
+                <th style="text-align:right">Pt Paid</th>
+                <th style="text-align:right">Balance</th>
+                <th>Period</th>
+              </tr>
+            </thead>
+            <tbody id="billing-tbody">
+              <tr><td colspan="10"><div class="empty-state"><div class="icon">💰</div><p>No billing records yet.</p><small>Upload a billing CSV to get started.</small></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
     <!-- ══════════════════════════════════ -->
     <!-- TASKS                               -->
@@ -2094,7 +2174,7 @@ function showPage(page, el) {
   if (page === 'daily') { setTodayDate(); loadDailyPage(); }
   if (page === 'patients') loadPatients();
   if (page === 'diagnoses') loadDiagnoses();
-  // claims tab removed
+  if (page === 'billing') loadBillingPage();
   if (page === 'tasks') loadTasks();
   if (page === 'reports') initReports();
 }
@@ -2328,7 +2408,7 @@ function badge(val, type) {
 async function populatePatientSelects() {
   if (allPatients.length === 0) await loadPatientsData();
   // Populate all searchable select dropdowns
-  const ssIds = ['ss-visit-patient', 'ss-dx-patient', 'ss-dx-filter', 'ss-rpt-patient'];
+  const ssIds = ['ss-visit-patient', 'ss-dx-patient', 'ss-dx-filter', 'ss-rpt-patient', 'ss-billing-patient'];
   ssIds.forEach(ssId => {
     const wrap = document.getElementById(ssId);
     if (!wrap) return;
@@ -2695,6 +2775,121 @@ async function saveDiagnosis() {
     closeModal('diagnosis-modal');
     loadDiagnoses();
   } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ════════════════════════════════════
+// BILLING
+// ════════════════════════════════════
+async function loadBillingPage() {
+  await populatePatientSelects();
+  // Set up patient filter callback
+  const wrap = document.getElementById('ss-billing-patient');
+  if (wrap) { wrap._allowEmpty = true; wrap._emptyLabel = 'All Patients'; wrap._onSelect = () => loadBillingReports(); }
+  // Load periods
+  try {
+    const periods = await api('GET', '/api/billing-reports/periods');
+    const sel = document.getElementById('billing-period-filter');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">All Periods</option>';
+    periods.forEach(p => { sel.innerHTML += `<option value="${p}">${p}</option>`; });
+    if (cur) sel.value = cur;
+  } catch(e) {}
+  loadBillingReports();
+}
+
+async function loadBillingReports() {
+  const period = document.getElementById('billing-period-filter')?.value || '';
+  const patientId = document.getElementById('billing-patient-filter')?.value || '';
+  try {
+    let url = '/api/billing-reports?';
+    if (period) url += `period=${period}&`;
+    if (patientId) url += `patient_id=${patientId}&`;
+    const records = await api('GET', url);
+
+    // Summary stats
+    const totalCharged = records.reduce((s, r) => s + (parseFloat(r.charge) || 0), 0);
+    const totalApproved = records.reduce((s, r) => s + (parseFloat(r.approved) || 0), 0);
+    const insReceived = records.reduce((s, r) => s + (parseFloat(r.pri_ins_received) || 0) + (parseFloat(r.sec_ins_received) || 0), 0);
+    const ptReceived = records.reduce((s, r) => s + (parseFloat(r.patient_received) || 0), 0);
+    const outstanding = totalCharged - insReceived - ptReceived;
+
+    document.getElementById('bill-total-charged').textContent = '$' + totalCharged.toFixed(2);
+    document.getElementById('bill-total-approved').textContent = '$' + totalApproved.toFixed(2);
+    document.getElementById('bill-ins-received').textContent = '$' + insReceived.toFixed(2);
+    document.getElementById('bill-patient-received').textContent = '$' + ptReceived.toFixed(2);
+    document.getElementById('bill-outstanding').textContent = '$' + outstanding.toFixed(2);
+    document.getElementById('bill-record-count').textContent = `${records.length} records`;
+
+    // Table
+    const tbody = document.getElementById('billing-tbody');
+    if (!records.length) {
+      tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="icon">💰</div><p>No billing records found.</p></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = records.map(r => {
+      const name = [r.patient_last_name, r.patient_first_name].filter(Boolean).join(', ') || '—';
+      const insPaid = (parseFloat(r.pri_ins_received) || 0) + (parseFloat(r.sec_ins_received) || 0);
+      const ptPaid = parseFloat(r.patient_received) || 0;
+      const charged = parseFloat(r.charge) || 0;
+      const balance = charged - insPaid - ptPaid;
+      return `<tr>
+        <td><strong>${esc(name)}</strong></td>
+        <td class="muted">${r.service_date || '—'}</td>
+        <td style="font-size:12px">${esc(r.insurance_name || '—')}</td>
+        <td class="muted">${esc(r.claim_number || '—')}</td>
+        <td style="text-align:right;font-weight:600">$${charged.toFixed(2)}</td>
+        <td style="text-align:right">$${(parseFloat(r.approved) || 0).toFixed(2)}</td>
+        <td style="text-align:right;color:#16a34a">$${insPaid.toFixed(2)}</td>
+        <td style="text-align:right">$${ptPaid.toFixed(2)}</td>
+        <td style="text-align:right;font-weight:700;color:${balance > 0 ? '#dc2626' : '#16a34a'}">$${balance.toFixed(2)}</td>
+        <td class="muted">${esc(r.report_period || '—')}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) { toast('Failed to load billing: ' + e.message, 'error'); }
+}
+
+async function handleBillingUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const lines = e.target.result.split('\n').map(l => l.trim()).filter(l => l);
+      if (lines.length < 2) { toast('CSV is empty', 'error'); return; }
+      const headers = parseCSVRow(lines[0]).map(h => h.trim().toLowerCase().replace(/\s+/g, '_'));
+      const records = [];
+      for (let i = 1; i < lines.length; i++) {
+        const vals = parseCSVRow(lines[i]);
+        if (vals.length < 2) continue;
+        const row = {};
+        headers.forEach((h, idx) => { row[h] = vals[idx]?.trim() || null; });
+        records.push({
+          patient_last_name: row.patient_last_name || row.last_name || row.lastname || null,
+          patient_first_name: row.patient_first_name || row.first_name || row.firstname || null,
+          service_date: row.service_date || row.date_of_service || row.dos || null,
+          insurance_type: row.insurance_type || row.ins_type || null,
+          insurance_id: row.insurance_id || row.member_id || null,
+          insurance_name: row.insurance_name || row.insurance || row.payer || null,
+          charge: parseFloat(row.charge || row.amount_billed || row.billed || 0) || null,
+          approved: parseFloat(row.approved || row.amount_approved || 0) || null,
+          pri_ins_received: parseFloat(row.pri_ins_received || row.primary_paid || row.ins_paid || 0) || null,
+          sec_ins_received: parseFloat(row.sec_ins_received || row.secondary_paid || 0) || null,
+          patient_received: parseFloat(row.patient_received || row.patient_paid || row.copay || 0) || null,
+          submit_date: row.submit_date || row.submitted_date || null,
+          claim_number: row.claim_number || row.claim_no || null,
+          report_period: row.report_period || row.period || null
+        });
+      }
+      if (!records.length) { toast('No valid records in CSV', 'error'); return; }
+      toast(`Uploading ${records.length} billing records...`);
+      const result = await api('POST', '/api/billing-reports/upload', { records });
+      toast(`Imported ${result.inserted} billing records`, 'success');
+      await loadBillingPage();
+    } catch(err) { toast('Upload failed: ' + err.message, 'error'); }
+  };
+  reader.readAsText(file);
 }
 
 // ════════════════════════════════════

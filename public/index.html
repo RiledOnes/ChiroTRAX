@@ -915,6 +915,12 @@
     }
     .search-select .ss-item:hover, .search-select .ss-item.active { background: var(--accent-dim); color: var(--accent); }
     .search-select .ss-item.ss-empty { color: var(--ink3); cursor: default; font-style: italic; }
+
+    /* Collapsible report groups */
+    .tool-group.collapsed .tool-group-body { display: none; }
+    .tool-group.collapsed .tool-group-header span:first-child::before { content: '▶ '; }
+    .tool-group:not(.collapsed) .tool-group-header span:first-child::before { content: '▼ '; }
+    .tool-group .tool-group-header span:first-child { display: inline; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 </head>
@@ -1621,6 +1627,88 @@
         <div class="card-head"><div class="card-title">Top Patients by Visit Count</div></div>
         <div style="padding:0" id="rpt-top-patients">
           <div class="empty-state"><p>Run a report to see data.</p></div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════ -->
+      <!-- REPORTING TOOL                      -->
+      <!-- ══════════════════════════════════ -->
+      <div class="card" style="margin-top:20px">
+        <div class="card-head"><div class="card-title">Reporting Tool</div></div>
+        <div style="padding:16px">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
+            <div style="flex:1;min-width:160px">
+              <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">Report Type</label>
+              <select id="tool-report-type" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
+                <option value="patient_visits">Patient Visit History</option>
+                <option value="claims_by_diagnosis">Claims by Diagnosis</option>
+                <option value="outstanding_claims">Outstanding Claims</option>
+                <option value="payment_summary">Payment & Reconciliation</option>
+                <option value="daily_intake">Daily Intake Summary</option>
+                <option value="denials">Denial Report</option>
+                <option value="status_activity">Status Activity</option>
+              </select>
+            </div>
+            <div style="flex:1;min-width:140px">
+              <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">Group By</label>
+              <select id="tool-group-by" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
+                <option value="none">No Grouping</option>
+                <option value="patient">Patient</option>
+                <option value="service_date">Service Date</option>
+                <option value="week">Week</option>
+                <option value="month">Month</option>
+                <option value="diagnosis_category">Diagnosis Category</option>
+                <option value="manipulation_type">Manipulation Type</option>
+                <option value="workflow_status">Workflow Status</option>
+              </select>
+            </div>
+            <div style="min-width:120px">
+              <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">From</label>
+              <input type="date" id="tool-from" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
+            </div>
+            <div style="min-width:120px">
+              <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">To</label>
+              <input type="date" id="tool-to" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
+            </div>
+            <div style="min-width:180px">
+              <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">Patient</label>
+              <div class="search-select" id="ss-tool-patient">
+                <input type="text" id="tool-patient-search" placeholder="All Patients" autocomplete="off" oninput="filterSearchSelect('ss-tool-patient')" onfocus="openSearchSelect('ss-tool-patient')"/>
+                <input type="hidden" id="tool-patient-id"/>
+                <div class="ss-list"></div>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="runReportTool()" style="height:38px">Run Report</button>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+            <div>
+              <label style="font-size:11px;color:var(--ink3)">Manipulation</label>
+              <select id="tool-manip" style="padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+                <option value="">All</option><option value="E1">E1</option><option value="E2">E2</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--ink3)">Dx Category</label>
+              <select id="tool-dx-cat" style="padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+                <option value="">All</option><option value="ALL">ALL</option><option value="LB">LB</option><option value="NECK">NECK</option><option value="MC-LB">MC-LB</option><option value="CUSTOM">CUSTOM</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--ink3)">Status</label>
+              <select id="tool-wf-status" style="padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+                <option value="">All</option><option value="intake">Intake</option><option value="entered_ebs">Entered EBS</option><option value="claim_created">Claim Created</option><option value="payment_received">Paid</option><option value="denied">Denied</option><option value="closed">Closed</option>
+              </select>
+            </div>
+          </div>
+          <div id="tool-actions" style="display:none;margin-bottom:12px;align-items:center;gap:8px">
+            <span id="tool-result-count" style="font-size:13px;color:var(--ink3)"></span>
+            <div style="flex:1"></div>
+            <button class="btn btn-ghost btn-sm" onclick="toggleAllGroups()">Collapse/Expand All</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportToolCSV()">Export CSV</button>
+          </div>
+          <div id="tool-results">
+            <div class="empty-state" style="padding:32px"><p>Select a report type and click Run Report.</p></div>
+          </div>
         </div>
       </div>
     </section>
@@ -2459,7 +2547,7 @@ function badge(val, type) {
 async function populatePatientSelects() {
   if (allPatients.length === 0) await loadPatientsData();
   // Populate all searchable select dropdowns
-  const ssIds = ['ss-visit-patient', 'ss-dx-patient', 'ss-dx-filter', 'ss-rpt-patient', 'ss-billing-patient', 'ss-task-patient'];
+  const ssIds = ['ss-visit-patient', 'ss-dx-patient', 'ss-dx-filter', 'ss-rpt-patient', 'ss-billing-patient', 'ss-task-patient', 'ss-tool-patient'];
   ssIds.forEach(ssId => {
     const wrap = document.getElementById(ssId);
     if (!wrap) return;
@@ -4246,12 +4334,22 @@ async function exportPatientPDF(patientId) {
 // ════════════════════════════════════
 async function initReports() {
   await populatePatientSelects();
+  // Set tool defaults
+  const toolWrap = document.getElementById('ss-tool-patient');
+  if (toolWrap) { toolWrap._allowEmpty = true; toolWrap._emptyLabel = 'All Patients'; }
   const from = document.getElementById('rpt-from');
   const to = document.getElementById('rpt-to');
   if (!from.value) {
     setReportRange(30);
   } else {
     loadReports();
+  }
+  // Also set reporting tool date defaults
+  if (!document.getElementById('tool-from').value) {
+    const now = new Date();
+    const ago = new Date(); ago.setDate(ago.getDate() - 30);
+    document.getElementById('tool-from').value = ago.toISOString().split('T')[0];
+    document.getElementById('tool-to').value = now.toISOString().split('T')[0];
   }
 }
 
@@ -4415,6 +4513,196 @@ function rptBar(label, value, max, color) {
       <div class="rpt-bar-value">${value}</div>
     </div>
   `;
+}
+
+// ════════════════════════════════════
+// REPORTING TOOL
+// ════════════════════════════════════
+const STATUS_LABELS = {
+  intake: 'Intake Logged', entered_ebs: 'Entered in EBS', claim_created: 'Claim Submitted',
+  already_entered: 'Previously Entered', payment_received: 'Payment Received',
+  payment_partial: 'Partial Payment', denied: 'Denied', denied_resubmitted: 'Resubmitted', closed: 'Closed'
+};
+
+let lastToolReport = null;
+
+async function runReportTool() {
+  const reportType = document.getElementById('tool-report-type').value;
+  const groupBy = document.getElementById('tool-group-by').value;
+  const from = document.getElementById('tool-from').value;
+  const to = document.getElementById('tool-to').value;
+  if (!from || !to) { toast('Select a date range', 'error'); return; }
+
+  const filters = { from, to };
+  const patientId = document.getElementById('tool-patient-id')?.value;
+  if (patientId) filters.patient_id = patientId;
+  const manip = document.getElementById('tool-manip')?.value;
+  if (manip) filters.manipulation_type = manip;
+  const dxCat = document.getElementById('tool-dx-cat')?.value;
+  if (dxCat) filters.diagnosis_category = dxCat;
+  const wfStatus = document.getElementById('tool-wf-status')?.value;
+  if (wfStatus) filters.workflow_status = wfStatus;
+
+  toast('Running report...');
+  try {
+    const result = await api('POST', '/api/reports/run', { report_type: reportType, filters, group_by: groupBy });
+    lastToolReport = result;
+    renderToolReport(result, reportType, groupBy);
+  } catch(e) { toast('Report failed: ' + e.message, 'error'); }
+}
+
+function renderToolReport(result, reportType, groupBy) {
+  const container = document.getElementById('tool-results');
+  const actions = document.getElementById('tool-actions');
+  actions.style.display = 'flex';
+
+  const totalRecords = (result.groups || []).reduce((s, g) => s + (g.records || []).length, 0);
+  document.getElementById('tool-result-count').textContent = `Showing ${totalRecords} records in ${(result.groups || []).length} group(s)`;
+
+  if (!result.groups || !result.groups.length) {
+    container.innerHTML = '<div class="empty-state" style="padding:32px"><p>No records found for this report.</p></div>';
+    return;
+  }
+
+  // Summary bar
+  const s = result.summary || {};
+  let html = `<div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 0;border-bottom:2px solid var(--border);margin-bottom:12px;font-size:13px">`;
+  if (s.total_records != null) html += `<div><strong>${s.total_records}</strong> <span style="color:var(--ink3)">records</span></div>`;
+  if (s.total_visits != null) html += `<div><strong>${s.total_visits}</strong> <span style="color:var(--ink3)">visits</span></div>`;
+  if (s.total_charged != null) html += `<div><strong>$${Number(s.total_charged).toLocaleString()}</strong> <span style="color:var(--ink3)">charged</span></div>`;
+  if (s.total_received != null) html += `<div style="color:#16a34a"><strong>$${Number(s.total_received).toLocaleString()}</strong> <span style="color:var(--ink3)">received</span></div>`;
+  if (s.total_outstanding != null) html += `<div style="color:#dc2626"><strong>$${Number(s.total_outstanding).toLocaleString()}</strong> <span style="color:var(--ink3)">outstanding</span></div>`;
+  if (s.aging) {
+    html += `<div style="font-size:11px;color:var(--ink3)">Aging: 0-30d: ${s.aging['0-30'] || 0} | 31-60d: ${s.aging['31-60'] || 0} | 61-90d: ${s.aging['61-90'] || 0} | 90+d: ${s.aging['90+'] || 0}</div>`;
+  }
+  html += `</div>`;
+
+  // Groups
+  result.groups.forEach((g, gi) => {
+    const sub = g.subtotals || {};
+    html += `<div class="tool-group" data-group="${gi}">`;
+    html += `<div class="tool-group-header" onclick="this.parentElement.classList.toggle('collapsed')" style="cursor:pointer;padding:8px 12px;background:var(--surface2);border-radius:6px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13px">`;
+    html += `<span>▼ ${esc(g.label || 'Ungrouped')} <span style="font-weight:400;color:var(--ink3)">(${(g.records || []).length} records)</span></span>`;
+    html += `<span style="font-size:12px;color:var(--ink3)">`;
+    if (sub.total_charged != null) html += `$${Number(sub.total_charged).toLocaleString()} charged `;
+    if (sub.total_received != null) html += `| $${Number(sub.total_received).toLocaleString()} received`;
+    html += `</span></div>`;
+
+    // Records table
+    html += `<div class="tool-group-body" style="margin-bottom:12px">`;
+    if (g.records && g.records.length) {
+      html += `<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr>`;
+      const cols = getReportColumns(reportType);
+      cols.forEach(c => { html += `<th style="padding:4px 8px;text-align:${c.align || 'left'};font-size:11px;color:var(--ink3);border-bottom:1px solid var(--border)">${c.label}</th>`; });
+      html += `</tr></thead><tbody>`;
+      g.records.forEach(r => {
+        html += `<tr>`;
+        cols.forEach(c => {
+          const val = c.render ? c.render(r) : (r[c.key] ?? '—');
+          html += `<td style="padding:3px 8px;border-bottom:1px solid var(--surface3);text-align:${c.align || 'left'};font-size:12px">${val}</td>`;
+        });
+        html += `</tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+    html += `</div></div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function getReportColumns(type) {
+  const sl = (v) => STATUS_LABELS[v] || v || '—';
+  const money = (v) => v != null ? '$' + Number(v).toFixed(2) : '—';
+  const dx = (r) => { const c = Array.isArray(r.diagnosis_codes) ? r.diagnosis_codes.join(', ') : (r.diagnosis_codes || ''); return r.diagnosis_category ? r.diagnosis_category + ': ' + c : c || '—'; };
+
+  const base = [
+    { key: 'service_date', label: 'Date' },
+    { key: 'patient_name', label: 'Patient' },
+    { key: 'patient_code', label: 'Code' }
+  ];
+
+  switch(type) {
+    case 'patient_visits':
+    case 'daily_intake':
+      return [...base,
+        { key: 'manipulation_type', label: 'Manip' },
+        { key: 'therapeutic_exercises', label: 'TE' },
+        { label: 'Diagnosis', render: dx },
+        { key: 'workflow_status', label: 'Status', render: r => sl(r.workflow_status) },
+        { key: 'claim_number', label: 'Claim #' },
+        { key: 'is_backdated', label: 'BD', render: r => r.is_backdated ? 'Yes' : '' }
+      ];
+    case 'claims_by_diagnosis':
+      return [...base,
+        { key: 'diagnosis_category', label: 'Dx Cat' },
+        { label: 'ICD-10', render: dx },
+        { key: 'cpt_manipulation', label: 'CPT' },
+        { key: 'workflow_status', label: 'Status', render: r => sl(r.workflow_status) }
+      ];
+    case 'outstanding_claims':
+      return [...base,
+        { key: 'workflow_status', label: 'Status', render: r => sl(r.workflow_status) },
+        { key: 'days_outstanding', label: 'Days', align: 'right' },
+        { key: 'claim_number', label: 'Claim #' },
+        { key: 'notes', label: 'Notes' }
+      ];
+    case 'payment_summary':
+      return [
+        { key: 'service_date', label: 'Date' },
+        { key: 'patient_last_name', label: 'Patient', render: r => [r.patient_last_name, r.patient_first_name].filter(Boolean).join(', ') || '—' },
+        { key: 'insurance_name', label: 'Insurance' },
+        { key: 'charge', label: 'Charged', align: 'right', render: r => money(r.charge) },
+        { key: 'approved', label: 'Approved', align: 'right', render: r => money(r.approved) },
+        { label: 'Ins Paid', align: 'right', render: r => money((parseFloat(r.pri_ins_received)||0) + (parseFloat(r.sec_ins_received)||0)) },
+        { key: 'patient_received', label: 'Pt Paid', align: 'right', render: r => money(r.patient_received) },
+        { key: 'claim_number', label: 'Claim #' }
+      ];
+    case 'denials':
+      return [...base,
+        { key: 'claim_number', label: 'Claim #' },
+        { key: 'workflow_status', label: 'Status', render: r => sl(r.workflow_status) },
+        { key: 'notes', label: 'Notes' }
+      ];
+    case 'status_activity':
+      return [
+        { key: 'changed_at', label: 'Changed At', render: r => r.changed_at ? new Date(r.changed_at).toLocaleString() : '—' },
+        { key: 'intake_id', label: 'Intake ID' },
+        { key: 'patient_name', label: 'Patient' },
+        { key: 'service_date', label: 'Svc Date' },
+        { key: 'previous_status', label: 'From', render: r => sl(r.previous_status) },
+        { key: 'new_status', label: 'To', render: r => sl(r.new_status) },
+        { key: 'changed_by', label: 'By' }
+      ];
+    default: return base;
+  }
+}
+
+function toggleAllGroups() {
+  const groups = document.querySelectorAll('.tool-group');
+  const allCollapsed = Array.from(groups).every(g => g.classList.contains('collapsed'));
+  groups.forEach(g => { allCollapsed ? g.classList.remove('collapsed') : g.classList.add('collapsed'); });
+}
+
+function exportToolCSV() {
+  if (!lastToolReport || !lastToolReport.groups) { toast('No report to export', 'error'); return; }
+  const reportType = document.getElementById('tool-report-type').value;
+  const cols = getReportColumns(reportType);
+  let csv = cols.map(c => c.label).join(',') + ',Group\n';
+  lastToolReport.groups.forEach(g => {
+    (g.records || []).forEach(r => {
+      csv += cols.map(c => {
+        const val = c.render ? c.render(r) : (r[c.key] ?? '');
+        return '"' + String(val).replace(/"/g, '""') + '"';
+      }).join(',') + ',"' + (g.label || '') + '"\n';
+    });
+  });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `report_${reportType}_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('CSV exported', 'success');
 }
 
 // ════════════════════════════════════

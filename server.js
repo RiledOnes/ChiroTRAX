@@ -1275,28 +1275,15 @@ app.post('/api/reports/run', async (req, res) => {
       }
 
       case 'reconciliation': {
-        // Cross-reference intake_records, charge_capture images, and billing_reports
+        // Read reconciliation fields directly from intake_records
         let irQuery = supabase.from('intake_records')
-          .select('id, intake_id, service_date, sheet_date, patient_id, patient_name, patient_code, manipulation_type, therapeutic_exercises, diagnosis_category, workflow_status, claim_number, cpt_manipulation, cpt_te')
+          .select('id, intake_id, service_date, sheet_date, patient_id, patient_name, patient_code, manipulation_type, diagnosis_category, workflow_status, claim_number, in_charge_capture, in_billing_report, billing_report_period, missing_from_report')
           .order('service_date', { ascending: true });
         irQuery = applyIntakeFilters(irQuery, filters);
         const { data: irData, error: irErr } = await irQuery;
         if (irErr) return dbError(res, irErr);
 
-        // Get charge capture images (grouped by date)
-        const serviceDates = [...new Set((irData || []).map(r => r.service_date).filter(Boolean))];
-        let ccDates = new Set();
-        if (serviceDates.length) {
-          const minD = serviceDates.reduce((a, b) => a < b ? a : b);
-          const maxD = serviceDates.reduce((a, b) => a > b ? a : b);
-          const { data: ccImages } = await supabase.from('daily_intake_images')
-            .select('business_date')
-            .eq('image_tag', 'charge_capture')
-            .gte('business_date', minD).lte('business_date', maxD);
-          ccDates = new Set((ccImages || []).map(i => i.business_date));
-        }
-
-        // Get billing reports for matching
+        // Get billing reports for billing amount lookup
         const { data: brData } = await supabase.from('billing_reports')
           .select('patient_id, service_date, charge, claim_number');
         const brMap = {};
@@ -1311,9 +1298,9 @@ app.post('/api/reports/run', async (req, res) => {
           return {
             ...r,
             on_intake: true,
-            in_charge_capture: ccDates.has(r.service_date),
+            in_charge_capture: !!r.in_charge_capture,
+            in_billing_report: !!r.in_billing_report,
             claim_number: r.claim_number || br?.claim_number || null,
-            in_billing_report: !!br,
             billing_amount: br ? parseFloat(br.charge) || 0 : null
           };
         });

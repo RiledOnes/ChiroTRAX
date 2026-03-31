@@ -4764,11 +4764,14 @@ function getReportColumns(type) {
         { key: 'patient_name', label: 'Patient' },
         { key: 'patient_code', label: 'Code' },
         { key: 'service_date', label: 'Date' },
-        { key: 'on_intake', label: 'On Intake', render: r => r.on_intake ? '<span style="color:#16a34a;font-weight:700">✓</span>' : '<span style="color:#dc2626;font-weight:700">✗</span>' },
-        { key: 'in_charge_capture', label: 'In Charge Capture', render: r => r.in_charge_capture ? '<span style="color:#16a34a;font-weight:700">✓</span>' : '<span style="color:#dc2626;font-weight:700">✗</span>' },
-        { key: 'claim_number', label: 'Claim #', render: r => r.claim_number || '<span style="color:#dc2626;font-weight:700">✗</span>' },
-        { key: 'in_billing_report', label: 'In Billing Report', render: r => r.in_billing_report ? '<span style="color:#16a34a;font-weight:700">✓</span>' : '<span style="color:#dc2626;font-weight:700">✗</span>' },
-        { key: 'billing_amount', label: 'Billing Amount', align: 'right', render: r => r.billing_amount != null ? '$' + Number(r.billing_amount).toFixed(2) : '—' },
+        { key: 'on_intake', label: 'On Intake', render: r => '<span style="color:#16a34a;font-weight:700">✓</span>' },
+        { key: 'in_charge_capture', label: 'Charge Capture', render: r =>
+          `<span class="recon-toggle" onclick="toggleReconField('${r.id}','in_charge_capture',${!r.in_charge_capture},this)" style="cursor:pointer;font-weight:700;color:${r.in_charge_capture ? '#16a34a' : '#dc2626'}">${r.in_charge_capture ? '✓' : '✗'}</span>` },
+        { key: 'claim_number', label: 'Claim #', render: r =>
+          `<input type="text" value="${esc(r.claim_number || '')}" onchange="updateReconClaim('${r.id}',this.value)" style="width:80px;padding:2px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--ink);font-size:12px" placeholder="—"/>` },
+        { key: 'in_billing_report', label: 'In Billing', render: r =>
+          `<span class="recon-toggle" onclick="toggleReconField('${r.id}','in_billing_report',${!r.in_billing_report},this)" style="cursor:pointer;font-weight:700;color:${r.in_billing_report ? '#16a34a' : '#dc2626'}">${r.in_billing_report ? '✓' : '✗'}</span>` },
+        { key: 'billing_amount', label: 'Billing Amt', align: 'right', render: r => r.billing_amount != null ? '$' + Number(r.billing_amount).toFixed(2) : '—' },
         { key: 'workflow_status', label: 'Status', render: r => sl(r.workflow_status) }
       ];
     default: return base;
@@ -4800,6 +4803,36 @@ function exportToolCSV() {
   a.href = url; a.download = `report_${reportType}_${new Date().toISOString().split('T')[0]}.csv`;
   a.click(); URL.revokeObjectURL(url);
   toast('CSV exported', 'success');
+}
+
+// ════════════════════════════════════
+// RECONCILIATION INLINE EDITING
+// ════════════════════════════════════
+async function toggleReconField(recordId, field, newValue, el) {
+  try {
+    await api('PUT', `/api/visits/${recordId}`, { [field]: newValue });
+    el.textContent = newValue ? '✓' : '✗';
+    el.style.color = newValue ? '#16a34a' : '#dc2626';
+    // Update the cached record
+    if (lastToolReport) {
+      for (const g of lastToolReport.groups) {
+        const rec = (g.records || []).find(r => r.id === recordId);
+        if (rec) { rec[field] = newValue; break; }
+      }
+    }
+  } catch(e) { toast('Failed to update: ' + e.message, 'error'); }
+}
+
+async function updateReconClaim(recordId, value) {
+  try {
+    await api('PUT', `/api/visits/${recordId}`, { claim_number: value || null });
+    if (lastToolReport) {
+      for (const g of lastToolReport.groups) {
+        const rec = (g.records || []).find(r => r.id === recordId);
+        if (rec) { rec.claim_number = value || null; break; }
+      }
+    }
+  } catch(e) { toast('Failed to update claim #: ' + e.message, 'error'); }
 }
 
 // ════════════════════════════════════

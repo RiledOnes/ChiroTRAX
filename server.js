@@ -379,12 +379,15 @@ app.post('/api/visits', async (req, res) => {
   if (body.visit_date) { body.service_date = body.visit_date; delete body.visit_date; }
   if (body.patient_status) { body.visit_status = body.patient_status; delete body.patient_status; }
   if (body.office_visit) { body.cpt_office_visit = body.office_visit; delete body.office_visit; }
-  // Auto-generate intake_id if not provided (MMDDYY_NN format)
-  if (!body.intake_id && body.service_date) {
-    const d = new Date(body.service_date + 'T12:00:00');
-    const prefix = String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + String(d.getFullYear()).slice(-2);
-    const { count } = await supabase.from('intake_records').select('*', { count: 'exact', head: true }).eq('service_date', body.service_date);
-    body.intake_id = `${prefix}_${String((count || 0) + 1).padStart(2, '0')}`;
+  // Auto-generate intake_id if not provided (MMDDYY_NN format based on sheet_date or service_date)
+  if (!body.intake_id) {
+    const idDate = body.sheet_date || body.service_date;
+    if (idDate) {
+      const d = new Date(idDate + 'T12:00:00');
+      const prefix = String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + String(d.getFullYear()).slice(-2);
+      const { count } = await supabase.from('intake_records').select('*', { count: 'exact', head: true }).eq('sheet_date', idDate);
+      body.intake_id = `${prefix}_${String((count || 0) + 1).padStart(2, '0')}`;
+    }
   }
   if (!body.patient_name && body.patient_id) {
     // Look up patient name for intake_records

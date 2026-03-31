@@ -1090,6 +1090,7 @@
                 <tr>
                   <th>Patient ID</th>
                   <th>Name</th>
+                  <th>Svc Date</th>
                   <th>Status</th>
                   <th>Manipulation</th>
                   <th>Exercises</th>
@@ -1537,8 +1538,12 @@
         </select>
       </div>
       <div class="form-group">
-        <label>Visit Date *</label>
+        <label>Intake Date *</label>
         <input type="date" id="visit-date"/>
+      </div>
+      <div class="form-group">
+        <label>Service Date (if different)</label>
+        <input type="date" id="visit-service-date"/>
       </div>
       <div class="form-group">
         <label>Patient Status</label>
@@ -2154,12 +2159,16 @@ function openVisitModal(visit = null) {
   populatePatientSelects();
   clearForm(['visit-edit-id','visit-patient-id','visit-status','visit-manip','visit-notes']);
   document.getElementById('visit-exercises').value = '';
-  document.getElementById('visit-date').value = today();
+  // Default intake date from the daily intake date picker, or today
+  const intakeDate = document.getElementById('intake-date')?.value || today();
+  document.getElementById('visit-date').value = intakeDate;
+  document.getElementById('visit-service-date').value = '';
   document.getElementById('visit-modal-title').textContent = visit ? 'Edit Visit' : 'Log Visit';
   if (visit) {
     document.getElementById('visit-edit-id').value = visit.id;
     document.getElementById('visit-patient-id').value = visit.patient_id || '';
-    document.getElementById('visit-date').value = visit.visit_date || '';
+    document.getElementById('visit-date').value = visit.sheet_date || visit.visit_date || '';
+    document.getElementById('visit-service-date').value = visit.is_backdated ? (visit.visit_date || '') : '';
     document.getElementById('visit-status').value = visit.patient_status || '';
     document.getElementById('visit-manip').value = visit.manipulation_type || '';
     document.getElementById('visit-exercises').value = visit.therapeutic_exercises ?? '';
@@ -2452,35 +2461,42 @@ async function loadVisits() {
 
 function renderVisitRows(tbodyId, visits, compact) {
   const tbody = document.getElementById(tbodyId);
-  const cols = compact ? 6 : 7;
+  const cols = compact ? 6 : 8;
   if (!visits.length) {
     tbody.innerHTML = `<tr><td colspan="${cols}"><div class="empty-state"><div class="icon">📋</div><p>No visits found for this date.</p></div></td></tr>`;
     return;
   }
-  tbody.innerHTML = visits.map(v => `
-    <tr>
+  tbody.innerHTML = visits.map(v => {
+    const svcDate = v.is_backdated ? `<span style="color:#d97706;font-weight:600" title="Backdated">${v.visit_date}</span>` : `<span class="muted">${v.visit_date || '—'}</span>`;
+    return `<tr>
       <td><strong>${v.patients?.patient_code || '—'}</strong></td>
       <td>${v.patients?.last_name || ''}, ${v.patients?.first_name || ''}</td>
+      <td>${svcDate}</td>
       <td>${badge(v.patient_status)}</td>
       <td>${badge(v.manipulation_type)}</td>
       <td>${v.therapeutic_exercises != null ? v.therapeutic_exercises : '<span class="muted">—</span>'}</td>
       <td class="muted">${v.notes || '—'}</td>
       ${compact ? '' : `<td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openVisitModal(${JSON.stringify(v)})'>Edit</button></div></td>`}
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 }
 
 async function saveVisit() {
   const editId = document.getElementById('visit-edit-id').value;
+  const intakeDate = document.getElementById('visit-date').value;
+  const serviceDate = document.getElementById('visit-service-date').value;
+  const isBackdated = serviceDate && serviceDate !== intakeDate;
   const body = {
     patient_id: document.getElementById('visit-patient-id').value,
-    visit_date: document.getElementById('visit-date').value,
+    visit_date: serviceDate || intakeDate,
+    sheet_date: intakeDate,
+    is_backdated: isBackdated,
     patient_status: document.getElementById('visit-status').value || null,
     manipulation_type: document.getElementById('visit-manip').value || null,
     therapeutic_exercises: parseInt(document.getElementById('visit-exercises').value) || 0,
     notes: document.getElementById('visit-notes').value || null
   };
-  if (!body.patient_id || !body.visit_date) { toast('Patient and date are required.', 'error'); return; }
+  if (!body.patient_id || !intakeDate) { toast('Patient and intake date are required.', 'error'); return; }
   try {
     if (editId) {
       await api('PUT', `/api/visits/${editId}`, body);

@@ -916,6 +916,18 @@
     .search-select .ss-item:hover, .search-select .ss-item.active { background: var(--accent-dim); color: var(--accent); }
     .search-select .ss-item.ss-empty { color: var(--ink3); cursor: default; font-style: italic; }
 
+    /* Report type cards */
+    .rb-type-card {
+      padding: 14px; background: var(--surface2); border: 2px solid var(--border);
+      border-radius: 10px; cursor: pointer; text-align: center; transition: all 0.15s;
+    }
+    .rb-type-card:hover { border-color: var(--accent); background: var(--accent-dim); }
+    .rb-type-card.active { border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 0 1px var(--accent); }
+
+    /* Drill-down row hover */
+    .rb-drill-row { cursor: pointer; transition: background 0.1s; }
+    .rb-drill-row:hover { background: var(--accent-dim) !important; }
+
     /* Collapsible report groups */
     .tool-group.collapsed .tool-group-body { display: none; }
     .tool-group.collapsed .tool-group-header span:first-child::before { content: '▶ '; }
@@ -1005,7 +1017,6 @@
         <span class="icon">🩺</span> Diagnoses
       </div>
       <div class="nav-section">Billing</div>
-      <div class="nav-section">Billing</div>
       <div class="nav-item" data-page="billing" onclick="showPage('billing', this)">
         <span class="icon">💰</span> Billing
       </div>
@@ -1014,7 +1025,10 @@
         <span class="icon">✅</span> Tasks
       </div>
       <div class="nav-item" data-page="reports" onclick="showPage('reports', this)">
-        <span class="icon">📊</span> Reports
+        <span class="icon">📊</span> Dashboard
+      </div>
+      <div class="nav-item" data-page="report-builder" onclick="showPage('report-builder', this)">
+        <span class="icon">📋</span> Report Builder
       </div>
     </nav>
     <div class="user-bar" id="user-bar">
@@ -1630,86 +1644,139 @@
         </div>
       </div>
 
-      <!-- ══════════════════════════════════ -->
-      <!-- REPORTING TOOL                      -->
-      <!-- ══════════════════════════════════ -->
-      <div class="card" style="margin-top:20px">
-        <div class="card-head"><div class="card-title">Reporting Tool</div></div>
-        <div style="padding:16px">
-          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
-            <div style="flex:1;min-width:160px">
-              <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">Report Type</label>
-              <select id="tool-report-type" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
-                <option value="patient_visits">Patient Visit History</option>
-                <option value="claims_by_diagnosis">Claims by Diagnosis</option>
-                <option value="outstanding_claims">Outstanding Claims</option>
-                <option value="payment_summary">Payment & Reconciliation</option>
-                <option value="daily_intake">Daily Intake Summary</option>
-                <option value="denials">Denial Report</option>
-                <option value="status_activity">Status Activity</option>
-              </select>
-            </div>
-            <div style="flex:1;min-width:140px">
-              <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">Group By</label>
-              <select id="tool-group-by" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
-                <option value="none">No Grouping</option>
-                <option value="patient">Patient</option>
-                <option value="service_date">Service Date</option>
-                <option value="week">Week</option>
-                <option value="month">Month</option>
-                <option value="diagnosis_category">Diagnosis Category</option>
-                <option value="manipulation_type">Manipulation Type</option>
-                <option value="workflow_status">Workflow Status</option>
-              </select>
-            </div>
-            <div style="min-width:120px">
-              <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">From</label>
-              <input type="date" id="tool-from" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
-            </div>
-            <div style="min-width:120px">
-              <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">To</label>
-              <input type="date" id="tool-to" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
-            </div>
-            <div style="min-width:180px">
-              <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">Patient</label>
-              <div class="search-select" id="ss-tool-patient">
-                <input type="text" id="tool-patient-search" placeholder="All Patients" autocomplete="off" oninput="filterSearchSelect('ss-tool-patient')" onfocus="openSearchSelect('ss-tool-patient')"/>
-                <input type="hidden" id="tool-patient-id"/>
-                <div class="ss-list"></div>
-              </div>
-            </div>
-            <button class="btn btn-primary" onclick="runReportTool()" style="height:38px">Run Report</button>
+    </section>
+
+    <!-- ══════════════════════════════════ -->
+    <!-- REPORT BUILDER                     -->
+    <!-- ══════════════════════════════════ -->
+    <section class="page" id="page-report-builder">
+      <div class="page-header">
+        <div>
+          <h2>Report Builder</h2>
+          <p>Generate detailed reports with drill-down</p>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="exportToolCSV()">Export CSV</button>
+          <button class="btn btn-ghost btn-sm" onclick="printToolReport()">Print</button>
+        </div>
+      </div>
+
+      <!-- Report Type Cards -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:20px">
+        <div class="rb-type-card active" data-type="patient_visits" onclick="selectReportType('patient_visits',this)">
+          <div style="font-size:20px;margin-bottom:4px">👤</div>
+          <div style="font-weight:600;font-size:13px">Patient Visits</div>
+          <div style="font-size:11px;color:var(--ink3)">Visit history by patient</div>
+        </div>
+        <div class="rb-type-card" data-type="claims_by_diagnosis" onclick="selectReportType('claims_by_diagnosis',this)">
+          <div style="font-size:20px;margin-bottom:4px">🩺</div>
+          <div style="font-weight:600;font-size:13px">By Diagnosis</div>
+          <div style="font-size:11px;color:var(--ink3)">Claims by ICD category</div>
+        </div>
+        <div class="rb-type-card" data-type="outstanding_claims" onclick="selectReportType('outstanding_claims',this)">
+          <div style="font-size:20px;margin-bottom:4px">⏳</div>
+          <div style="font-weight:600;font-size:13px">Outstanding</div>
+          <div style="font-size:11px;color:var(--ink3)">Unpaid with aging</div>
+        </div>
+        <div class="rb-type-card" data-type="payment_summary" onclick="selectReportType('payment_summary',this)">
+          <div style="font-size:20px;margin-bottom:4px">💰</div>
+          <div style="font-weight:600;font-size:13px">Payments</div>
+          <div style="font-size:11px;color:var(--ink3)">Billed vs received</div>
+        </div>
+        <div class="rb-type-card" data-type="daily_intake" onclick="selectReportType('daily_intake',this)">
+          <div style="font-size:20px;margin-bottom:4px">📋</div>
+          <div style="font-weight:600;font-size:13px">Daily Intake</div>
+          <div style="font-size:11px;color:var(--ink3)">Intake log by date</div>
+        </div>
+        <div class="rb-type-card" data-type="denials" onclick="selectReportType('denials',this)">
+          <div style="font-size:20px;margin-bottom:4px">❌</div>
+          <div style="font-weight:600;font-size:13px">Denials</div>
+          <div style="font-size:11px;color:var(--ink3)">Denied claims</div>
+        </div>
+        <div class="rb-type-card" data-type="status_activity" onclick="selectReportType('status_activity',this)">
+          <div style="font-size:20px;margin-bottom:4px">📝</div>
+          <div style="font-weight:600;font-size:13px">Status Activity</div>
+          <div style="font-size:11px;color:var(--ink3)">Workflow audit trail</div>
+        </div>
+      </div>
+
+      <!-- Filters bar -->
+      <div class="card" style="margin-bottom:16px">
+        <div style="padding:14px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+          <div style="min-width:120px">
+            <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">From</label>
+            <input type="date" id="tool-from" style="width:100%;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
           </div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-            <div>
-              <label style="font-size:11px;color:var(--ink3)">Manipulation</label>
-              <select id="tool-manip" style="padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
-                <option value="">All</option><option value="E1">E1</option><option value="E2">E2</option>
-              </select>
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--ink3)">Dx Category</label>
-              <select id="tool-dx-cat" style="padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
-                <option value="">All</option><option value="ALL">ALL</option><option value="LB">LB</option><option value="NECK">NECK</option><option value="MC-LB">MC-LB</option><option value="CUSTOM">CUSTOM</option>
-              </select>
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--ink3)">Status</label>
-              <select id="tool-wf-status" style="padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
-                <option value="">All</option><option value="intake">Intake</option><option value="entered_ebs">Entered EBS</option><option value="claim_created">Claim Created</option><option value="payment_received">Paid</option><option value="denied">Denied</option><option value="closed">Closed</option>
-              </select>
+          <div style="min-width:120px">
+            <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">To</label>
+            <input type="date" id="tool-to" style="width:100%;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
+          </div>
+          <div style="min-width:190px">
+            <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">Patient</label>
+            <div class="search-select" id="ss-tool-patient">
+              <input type="text" id="tool-patient-search" placeholder="All Patients" autocomplete="off" oninput="filterSearchSelect('ss-tool-patient')" onfocus="openSearchSelect('ss-tool-patient')"/>
+              <input type="hidden" id="tool-patient-id"/>
+              <div class="ss-list"></div>
             </div>
           </div>
-          <div id="tool-actions" style="display:none;margin-bottom:12px;align-items:center;gap:8px">
-            <span id="tool-result-count" style="font-size:13px;color:var(--ink3)"></span>
-            <div style="flex:1"></div>
-            <button class="btn btn-ghost btn-sm" onclick="toggleAllGroups()">Collapse/Expand All</button>
-            <button class="btn btn-ghost btn-sm" onclick="exportToolCSV()">Export CSV</button>
+          <div>
+            <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">Manip</label>
+            <select id="tool-manip" style="padding:7px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+              <option value="">All</option><option value="E1">E1</option><option value="E2">E2</option>
+            </select>
           </div>
-          <div id="tool-results">
-            <div class="empty-state" style="padding:32px"><p>Select a report type and click Run Report.</p></div>
+          <div>
+            <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">Dx Cat</label>
+            <select id="tool-dx-cat" style="padding:7px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+              <option value="">All</option><option value="ALL">ALL</option><option value="LB">LB</option><option value="NECK">NECK</option><option value="MC-LB">MC-LB</option><option value="CUSTOM">CUSTOM</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">Status</label>
+            <select id="tool-wf-status" style="padding:7px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+              <option value="">All</option><option value="intake">Intake</option><option value="entered_ebs">Entered EBS</option><option value="claim_created">Claim Created</option><option value="payment_received">Paid</option><option value="denied">Denied</option><option value="closed">Closed</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--ink3);display:block;margin-bottom:4px">Group By</label>
+            <select id="tool-group-by" style="padding:7px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:12px">
+              <option value="none">No Grouping</option>
+              <option value="patient" selected>Patient</option>
+              <option value="service_date">Service Date</option>
+              <option value="week">Week</option>
+              <option value="month">Month</option>
+              <option value="diagnosis_category">Dx Category</option>
+              <option value="manipulation_type">Manipulation</option>
+              <option value="workflow_status">Status</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="runReportTool()" style="height:36px;padding:0 20px">Run Report</button>
+          <!-- Quick date presets -->
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="setToolRange(7)" style="font-size:11px;padding:4px 8px">7d</button>
+            <button class="btn btn-ghost btn-sm" onclick="setToolRange(30)" style="font-size:11px;padding:4px 8px">30d</button>
+            <button class="btn btn-ghost btn-sm" onclick="setToolRange(90)" style="font-size:11px;padding:4px 8px">90d</button>
+            <button class="btn btn-ghost btn-sm" onclick="setToolRange(365)" style="font-size:11px;padding:4px 8px">1yr</button>
           </div>
         </div>
+      </div>
+
+      <!-- Breadcrumb for drill-down -->
+      <div id="rb-breadcrumb" style="display:none;margin-bottom:12px;font-size:13px">
+        <a href="#" onclick="event.preventDefault();rbDrillBack()" style="color:var(--accent)">← Back to summary</a>
+        <span id="rb-breadcrumb-label" style="color:var(--ink3);margin-left:8px"></span>
+      </div>
+
+      <!-- Results action bar -->
+      <div id="tool-actions" style="display:none;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+        <span id="tool-result-count" style="font-size:13px;color:var(--ink3)"></span>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost btn-sm" onclick="toggleAllGroups()">Collapse/Expand All</button>
+      </div>
+
+      <!-- Results container -->
+      <div id="tool-results">
+        <div class="empty-state" style="padding:48px"><div class="icon" style="font-size:40px">📋</div><p>Select a report type above and click Run Report</p></div>
       </div>
     </section>
 
@@ -2314,6 +2381,7 @@ function showPage(page, el) {
   if (page === 'patients') loadPatients();
   if (page === 'diagnoses') loadDiagnoses();
   if (page === 'billing') loadBillingPage();
+  if (page === 'report-builder') initReportBuilder();
   if (page === 'tasks') loadTasks();
   if (page === 'reports') initReports();
 }
@@ -4527,7 +4595,7 @@ const STATUS_LABELS = {
 let lastToolReport = null;
 
 async function runReportTool() {
-  const reportType = document.getElementById('tool-report-type').value;
+  const reportType = rbCurrentType || 'patient_visits';
   const groupBy = document.getElementById('tool-group-by').value;
   const from = document.getElementById('tool-from').value;
   const to = document.getElementById('tool-to').value;
@@ -4581,12 +4649,14 @@ function renderToolReport(result, reportType, groupBy) {
   result.groups.forEach((g, gi) => {
     const sub = g.subtotals || {};
     html += `<div class="tool-group" data-group="${gi}">`;
-    html += `<div class="tool-group-header" onclick="this.parentElement.classList.toggle('collapsed')" style="cursor:pointer;padding:8px 12px;background:var(--surface2);border-radius:6px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13px">`;
-    html += `<span>▼ ${esc(g.label || 'Ungrouped')} <span style="font-weight:400;color:var(--ink3)">(${(g.records || []).length} records)</span></span>`;
+    html += `<div class="tool-group-header" style="cursor:pointer;padding:8px 12px;background:var(--surface2);border-radius:6px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13px">`;
+    html += `<span onclick="this.closest('.tool-group').classList.toggle('collapsed')">▼ ${esc(g.label || 'Ungrouped')} <span style="font-weight:400;color:var(--ink3)">(${(g.records || []).length} records)</span></span>`;
+    html += `<div style="display:flex;gap:8px;align-items:center">`;
+    html += `<button class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px" onclick="rbDrillInto('${esc(g.label||'').replace(/'/g,"\\'")}', lastToolReport.groups[${gi}].records, '${reportType}')">Drill Down →</button>`;
     html += `<span style="font-size:12px;color:var(--ink3)">`;
     if (sub.total_charged != null) html += `$${Number(sub.total_charged).toLocaleString()} charged `;
     if (sub.total_received != null) html += `| $${Number(sub.total_received).toLocaleString()} received`;
-    html += `</span></div>`;
+    html += `</span></div></div>`;
 
     // Records table
     html += `<div class="tool-group-body" style="margin-bottom:12px">`;
@@ -4686,7 +4756,7 @@ function toggleAllGroups() {
 
 function exportToolCSV() {
   if (!lastToolReport || !lastToolReport.groups) { toast('No report to export', 'error'); return; }
-  const reportType = document.getElementById('tool-report-type').value;
+  const reportType = rbCurrentType || 'patient_visits';
   const cols = getReportColumns(reportType);
   let csv = cols.map(c => c.label).join(',') + ',Group\n';
   lastToolReport.groups.forEach(g => {
@@ -4703,6 +4773,90 @@ function exportToolCSV() {
   a.href = url; a.download = `report_${reportType}_${new Date().toISOString().split('T')[0]}.csv`;
   a.click(); URL.revokeObjectURL(url);
   toast('CSV exported', 'success');
+}
+
+// ════════════════════════════════════
+// REPORT BUILDER CONTROLS
+// ════════════════════════════════════
+let rbCurrentType = 'patient_visits';
+let rbDrillStack = [];
+
+async function initReportBuilder() {
+  await populatePatientSelects();
+  const toolWrap = document.getElementById('ss-tool-patient');
+  if (toolWrap) { toolWrap._allowEmpty = true; toolWrap._emptyLabel = 'All Patients'; }
+  if (!document.getElementById('tool-from').value) {
+    setToolRange(30);
+  }
+}
+
+function selectReportType(type, el) {
+  rbCurrentType = type;
+  document.querySelectorAll('.rb-type-card').forEach(c => c.classList.remove('active'));
+  if (el) el.classList.add('active');
+  // Set smart defaults
+  const gb = document.getElementById('tool-group-by');
+  const defaults = {
+    patient_visits: 'patient', claims_by_diagnosis: 'diagnosis_category',
+    outstanding_claims: 'workflow_status', payment_summary: 'month',
+    daily_intake: 'service_date', denials: 'patient', status_activity: 'service_date'
+  };
+  gb.value = defaults[type] || 'none';
+  // Update hidden select
+  const sel = document.getElementById('tool-report-type');
+  if (sel) sel.value = type;
+}
+
+function setToolRange(days) {
+  const to = new Date();
+  const from = new Date(); from.setDate(from.getDate() - days);
+  document.getElementById('tool-from').value = from.toISOString().split('T')[0];
+  document.getElementById('tool-to').value = to.toISOString().split('T')[0];
+}
+
+function rbDrillInto(groupLabel, records, reportType) {
+  rbDrillStack.push(lastToolReport);
+  document.getElementById('rb-breadcrumb').style.display = '';
+  document.getElementById('rb-breadcrumb-label').textContent = `Drilling into: ${groupLabel}`;
+  // Render as flat detail table
+  const container = document.getElementById('tool-results');
+  document.getElementById('tool-result-count').textContent = `${records.length} records`;
+  let html = `<div class="card"><div style="padding:0">`;
+  html += `<table style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr>`;
+  const cols = getReportColumns(reportType);
+  cols.forEach(c => { html += `<th style="padding:8px 10px;text-align:${c.align||'left'};font-size:12px;color:var(--ink3);border-bottom:2px solid var(--border)">${c.label}</th>`; });
+  html += `</tr></thead><tbody>`;
+  records.forEach(r => {
+    html += `<tr>`;
+    cols.forEach(c => {
+      const val = c.render ? c.render(r) : (r[c.key] ?? '—');
+      html += `<td style="padding:6px 10px;border-bottom:1px solid var(--surface3);text-align:${c.align||'left'}">${val}</td>`;
+    });
+    html += `</tr>`;
+  });
+  html += `</tbody></table></div></div>`;
+  container.innerHTML = html;
+}
+
+function rbDrillBack() {
+  if (rbDrillStack.length) {
+    const prev = rbDrillStack.pop();
+    lastToolReport = prev;
+    renderToolReport(prev, rbCurrentType, document.getElementById('tool-group-by').value);
+  }
+  if (!rbDrillStack.length) {
+    document.getElementById('rb-breadcrumb').style.display = 'none';
+  }
+}
+
+function printToolReport() {
+  const content = document.getElementById('tool-results').innerHTML;
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Report</title>
+    <style>body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1a1a2e;padding:16px}table{width:100%;border-collapse:collapse}th{background:#f1f5f9;padding:6px 8px;text-align:left;font-size:11px;border-bottom:2px solid #e2e8f0}td{padding:5px 8px;border-bottom:1px solid #e2e8f0}.tool-group-header{background:#f1f5f9;padding:8px 12px;font-weight:600;margin-top:12px;border-radius:4px}</style>
+    </head><body>${content}</body></html>`);
+  win.document.close();
+  win.onload = () => win.print();
 }
 
 // ════════════════════════════════════

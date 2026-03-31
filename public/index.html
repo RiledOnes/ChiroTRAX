@@ -889,6 +889,25 @@
       background: none; border: none; color: var(--danger);
       cursor: pointer; font-size: 11px; font-weight: 600;
     }
+
+    /* Searchable select */
+    .search-select { position: relative; display: inline-block; }
+    .search-select input {
+      width: 100%; padding: 8px 10px; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--ink); font-size: 13px; outline: none;
+    }
+    .search-select input:focus { border-color: var(--accent); }
+    .search-select .ss-list {
+      display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 200px;
+      overflow-y: auto; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 0 0 8px 8px; z-index: 200; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .search-select.open .ss-list { display: block; }
+    .search-select .ss-item {
+      padding: 6px 10px; cursor: pointer; font-size: 13px; color: var(--ink);
+    }
+    .search-select .ss-item:hover, .search-select .ss-item.active { background: var(--accent-dim); color: var(--accent); }
+    .search-select .ss-item.ss-empty { color: var(--ink3); cursor: default; font-style: italic; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 </head>
@@ -973,8 +992,9 @@
         <span class="icon">🩺</span> Diagnoses
       </div>
       <div class="nav-section">Billing</div>
-      <div class="nav-item" data-page="claims" onclick="showPage('claims', this)">
-        <span class="icon">💳</span> Claims
+      <div class="nav-section">Billing</div>
+      <div class="nav-item" data-page="billing" onclick="showPage('billing', this)">
+        <span class="icon">💰</span> Billing
       </div>
       <div class="nav-section">Workspace</div>
       <div class="nav-item" data-page="tasks" onclick="showPage('tasks', this)">
@@ -1018,9 +1038,9 @@
           <div class="s-sub">in directory</div>
         </div>
         <div class="stat-card warn">
-          <div class="s-label">Pending Claims</div>
+          <div class="s-label">Workflow Pending</div>
           <div class="s-value" id="stat-claims">—</div>
-          <div class="s-sub">awaiting action</div>
+          <div class="s-sub">intake records</div>
         </div>
         <div class="stat-card green">
           <div class="s-label">New This Month</div>
@@ -1295,9 +1315,11 @@
 
       <div class="card">
         <div class="toolbar">
-          <select id="dx-filter" onchange="loadDiagnoses()" style="max-width:180px">
-            <option value="">All Patients</option>
-          </select>
+          <div class="search-select" id="ss-dx-filter" style="max-width:220px">
+            <input type="text" id="dx-filter-search" placeholder="Filter by patient..." autocomplete="off" oninput="filterSearchSelect('ss-dx-filter')" onfocus="openSearchSelect('ss-dx-filter')"/>
+            <input type="hidden" id="dx-filter"/>
+            <div class="ss-list"></div>
+          </div>
           <select id="dx-active-filter" onchange="loadDiagnoses()" style="max-width:160px">
             <option value="">Active & Inactive</option>
             <option value="true">Active Only</option>
@@ -1309,7 +1331,8 @@
             <thead>
               <tr>
                 <th>Patient</th>
-                <th>ICD Code</th>
+                <th>Category</th>
+                <th>ICD-10 Codes</th>
                 <th>Description</th>
                 <th>Date</th>
                 <th>Status</th>
@@ -1327,48 +1350,83 @@
     <!-- ══════════════════════════════════ -->
     <!-- CLAIMS                             -->
     <!-- ══════════════════════════════════ -->
-    <section class="page" id="page-claims">
+    <!-- ══════════════════════════════════ -->
+    <!-- BILLING                            -->
+    <!-- ══════════════════════════════════ -->
+    <section class="page" id="page-billing">
       <div class="page-header">
         <div>
-          <h2>Claims</h2>
-          <p>Billing and insurance tracking</p>
+          <h2>Billing</h2>
+          <p>Insurance billing reports and payment tracking</p>
         </div>
-        <button class="btn btn-primary" onclick="openClaimModal()">+ New Claim</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="billing-period-filter" onchange="loadBillingReports()" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
+            <option value="">All Periods</option>
+          </select>
+          <div class="search-select" id="ss-billing-patient" style="max-width:200px">
+            <input type="text" id="billing-patient-search" placeholder="All Patients" autocomplete="off" oninput="filterSearchSelect('ss-billing-patient')" onfocus="openSearchSelect('ss-billing-patient')"/>
+            <input type="hidden" id="billing-patient-filter"/>
+            <div class="ss-list"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('billing-csv-input').click()">Upload Billing CSV</button>
+          <input type="file" id="billing-csv-input" accept=".csv" onchange="handleBillingUpload(event)" style="display:none"/>
+        </div>
       </div>
 
-      <div class="card">
-        <div class="toolbar">
-          <select id="claims-filter" onchange="loadClaims()" style="max-width:180px">
-            <option value="">All Claims</option>
-            <option value="pending">Pending</option>
-            <option value="submitted">Submitted</option>
-            <option value="approved">Approved</option>
-            <option value="paid">Paid</option>
-            <option value="denied">Denied</option>
-          </select>
+      <!-- Billing summary stats -->
+      <div class="stats-row">
+        <div class="stat-card accent">
+          <div class="s-label">Total Charged</div>
+          <div class="s-value" id="bill-total-charged">—</div>
+          <div class="s-sub" id="bill-record-count">— records</div>
         </div>
+        <div class="stat-card green">
+          <div class="s-label">Approved</div>
+          <div class="s-value" id="bill-total-approved">—</div>
+          <div class="s-sub">by insurance</div>
+        </div>
+        <div class="stat-card green">
+          <div class="s-label">Insurance Received</div>
+          <div class="s-value" id="bill-ins-received">—</div>
+          <div class="s-sub">pri + sec</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-label">Patient Received</div>
+          <div class="s-value" id="bill-patient-received">—</div>
+          <div class="s-sub">copay/cash</div>
+        </div>
+        <div class="stat-card warn">
+          <div class="s-label">Outstanding</div>
+          <div class="s-value" id="bill-outstanding">—</div>
+          <div class="s-sub">charged − received</div>
+        </div>
+      </div>
+
+      <!-- Billing records table -->
+      <div class="card" style="margin-top:4px">
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Patient</th>
-                <th>Visit Date</th>
-                <th>Payment Type</th>
-                <th>Billed</th>
-                <th>Paid</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>Service Date</th>
+                <th>Insurance</th>
+                <th>Claim #</th>
+                <th style="text-align:right">Charged</th>
+                <th style="text-align:right">Approved</th>
+                <th style="text-align:right">Ins Paid</th>
+                <th style="text-align:right">Pt Paid</th>
+                <th style="text-align:right">Balance</th>
+                <th>Period</th>
               </tr>
             </thead>
-            <tbody id="claims-tbody">
-              <tr><td colspan="7"><div class="empty-state"><div class="icon">💳</div><p>No claims yet.</p></div></td></tr>
+            <tbody id="billing-tbody">
+              <tr><td colspan="10"><div class="empty-state"><div class="icon">💰</div><p>No billing records yet.</p><small>Upload a billing CSV to get started.</small></div></td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </section>
-
-    <!-- Bulk Upload + Intake Images now merged into Daily Intake above -->
 
     <!-- ══════════════════════════════════ -->
     <!-- TASKS                               -->
@@ -1417,7 +1475,12 @@
           <h2>Reports</h2>
           <p>Practice analytics and performance overview</p>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div class="search-select" id="ss-rpt-patient" style="max-width:220px">
+            <input type="text" id="rpt-patient-search" placeholder="All Patients" autocomplete="off" oninput="filterSearchSelect('ss-rpt-patient')" onfocus="openSearchSelect('ss-rpt-patient')"/>
+            <input type="hidden" id="rpt-patient"/>
+            <div class="ss-list"></div>
+          </div>
           <input type="date" id="rpt-from" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
           <span style="color:var(--ink3)">to</span>
           <input type="date" id="rpt-to" style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/>
@@ -1426,7 +1489,7 @@
       </div>
 
       <!-- Quick Presets -->
-      <div style="display:flex;gap:8px;margin-bottom:20px">
+      <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="setReportRange(7)">Last 7 Days</button>
         <button class="btn btn-ghost btn-sm" onclick="setReportRange(30)">Last 30 Days</button>
         <button class="btn btn-ghost btn-sm" onclick="setReportRange(90)">Last 90 Days</button>
@@ -1444,17 +1507,27 @@
         <div class="stat-card green">
           <div class="s-label">New Patients</div>
           <div class="s-value" id="rpt-new-patients">—</div>
-          <div class="s-sub">in this period</div>
+          <div class="s-sub" id="rpt-returning-patients">— returning</div>
         </div>
         <div class="stat-card">
-          <div class="s-label">Avg Exercises</div>
+          <div class="s-label">E1 / E2</div>
+          <div class="s-value" id="rpt-e1e2">—</div>
+          <div class="s-sub">manipulations</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-label">Avg TE</div>
           <div class="s-value" id="rpt-avg-exercises">—</div>
           <div class="s-sub">per visit</div>
         </div>
+        <div class="stat-card warn">
+          <div class="s-label">Backdated</div>
+          <div class="s-value" id="rpt-backdated">—</div>
+          <div class="s-sub" id="rpt-no-fault">— no-fault</div>
+        </div>
         <div class="stat-card">
-          <div class="s-label">Intake Images</div>
+          <div class="s-label">Images</div>
           <div class="s-value" id="rpt-images">—</div>
-          <div class="s-sub" id="rpt-image-days">— days covered</div>
+          <div class="s-sub" id="rpt-image-days">— days</div>
         </div>
       </div>
 
@@ -1482,8 +1555,8 @@
         </div>
       </div>
 
-      <!-- Manipulation Breakdown + Claims by Status -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px">
+      <!-- Row: Manipulation + Workflow Pipeline + Diagnosis Categories -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:4px">
         <div class="card">
           <div class="card-head"><div class="card-title">Manipulation Breakdown</div></div>
           <div style="padding:16px" id="rpt-manip-breakdown">
@@ -1491,8 +1564,30 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><div class="card-title">Workflow Pipeline</div></div>
+          <div style="padding:16px" id="rpt-workflow-breakdown">
+            <div class="empty-state"><p>Run a report to see data.</p></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Diagnosis Categories</div></div>
+          <div style="padding:16px" id="rpt-dx-breakdown">
+            <div class="empty-state"><p>Run a report to see data.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Claims by Status -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+        <div class="card">
           <div class="card-head"><div class="card-title">Claims by Status</div></div>
           <div style="padding:16px" id="rpt-claims-breakdown">
+            <div class="empty-state"><p>Run a report to see data.</p></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Patient Directory Summary</div></div>
+          <div style="padding:16px" id="rpt-patient-mix">
             <div class="empty-state"><p>Run a report to see data.</p></div>
           </div>
         </div>
@@ -1500,16 +1595,16 @@
 
       <!-- Visits by Date Chart -->
       <div class="card" style="margin-top:16px">
-        <div class="card-head"><div class="card-title">Visits by Date</div></div>
+        <div class="card-head"><div class="card-title">Visits by Service Date</div></div>
         <div style="padding:16px;overflow-x:auto" id="rpt-visits-chart">
           <div class="empty-state"><p>Run a report to see data.</p></div>
         </div>
       </div>
 
-      <!-- Patient Mix -->
+      <!-- Top Patients Table -->
       <div class="card" style="margin-top:16px">
-        <div class="card-head"><div class="card-title">Patient Directory Summary</div></div>
-        <div style="padding:16px" id="rpt-patient-mix">
+        <div class="card-head"><div class="card-title">Top Patients by Visit Count</div></div>
+        <div style="padding:0" id="rpt-top-patients">
           <div class="empty-state"><p>Run a report to see data.</p></div>
         </div>
       </div>
@@ -1533,9 +1628,11 @@
     <div class="form-grid">
       <div class="form-group">
         <label>Patient *</label>
-        <select id="visit-patient-id">
-          <option value="">— Select Patient —</option>
-        </select>
+        <div class="search-select" id="ss-visit-patient">
+          <input type="text" id="visit-patient-search" placeholder="Type to search patients..." autocomplete="off" oninput="filterSearchSelect('ss-visit-patient')" onfocus="openSearchSelect('ss-visit-patient')"/>
+          <input type="hidden" id="visit-patient-id"/>
+          <div class="ss-list"></div>
+        </div>
       </div>
       <div class="form-group">
         <label>Intake Date *</label>
@@ -1645,9 +1742,11 @@
     <div class="form-grid">
       <div class="form-group">
         <label>Patient *</label>
-        <select id="dx-patient-id">
-          <option value="">— Select Patient —</option>
-        </select>
+        <div class="search-select" id="ss-dx-patient">
+          <input type="text" id="dx-patient-search" placeholder="Type to search patients..." autocomplete="off" oninput="filterSearchSelect('ss-dx-patient')" onfocus="openSearchSelect('ss-dx-patient')"/>
+          <input type="hidden" id="dx-patient-id"/>
+          <div class="ss-list"></div>
+        </div>
       </div>
       <div class="form-group">
         <label>ICD-10 Code</label>
@@ -1676,65 +1775,7 @@
   </div>
 </div>
 
-<!-- CLAIM MODAL -->
-<div class="modal-overlay" id="claim-modal">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 id="claim-modal-title">New Claim</h3>
-      <button class="modal-close" onclick="closeModal('claim-modal')">✕</button>
-    </div>
-    <input type="hidden" id="cl-edit-id"/>
-    <div class="form-grid">
-      <div class="form-group">
-        <label>Patient *</label>
-        <select id="cl-patient-id">
-          <option value="">— Select Patient —</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Claim Date</label>
-        <input type="date" id="cl-date"/>
-      </div>
-      <div class="form-group">
-        <label>Payment Type</label>
-        <select id="cl-payment">
-          <option value="insurance">Insurance</option>
-          <option value="cash">Cash</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Insurance Provider</label>
-        <input type="text" id="cl-insurance" placeholder="BlueCross, etc."/>
-      </div>
-      <div class="form-group">
-        <label>Amount Billed ($)</label>
-        <input type="number" id="cl-billed" placeholder="0.00" step="0.01" min="0"/>
-      </div>
-      <div class="form-group">
-        <label>Amount Paid ($)</label>
-        <input type="number" id="cl-paid" placeholder="0.00" step="0.01" min="0"/>
-      </div>
-      <div class="form-group">
-        <label>Claim Status</label>
-        <select id="cl-status">
-          <option value="pending">Pending</option>
-          <option value="submitted">Submitted</option>
-          <option value="approved">Approved</option>
-          <option value="paid">Paid</option>
-          <option value="denied">Denied</option>
-        </select>
-      </div>
-      <div class="form-group full">
-        <label>Notes</label>
-        <textarea id="cl-notes" placeholder="Any notes about this claim..."></textarea>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('claim-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveClaim()">Save Claim</button>
-    </div>
-  </div>
-</div>
+<!-- Claim modal removed — claims will be built into workflow -->
 
 <!-- INTAKE RECORD MODAL -->
 <div class="modal-overlay" id="intake-modal">
@@ -2133,7 +2174,7 @@ function showPage(page, el) {
   if (page === 'daily') { setTodayDate(); loadDailyPage(); }
   if (page === 'patients') loadPatients();
   if (page === 'diagnoses') loadDiagnoses();
-  if (page === 'claims') loadClaims();
+  if (page === 'billing') loadBillingPage();
   if (page === 'tasks') loadTasks();
   if (page === 'reports') initReports();
 }
@@ -2157,16 +2198,17 @@ function closeModal(id) {
 
 function openVisitModal(visit = null) {
   populatePatientSelects();
-  clearForm(['visit-edit-id','visit-patient-id','visit-status','visit-manip','visit-notes']);
+  clearForm(['visit-edit-id','visit-status','visit-manip','visit-notes']);
+  setSearchSelectValue('ss-visit-patient', '', '');
   document.getElementById('visit-exercises').value = '';
-  // Default intake date from the daily intake date picker, or today
   const intakeDate = document.getElementById('intake-date')?.value || today();
   document.getElementById('visit-date').value = intakeDate;
   document.getElementById('visit-service-date').value = '';
   document.getElementById('visit-modal-title').textContent = visit ? 'Edit Visit' : 'Log Visit';
   if (visit) {
     document.getElementById('visit-edit-id').value = visit.id;
-    document.getElementById('visit-patient-id').value = visit.patient_id || '';
+    const patLabel = visit.patients ? `${visit.patients.patient_code} — ${visit.patients.last_name}, ${visit.patients.first_name}` : (visit.patient_name || '');
+    setSearchSelectValue('ss-visit-patient', visit.patient_id || '', patLabel);
     document.getElementById('visit-date').value = visit.sheet_date || visit.visit_date || '';
     document.getElementById('visit-service-date').value = visit.is_backdated ? (visit.visit_date || '') : '';
     document.getElementById('visit-status').value = visit.patient_status || '';
@@ -2200,41 +2242,20 @@ function openPatientModal(patient = null) {
 function openDiagnosisModal(dx = null) {
   populatePatientSelects();
   clearForm(['dx-edit-id','dx-code','dx-desc']);
+  setSearchSelectValue('ss-dx-patient', '', '');
   document.getElementById('dx-date').value = today();
   document.getElementById('dx-active').value = 'true';
   document.getElementById('dx-modal-title').textContent = dx ? 'Edit Diagnosis' : 'Add Diagnosis';
   if (dx) {
     document.getElementById('dx-edit-id').value = dx.id;
-    document.getElementById('dx-patient-id').value = dx.patient_id || '';
+    const patLabel = dx._patient ? `${dx._patient.patient_code} — ${dx._patient.last_name}, ${dx._patient.first_name}` : '';
+    setSearchSelectValue('ss-dx-patient', dx.patient_id || '', patLabel);
     document.getElementById('dx-code').value = dx.diagnosis_code || '';
     document.getElementById('dx-desc').value = dx.diagnosis_description || '';
     document.getElementById('dx-date').value = dx.diagnosed_date || '';
     document.getElementById('dx-active').value = dx.is_active ? 'true' : 'false';
   }
   document.getElementById('diagnosis-modal').classList.add('open');
-}
-
-function openClaimModal(claim = null) {
-  populatePatientSelects();
-  clearForm(['cl-edit-id','cl-insurance','cl-notes']);
-  document.getElementById('cl-date').value = today();
-  document.getElementById('cl-billed').value = '';
-  document.getElementById('cl-paid').value = '';
-  document.getElementById('cl-payment').value = 'insurance';
-  document.getElementById('cl-status').value = 'pending';
-  document.getElementById('claim-modal-title').textContent = claim ? 'Edit Claim' : 'New Claim';
-  if (claim) {
-    document.getElementById('cl-edit-id').value = claim.id;
-    document.getElementById('cl-patient-id').value = claim.patient_id || '';
-    document.getElementById('cl-date').value = claim.claim_date || '';
-    document.getElementById('cl-payment').value = claim.payment_type || 'insurance';
-    document.getElementById('cl-insurance').value = claim.insurance_provider || '';
-    document.getElementById('cl-billed').value = claim.amount_billed || '';
-    document.getElementById('cl-paid').value = claim.amount_paid || '';
-    document.getElementById('cl-status').value = claim.claim_status || 'pending';
-    document.getElementById('cl-notes').value = claim.notes || '';
-  }
-  document.getElementById('claim-modal').classList.add('open');
 }
 
 function clearForm(ids) {
@@ -2386,16 +2407,81 @@ function badge(val, type) {
 
 async function populatePatientSelects() {
   if (allPatients.length === 0) await loadPatientsData();
-  ['visit-patient-id','dx-patient-id','cl-patient-id'].forEach(id => {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">— Select Patient —</option>';
-    allPatients.forEach(p => {
-      sel.innerHTML += `<option value="${p.id}">${p.patient_code} — ${p.last_name}, ${p.first_name}</option>`;
-    });
-    if (cur) sel.value = cur;
+  // Populate all searchable select dropdowns
+  const ssIds = ['ss-visit-patient', 'ss-dx-patient', 'ss-dx-filter', 'ss-rpt-patient', 'ss-billing-patient'];
+  ssIds.forEach(ssId => {
+    const wrap = document.getElementById(ssId);
+    if (!wrap) return;
+    wrap._patients = allPatients;
+    // For filter dropdowns, add an "All" option
+    const isFilter = ssId === 'ss-dx-filter' || ssId === 'ss-rpt-patient';
+    wrap._allowEmpty = isFilter;
+    wrap._emptyLabel = isFilter ? 'All Patients' : '— Select Patient —';
+    // Set the onSelect callback
+    if (ssId === 'ss-dx-filter') wrap._onSelect = () => loadDiagnoses();
+    if (ssId === 'ss-rpt-patient') wrap._onSelect = () => loadReports();
   });
+}
+
+function openSearchSelect(ssId) {
+  const wrap = document.getElementById(ssId);
+  if (!wrap) return;
+  wrap.classList.add('open');
+  filterSearchSelect(ssId);
+  // Close on outside click
+  setTimeout(() => {
+    const close = (e) => { if (!wrap.contains(e.target)) { wrap.classList.remove('open'); document.removeEventListener('mousedown', close); } };
+    document.addEventListener('mousedown', close);
+  }, 0);
+}
+
+function filterSearchSelect(ssId) {
+  const wrap = document.getElementById(ssId);
+  if (!wrap) return;
+  const input = wrap.querySelector('input[type="text"]');
+  const list = wrap.querySelector('.ss-list');
+  const q = (input.value || '').toLowerCase();
+  const patients = wrap._patients || allPatients;
+
+  let html = '';
+  if (wrap._allowEmpty) {
+    html += `<div class="ss-item" onclick="selectSearchItem('${ssId}','','${wrap._emptyLabel || 'All Patients'}')">${wrap._emptyLabel || 'All Patients'}</div>`;
+  }
+  const filtered = patients.filter(p =>
+    p.first_name.toLowerCase().includes(q) ||
+    p.last_name.toLowerCase().includes(q) ||
+    p.patient_code.toLowerCase().includes(q)
+  );
+  if (filtered.length) {
+    filtered.slice(0, 50).forEach(p => {
+      const label = `${p.patient_code} — ${p.last_name}, ${p.first_name}`;
+      html += `<div class="ss-item" onclick="selectSearchItem('${ssId}','${p.id}',\`${label.replace(/`/g, '')}\`)">${esc(label)}</div>`;
+    });
+    if (filtered.length > 50) html += `<div class="ss-item ss-empty">+${filtered.length - 50} more...</div>`;
+  } else {
+    html += `<div class="ss-item ss-empty">No patients found</div>`;
+  }
+  list.innerHTML = html;
+}
+
+function selectSearchItem(ssId, value, label) {
+  const wrap = document.getElementById(ssId);
+  if (!wrap) return;
+  const input = wrap.querySelector('input[type="text"]');
+  const hidden = wrap.querySelector('input[type="hidden"]');
+  input.value = value ? label : '';
+  hidden.value = value;
+  wrap.classList.remove('open');
+  if (wrap._onSelect) wrap._onSelect();
+}
+
+function setSearchSelectValue(ssId, value, label) {
+  const wrap = document.getElementById(ssId);
+  if (!wrap) return;
+  const input = wrap.querySelector('input[type="text"]');
+  const hidden = wrap.querySelector('input[type="hidden"]');
+  input.value = label || '';
+  hidden.value = value || '';
 }
 
 // ════════════════════════════════════
@@ -2431,15 +2517,15 @@ async function loadDashboard() {
   document.getElementById('today-label').textContent = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
   try {
-    const [visits, patients, claims] = await Promise.all([
+    const [visits, patients, wfCounts] = await Promise.all([
       api('GET', `/api/visits?date=${today()}`),
       api('GET', '/api/patients'),
-      api('GET', '/api/claims?status=pending')
+      api('GET', '/api/visits/workflow-counts')
     ]);
     allPatients = patients;
     document.getElementById('stat-today').textContent = visits.length;
     document.getElementById('stat-patients').textContent = patients.length;
-    document.getElementById('stat-claims').textContent = claims.length;
+    document.getElementById('stat-claims').textContent = (wfCounts.intake || 0) + (wfCounts.entered_ebs || 0);
     const mo = today().substring(0,7);
     document.getElementById('stat-new').textContent = patients.filter(p => p.created_at?.startsWith(mo)).length;
     renderVisitRows('dashboard-tbody', visits, true);
@@ -2522,14 +2608,6 @@ async function loadPatients() {
   try {
     await loadPatientsData();
     renderPatientRows(allPatients);
-    // populate filter dropdown in diagnoses
-    const dxFilter = document.getElementById('dx-filter');
-    if (dxFilter) {
-      dxFilter.innerHTML = '<option value="">All Patients</option>';
-      allPatients.forEach(p => {
-        dxFilter.innerHTML += `<option value="${p.id}">${p.patient_code} — ${p.last_name}, ${p.first_name}</option>`;
-      });
-    }
   } catch(e) { toast('Failed to load patients: ' + e.message, 'error'); }
 }
 
@@ -2602,24 +2680,51 @@ async function loadDiagnoses() {
 
   try {
     if (allPatients.length === 0) await loadPatientsData();
-
-    // populate the filter dropdown
-    const dxFilter = document.getElementById('dx-filter');
-    if (dxFilter && dxFilter.options.length <= 1) {
-      allPatients.forEach(p => {
-        dxFilter.innerHTML += `<option value="${p.id}">${p.patient_code} — ${p.last_name}, ${p.first_name}</option>`;
-      });
-    }
+    await populatePatientSelects();
 
     const patientsToQuery = patientFilter
       ? allPatients.filter(p => p.id === patientFilter)
       : allPatients;
 
+    // Fetch diagnoses table + intake_records for full ICD-10 codes
     const allDx = [];
     for (const p of patientsToQuery) {
-      const dx = await api('GET', `/api/diagnoses/${p.id}`);
-      dx.forEach(d => d._patient = p);
-      allDx.push(...dx);
+      const [dx, visits] = await Promise.all([
+        api('GET', `/api/diagnoses/${p.id}`),
+        api('GET', `/api/visits?patient_id=${p.id}`)
+      ]);
+
+      // Build unique ICD-10 code set from intake_records
+      const codeSet = new Set();
+      const categories = new Set();
+      visits.forEach(v => {
+        if (v.diagnosis_category) categories.add(v.diagnosis_category);
+        const codes = typeof v.diagnosis_codes === 'string' ? v.diagnosis_codes.split(',').map(s => s.trim()) : (v.diagnosis_codes || []);
+        codes.forEach(c => { if (c) codeSet.add(c); });
+      });
+
+      if (dx.length) {
+        // Merge diagnosis table entries with full code list
+        dx.forEach(d => {
+          d._patient = p;
+          d._allCodes = Array.from(codeSet);
+          d._categories = Array.from(categories).join(', ');
+        });
+        allDx.push(...dx);
+      } else if (codeSet.size > 0) {
+        // No diagnoses table entry, but codes exist in intake_records
+        allDx.push({
+          id: null,
+          patient_id: p.id,
+          diagnosis_code: Array.from(codeSet)[0],
+          diagnosis_description: Array.from(categories).join(', ') || 'From intake records',
+          diagnosed_date: visits[0]?.visit_date || null,
+          is_active: true,
+          _patient: p,
+          _allCodes: Array.from(codeSet),
+          _categories: Array.from(categories).join(', ')
+        });
+      }
     }
 
     const filtered = activeFilter
@@ -2628,19 +2733,22 @@ async function loadDiagnoses() {
 
     const tbody = document.getElementById('diagnoses-tbody');
     if (!filtered.length) {
-      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="icon">🩺</div><p>No diagnoses found.</p></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">🩺</div><p>No diagnoses found.</p></div></td></tr>`;
       return;
     }
-    tbody.innerHTML = filtered.map(d => `
-      <tr>
+    tbody.innerHTML = filtered.map(d => {
+      const allCodes = (d._allCodes || []).join(', ') || d.diagnosis_code || '—';
+      const category = d._categories || '—';
+      return `<tr>
         <td><strong>${d._patient?.patient_code}</strong> — ${d._patient?.last_name}, ${d._patient?.first_name}</td>
-        <td class="muted">${d.diagnosis_code || '—'}</td>
-        <td>${d.diagnosis_description}</td>
+        <td>${badge(category)}</td>
+        <td style="font-size:12px;max-width:200px;word-wrap:break-word">${esc(allCodes)}</td>
+        <td>${esc(d.diagnosis_description || '—')}</td>
         <td class="muted">${d.diagnosed_date || '—'}</td>
         <td>${d.is_active ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-inactive">Resolved</span>'}</td>
-        <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openDiagnosisModal(${JSON.stringify(d)})'>Edit</button></div></td>
-      </tr>
-    `).join('');
+        <td><div class="actions">${d.id ? `<button class="btn btn-secondary btn-xs" onclick='openDiagnosisModal(${JSON.stringify(d)})'>Edit</button>` : ''}</div></td>
+      </tr>`;
+    }).join('');
   } catch(e) { toast('Failed to load diagnoses: ' + e.message, 'error'); }
 }
 
@@ -2670,55 +2778,118 @@ async function saveDiagnosis() {
 }
 
 // ════════════════════════════════════
-// CLAIMS
+// BILLING
 // ════════════════════════════════════
-async function loadClaims() {
-  const status = document.getElementById('claims-filter')?.value || '';
+async function loadBillingPage() {
+  await populatePatientSelects();
+  // Set up patient filter callback
+  const wrap = document.getElementById('ss-billing-patient');
+  if (wrap) { wrap._allowEmpty = true; wrap._emptyLabel = 'All Patients'; wrap._onSelect = () => loadBillingReports(); }
+  // Load periods
   try {
-    const claims = await api('GET', `/api/claims${status ? '?status=' + status : ''}`);
-    const tbody = document.getElementById('claims-tbody');
-    if (!claims.length) {
-      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">💳</div><p>No claims found.</p></div></td></tr>`;
-      return;
-    }
-    tbody.innerHTML = claims.map(c => `
-      <tr>
-        <td><strong>${c.patients?.patient_code || '—'}</strong> — ${c.patients?.last_name || ''}, ${c.patients?.first_name || ''}</td>
-        <td class="muted">${c.claim_date || '—'}</td>
-        <td>${badge(c.payment_type)}</td>
-        <td>$${c.amount_billed != null ? Number(c.amount_billed).toFixed(2) : '—'}</td>
-        <td>$${c.amount_paid != null ? Number(c.amount_paid).toFixed(2) : '—'}</td>
-        <td>${badge(c.claim_status)}</td>
-        <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openClaimModal(${JSON.stringify(c)})'>Edit</button></div></td>
-      </tr>
-    `).join('');
-  } catch(e) { toast('Failed to load claims: ' + e.message, 'error'); }
+    const periods = await api('GET', '/api/billing-reports/periods');
+    const sel = document.getElementById('billing-period-filter');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">All Periods</option>';
+    periods.forEach(p => { sel.innerHTML += `<option value="${p}">${p}</option>`; });
+    if (cur) sel.value = cur;
+  } catch(e) {}
+  loadBillingReports();
 }
 
-async function saveClaim() {
-  const editId = document.getElementById('cl-edit-id').value;
-  const body = {
-    patient_id: document.getElementById('cl-patient-id').value,
-    claim_date: document.getElementById('cl-date').value,
-    payment_type: document.getElementById('cl-payment').value,
-    insurance_provider: document.getElementById('cl-insurance').value.trim() || null,
-    amount_billed: parseFloat(document.getElementById('cl-billed').value) || null,
-    amount_paid: parseFloat(document.getElementById('cl-paid').value) || null,
-    claim_status: document.getElementById('cl-status').value,
-    notes: document.getElementById('cl-notes').value.trim() || null
-  };
-  if (!body.patient_id) { toast('Patient is required.', 'error'); return; }
+async function loadBillingReports() {
+  const period = document.getElementById('billing-period-filter')?.value || '';
+  const patientId = document.getElementById('billing-patient-filter')?.value || '';
   try {
-    if (editId) {
-      await api('PUT', `/api/claims/${editId}`, body);
-      toast('Claim updated!', 'success');
-    } else {
-      await api('POST', '/api/claims', body);
-      toast('Claim created!', 'success');
+    let url = '/api/billing-reports?';
+    if (period) url += `period=${period}&`;
+    if (patientId) url += `patient_id=${patientId}&`;
+    const records = await api('GET', url);
+
+    // Summary stats
+    const totalCharged = records.reduce((s, r) => s + (parseFloat(r.charge) || 0), 0);
+    const totalApproved = records.reduce((s, r) => s + (parseFloat(r.approved) || 0), 0);
+    const insReceived = records.reduce((s, r) => s + (parseFloat(r.pri_ins_received) || 0) + (parseFloat(r.sec_ins_received) || 0), 0);
+    const ptReceived = records.reduce((s, r) => s + (parseFloat(r.patient_received) || 0), 0);
+    const outstanding = totalCharged - insReceived - ptReceived;
+
+    document.getElementById('bill-total-charged').textContent = '$' + totalCharged.toFixed(2);
+    document.getElementById('bill-total-approved').textContent = '$' + totalApproved.toFixed(2);
+    document.getElementById('bill-ins-received').textContent = '$' + insReceived.toFixed(2);
+    document.getElementById('bill-patient-received').textContent = '$' + ptReceived.toFixed(2);
+    document.getElementById('bill-outstanding').textContent = '$' + outstanding.toFixed(2);
+    document.getElementById('bill-record-count').textContent = `${records.length} records`;
+
+    // Table
+    const tbody = document.getElementById('billing-tbody');
+    if (!records.length) {
+      tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="icon">💰</div><p>No billing records found.</p></div></td></tr>';
+      return;
     }
-    closeModal('claim-modal');
-    loadClaims();
-  } catch(e) { toast('Error: ' + e.message, 'error'); }
+    tbody.innerHTML = records.map(r => {
+      const name = [r.patient_last_name, r.patient_first_name].filter(Boolean).join(', ') || '—';
+      const insPaid = (parseFloat(r.pri_ins_received) || 0) + (parseFloat(r.sec_ins_received) || 0);
+      const ptPaid = parseFloat(r.patient_received) || 0;
+      const charged = parseFloat(r.charge) || 0;
+      const balance = charged - insPaid - ptPaid;
+      return `<tr>
+        <td><strong>${esc(name)}</strong></td>
+        <td class="muted">${r.service_date || '—'}</td>
+        <td style="font-size:12px">${esc(r.insurance_name || '—')}</td>
+        <td class="muted">${esc(r.claim_number || '—')}</td>
+        <td style="text-align:right;font-weight:600">$${charged.toFixed(2)}</td>
+        <td style="text-align:right">$${(parseFloat(r.approved) || 0).toFixed(2)}</td>
+        <td style="text-align:right;color:#16a34a">$${insPaid.toFixed(2)}</td>
+        <td style="text-align:right">$${ptPaid.toFixed(2)}</td>
+        <td style="text-align:right;font-weight:700;color:${balance > 0 ? '#dc2626' : '#16a34a'}">$${balance.toFixed(2)}</td>
+        <td class="muted">${esc(r.report_period || '—')}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) { toast('Failed to load billing: ' + e.message, 'error'); }
+}
+
+async function handleBillingUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const lines = e.target.result.split('\n').map(l => l.trim()).filter(l => l);
+      if (lines.length < 2) { toast('CSV is empty', 'error'); return; }
+      const headers = parseCSVRow(lines[0]).map(h => h.trim().toLowerCase().replace(/\s+/g, '_'));
+      const records = [];
+      for (let i = 1; i < lines.length; i++) {
+        const vals = parseCSVRow(lines[i]);
+        if (vals.length < 2) continue;
+        const row = {};
+        headers.forEach((h, idx) => { row[h] = vals[idx]?.trim() || null; });
+        records.push({
+          patient_last_name: row.patient_last_name || row.last_name || row.lastname || null,
+          patient_first_name: row.patient_first_name || row.first_name || row.firstname || null,
+          service_date: row.service_date || row.date_of_service || row.dos || null,
+          insurance_type: row.insurance_type || row.ins_type || null,
+          insurance_id: row.insurance_id || row.member_id || null,
+          insurance_name: row.insurance_name || row.insurance || row.payer || null,
+          charge: parseFloat(row.charge || row.amount_billed || row.billed || 0) || null,
+          approved: parseFloat(row.approved || row.amount_approved || 0) || null,
+          pri_ins_received: parseFloat(row.pri_ins_received || row.primary_paid || row.ins_paid || 0) || null,
+          sec_ins_received: parseFloat(row.sec_ins_received || row.secondary_paid || 0) || null,
+          patient_received: parseFloat(row.patient_received || row.patient_paid || row.copay || 0) || null,
+          submit_date: row.submit_date || row.submitted_date || null,
+          claim_number: row.claim_number || row.claim_no || null,
+          report_period: row.report_period || row.period || null
+        });
+      }
+      if (!records.length) { toast('No valid records in CSV', 'error'); return; }
+      toast(`Uploading ${records.length} billing records...`);
+      const result = await api('POST', '/api/billing-reports/upload', { records });
+      toast(`Imported ${result.inserted} billing records`, 'success');
+      await loadBillingPage();
+    } catch(err) { toast('Upload failed: ' + err.message, 'error'); }
+  };
+  reader.readAsText(file);
 }
 
 // ════════════════════════════════════
@@ -3396,9 +3567,10 @@ async function exportDailyPDF() {
 
       .main { display: flex; gap: 6px; margin-top: 4px; height: calc(100vh - 30px); }
 
-      /* Left column: intake form image (40%, 90% height) */
-      .col-left { width: 40%; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-      .col-left img { width: 100%; flex: 1; min-height: 0; object-fit: contain; object-position: top left; border: 1px solid #ccc; background: #f9f9f9; }
+      /* Left column: notes + intake form image (40%) */
+      .col-left { width: 40%; display: flex; flex-direction: column; gap: 3px; min-width: 0; overflow: hidden; }
+      .intake-img-wrap { flex: 1; min-height: 0; position: relative; border: 1px solid #ccc; background: #f9f9f9; overflow: hidden; }
+      .intake-img-wrap img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; object-position: top left; }
       .col-left .img-placeholder { flex: 1; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; color: #999; font-size: 9px; }
 
       /* Right column: notes + record count + digitalized list + charge capture (60%) */
@@ -3455,7 +3627,7 @@ async function exportDailyPDF() {
     html += `</div>`;
     html += `<div class="section-label purple complete">INTAKE FORM</div>`;
     if (intakeImageData.length) {
-      html += `<img src="${intakeImageData[0].image_data}" alt="Intake Form"/>`;
+      html += `<div class="intake-img-wrap"><img src="${intakeImageData[0].image_data}" alt="Intake Form"/></div>`;
     } else {
       html += `<div class="img-placeholder">No intake form</div>`;
     }
@@ -3980,7 +4152,8 @@ async function exportPatientPDF(patientId) {
 // ════════════════════════════════════
 // REPORTS
 // ════════════════════════════════════
-function initReports() {
+async function initReports() {
+  await populatePatientSelects();
   const from = document.getElementById('rpt-from');
   const to = document.getElementById('rpt-to');
   if (!from.value) {
@@ -4021,7 +4194,10 @@ async function loadReports() {
   if (!from || !to) return;
 
   try {
-    const rpt = await api('GET', `/api/reports/summary?from=${from}&to=${to}`);
+    let url = `/api/reports/summary?from=${from}&to=${to}`;
+    const patientId = document.getElementById('rpt-patient')?.value;
+    if (patientId) url += `&patient_id=${patientId}`;
+    const rpt = await api('GET', url);
     renderReports(rpt);
   } catch(e) { toast('Report failed: ' + e.message, 'error'); }
 }
@@ -4030,10 +4206,14 @@ function renderReports(r) {
   // Visit stats
   document.getElementById('rpt-total-visits').textContent = r.visits.total;
   document.getElementById('rpt-unique-patients').textContent = `${r.visits.uniquePatients} unique patients`;
-  document.getElementById('rpt-new-patients').textContent = r.patients.newInPeriod;
+  document.getElementById('rpt-new-patients').textContent = r.visits.newPatients;
+  document.getElementById('rpt-returning-patients').textContent = `${r.visits.returning} returning`;
+  document.getElementById('rpt-e1e2').textContent = `${r.visits.e1} / ${r.visits.e2}`;
   document.getElementById('rpt-avg-exercises').textContent = r.visits.avgExercises;
+  document.getElementById('rpt-backdated').textContent = r.visits.backdated;
+  document.getElementById('rpt-no-fault').textContent = `${r.visits.noFault} no-fault`;
   document.getElementById('rpt-images').textContent = r.images.total;
-  document.getElementById('rpt-image-days').textContent = `${r.images.daysWithImages} days covered`;
+  document.getElementById('rpt-image-days').textContent = `${r.images.daysWithImages} days`;
 
   // Revenue stats
   document.getElementById('rpt-billed').textContent = '$' + r.claims.totalBilled.toFixed(2);
@@ -4046,35 +4226,34 @@ function renderReports(r) {
   // Manipulation breakdown
   const maxManip = Math.max(r.visits.e1, r.visits.e2, 1);
   document.getElementById('rpt-manip-breakdown').innerHTML = `
-    ${rptBar('E1 — Spinal', r.visits.e1, maxManip, 'green')}
-    ${rptBar('E2 — Complex', r.visits.e2, maxManip, 'blue')}
+    ${rptBar('E1 — Spinal (98940)', r.visits.e1, maxManip, 'green')}
+    ${rptBar('E2 — Complex (98941)', r.visits.e2, maxManip, 'blue')}
     <div style="margin-top:8px;font-size:12px;color:var(--ink3)">No manipulation: ${r.visits.total - r.visits.e1 - r.visits.e2} visits</div>
   `;
+
+  // Workflow pipeline
+  const wfStages = ['intake', 'entered_ebs', 'claim_created', 'submitted', 'processed'];
+  const wfLabels = { intake: 'Intake', entered_ebs: 'Entered EBS', claim_created: 'Claim Created', submitted: 'Submitted', processed: 'Processed' };
+  const wfColors = { intake: 'orange', entered_ebs: 'blue', claim_created: 'blue', submitted: 'green', processed: 'green' };
+  const maxWf = Math.max(...wfStages.map(s => r.workflow[s] || 0), 1);
+  document.getElementById('rpt-workflow-breakdown').innerHTML = wfStages.map(s =>
+    rptBar(wfLabels[s], r.workflow[s] || 0, maxWf, wfColors[s])
+  ).join('');
+
+  // Diagnosis categories
+  const dxCats = Object.entries(r.dxCategories).sort((a, b) => b[1] - a[1]);
+  const maxDx = dxCats.length ? Math.max(...dxCats.map(d => d[1])) : 1;
+  document.getElementById('rpt-dx-breakdown').innerHTML = dxCats.length
+    ? dxCats.map(([cat, cnt]) => rptBar(cat, cnt, maxDx, 'blue')).join('')
+    : '<div style="text-align:center;color:var(--ink3);font-size:13px">No diagnosis data</div>';
 
   // Claims by status
   const statuses = ['pending', 'submitted', 'approved', 'paid', 'denied'];
   const statusColors = { pending: 'orange', submitted: 'blue', approved: 'green', paid: 'green', denied: 'red' };
   const maxClaim = Math.max(...statuses.map(s => r.claims.byStatus[s] || 0), 1);
-  document.getElementById('rpt-claims-breakdown').innerHTML = statuses.length ?
+  document.getElementById('rpt-claims-breakdown').innerHTML =
     statuses.map(s => rptBar(s.charAt(0).toUpperCase() + s.slice(1), r.claims.byStatus[s] || 0, maxClaim, statusColors[s] || 'blue')).join('') +
-    (r.claims.total === 0 ? '<div style="text-align:center;color:var(--ink3);font-size:13px;margin-top:12px">No claims in this period</div>' : '') :
-    '<div class="empty-state"><p>No claims data.</p></div>';
-
-  // Visits by date chart
-  const dates = Object.keys(r.visits.byDate).sort();
-  if (dates.length > 0) {
-    const maxV = Math.max(...dates.map(d => r.visits.byDate[d]));
-    document.getElementById('rpt-visits-chart').innerHTML = `
-      <div class="visit-chart">${dates.map(d => {
-        const pct = (r.visits.byDate[d] / maxV) * 100;
-        return `<div class="visit-chart-bar" style="height:${Math.max(pct, 4)}%" title="${d}: ${r.visits.byDate[d]} visits"></div>`;
-      }).join('')}</div>
-      <div class="visit-chart-labels">${dates.map(d => `<span title="${d}">${d.slice(5)}</span>`).join('')}</div>
-      <div style="margin-top:8px;font-size:12px;color:var(--ink3)">${dates.length} days with visits</div>
-    `;
-  } else {
-    document.getElementById('rpt-visits-chart').innerHTML = '<div class="empty-state"><p>No visits in this period.</p></div>';
-  }
+    (r.claims.total === 0 ? '<div style="text-align:center;color:var(--ink3);font-size:13px;margin-top:12px">No claims in this period</div>' : '');
 
   // Patient mix
   document.getElementById('rpt-patient-mix').innerHTML = `
@@ -4083,8 +4262,56 @@ function renderReports(r) {
       <div><span style="font-size:24px;font-weight:700;color:var(--accent)">${r.patients.insurance}</span><br><span style="font-size:12px;color:var(--ink3)">Insurance</span></div>
       <div><span style="font-size:24px;font-weight:700;color:var(--accent2)">${r.patients.cash}</span><br><span style="font-size:12px;color:var(--ink3)">Cash</span></div>
       <div><span style="font-size:24px;font-weight:700;color:var(--ink3)">${r.patients.total - r.patients.insurance - r.patients.cash}</span><br><span style="font-size:12px;color:var(--ink3)">Unset</span></div>
+      <div><span style="font-size:24px;font-weight:700;color:var(--accent)">${r.patients.newInPeriod}</span><br><span style="font-size:12px;color:var(--ink3)">New This Period</span></div>
     </div>
   `;
+
+  // Visits by date chart
+  const dates = Object.keys(r.visits.byDate).sort();
+  if (dates.length > 0) {
+    const maxV = Math.max(...dates.map(d => r.visits.byDate[d]));
+    document.getElementById('rpt-visits-chart').innerHTML = `
+      <div class="visit-chart">${dates.map(d => {
+        const pct = (r.visits.byDate[d] / maxV) * 100;
+        return `<div class="visit-chart-bar" style="height:${Math.max(pct, 4)}%" title="${d}: ${r.visits.byDate[d]} visits"><span class="bar-tip">${r.visits.byDate[d]}</span></div>`;
+      }).join('')}</div>
+      <div class="visit-chart-labels">${dates.map(d => `<span title="${d}">${d.slice(5)}</span>`).join('')}</div>
+      <div style="margin-top:8px;font-size:12px;color:var(--ink3)">${dates.length} days &bull; ${r.visits.total} total visits</div>
+    `;
+  } else {
+    document.getElementById('rpt-visits-chart').innerHTML = '<div class="empty-state"><p>No visits in this period.</p></div>';
+  }
+
+  // Top patients table
+  const tp = r.topPatients || [];
+  if (tp.length) {
+    let tbl = `<table style="width:100%;font-size:13px"><thead><tr>
+      <th style="padding:8px 12px">#</th>
+      <th style="padding:8px 12px">Patient</th>
+      <th style="padding:8px 12px">Code</th>
+      <th style="padding:8px 12px;text-align:center">Visits</th>
+      <th style="padding:8px 12px;text-align:center">E1</th>
+      <th style="padding:8px 12px;text-align:center">E2</th>
+      <th style="padding:8px 12px">Distribution</th>
+    </tr></thead><tbody>`;
+    const maxPv = tp[0].visits;
+    tp.forEach((p, i) => {
+      const pct = maxPv > 0 ? (p.visits / maxPv * 100) : 0;
+      tbl += `<tr>
+        <td style="padding:6px 12px;color:var(--ink3)">${i + 1}</td>
+        <td style="padding:6px 12px;font-weight:600">${esc(p.name)}</td>
+        <td style="padding:6px 12px;color:var(--ink3)">${esc(p.code)}</td>
+        <td style="padding:6px 12px;text-align:center;font-weight:700">${p.visits}</td>
+        <td style="padding:6px 12px;text-align:center">${p.e1}</td>
+        <td style="padding:6px 12px;text-align:center">${p.e2}</td>
+        <td style="padding:6px 12px"><div style="background:var(--surface2);border-radius:4px;height:16px;overflow:hidden"><div style="background:var(--accent);height:100%;width:${pct}%;border-radius:4px"></div></div></td>
+      </tr>`;
+    });
+    tbl += `</tbody></table>`;
+    document.getElementById('rpt-top-patients').innerHTML = tbl;
+  } else {
+    document.getElementById('rpt-top-patients').innerHTML = '<div class="empty-state" style="padding:20px"><p>No visit data in this period.</p></div>';
+  }
 }
 
 function rptBar(label, value, max, color) {

@@ -1703,6 +1703,11 @@
           <div style="font-weight:600;font-size:13px">Reconciliation</div>
           <div style="font-size:11px;color:var(--ink3)">Cross-check intake vs billing</div>
         </div>
+        <div class="rb-type-card" data-type="monthly_summary" onclick="selectReportType('monthly_summary',this)">
+          <div style="font-size:20px;margin-bottom:4px">📅</div>
+          <div style="font-weight:600;font-size:13px">Monthly Report</div>
+          <div style="font-size:11px;color:var(--ink3)">Full month overview + billing</div>
+        </div>
       </div>
 
       <!-- Filters bar -->
@@ -4637,6 +4642,12 @@ function renderToolReport(result, reportType, groupBy) {
     return;
   }
 
+  // Monthly summary gets a custom layout
+  if (reportType === 'monthly_summary') {
+    renderMonthlyReport(result, container);
+    return;
+  }
+
   // Summary bar
   const s = result.summary || {};
   let html = `<div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 0;border-bottom:2px solid var(--border);margin-bottom:12px;font-size:13px">`;
@@ -4774,6 +4785,15 @@ function getReportColumns(type) {
         { key: 'billing_amount', label: 'Billing Amt', align: 'right', render: r => r.billing_amount != null ? '$' + Number(r.billing_amount).toFixed(2) : '—' },
         { key: 'workflow_status', label: 'Status', render: r => sl(r.workflow_status) }
       ];
+    case 'monthly_summary':
+      return [...base,
+        { key: 'manipulation_type', label: 'Manip' },
+        { key: 'therapeutic_exercises', label: 'TE' },
+        { label: 'Diagnosis', render: dx },
+        { key: 'workflow_status', label: 'Status', render: r => sl(r.workflow_status) },
+        { key: 'claim_number', label: 'Claim #' },
+        { key: 'is_backdated', label: 'BD', render: r => r.is_backdated ? 'Yes' : '' }
+      ];
     default: return base;
   }
 }
@@ -4803,6 +4823,173 @@ function exportToolCSV() {
   a.href = url; a.download = `report_${reportType}_${new Date().toISOString().split('T')[0]}.csv`;
   a.click(); URL.revokeObjectURL(url);
   toast('CSV exported', 'success');
+}
+
+// ════════════════════════════════════
+// MONTHLY REPORT RENDERER
+// ════════════════════════════════════
+function renderMonthlyReport(result, container) {
+  const s = result.summary || {};
+  const groups = result.groups || [];
+  const money = v => v != null ? '$' + Number(v).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '—';
+  const sl = v => STATUS_LABELS[v] || v || '—';
+
+  let html = '';
+
+  // ── OVERVIEW SECTION ──
+  html += `<div class="card" style="margin-bottom:16px">
+    <div class="card-head"><div class="card-title">Monthly Overview — ${s.period?.from || ''} to ${s.period?.to || ''}</div></div>
+    <div style="padding:16px">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+        <div style="flex:1;min-width:100px;text-align:center;padding:12px;background:var(--accent-dim);border-radius:8px">
+          <div style="font-size:28px;font-weight:700;color:var(--accent)">${s.days_open || 0}</div>
+          <div style="font-size:11px;color:var(--ink3)">Days Open</div>
+        </div>
+        <div style="flex:1;min-width:100px;text-align:center;padding:12px;background:var(--accent-dim);border-radius:8px">
+          <div style="font-size:28px;font-weight:700;color:var(--accent)">${s.total_visits || 0}</div>
+          <div style="font-size:11px;color:var(--ink3)">Total Visits</div>
+        </div>
+        <div style="flex:1;min-width:100px;text-align:center;padding:12px;background:var(--surface2);border-radius:8px">
+          <div style="font-size:28px;font-weight:700">${s.unique_patients || 0}</div>
+          <div style="font-size:11px;color:var(--ink3)">Unique Patients</div>
+        </div>
+        <div style="flex:1;min-width:100px;text-align:center;padding:12px;background:var(--surface2);border-radius:8px">
+          <div style="font-size:28px;font-weight:700">${s.e1 || 0} / ${s.e2 || 0}</div>
+          <div style="font-size:11px;color:var(--ink3)">E1 / E2</div>
+        </div>
+        <div style="flex:1;min-width:100px;text-align:center;padding:12px;background:var(--surface2);border-radius:8px">
+          <div style="font-size:28px;font-weight:700">${s.new_patients || 0}</div>
+          <div style="font-size:11px;color:var(--ink3)">New Patients</div>
+        </div>
+        <div style="flex:1;min-width:100px;text-align:center;padding:12px;background:var(--surface2);border-radius:8px">
+          <div style="font-size:28px;font-weight:700">${s.backdated || 0}</div>
+          <div style="font-size:11px;color:var(--ink3)">Backdated</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--ink3)">Avg ${s.total_visits && s.days_open ? (s.total_visits / s.days_open).toFixed(1) : '—'} patients/day</div>
+    </div>
+  </div>`;
+
+  // ── DAILY BREAKDOWN TABLE ──
+  html += `<div class="card" style="margin-bottom:16px">
+    <div class="card-head"><div class="card-title">Daily Breakdown</div></div>
+    <div style="padding:0">
+      <table style="width:100%;font-size:13px;border-collapse:collapse">
+        <thead><tr>
+          <th style="padding:8px 12px">Date</th>
+          <th style="padding:8px 12px;text-align:center">Patients</th>
+          <th style="padding:8px 12px;text-align:center">E1</th>
+          <th style="padding:8px 12px;text-align:center">E2</th>
+          <th style="padding:8px 12px;text-align:center">New</th>
+          <th style="padding:8px 12px;text-align:center">BD</th>
+          <th style="padding:8px 12px;text-align:right">Charged</th>
+          <th style="padding:8px 12px;text-align:right">Received</th>
+          <th style="padding:8px 12px;text-align:right">Outstanding</th>
+          <th style="padding:8px 12px">Visual</th>
+        </tr></thead><tbody>`;
+
+  const maxVisits = Math.max(...groups.map(g => g.subtotals?.count || 0), 1);
+  groups.forEach((g, gi) => {
+    const sub = g.subtotals || {};
+    const dayName = new Date(g.label + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' });
+    const pct = ((sub.count || 0) / maxVisits * 100).toFixed(0);
+    html += `<tr class="rb-drill-row" onclick="rbDrillIntoMonthDay(${gi})">
+      <td style="padding:6px 12px;font-weight:600">${dayName} ${g.label}</td>
+      <td style="padding:6px 12px;text-align:center;font-weight:700">${sub.count || 0}</td>
+      <td style="padding:6px 12px;text-align:center">${sub.e1 || 0}</td>
+      <td style="padding:6px 12px;text-align:center">${sub.e2 || 0}</td>
+      <td style="padding:6px 12px;text-align:center">${sub.new_patients || 0}</td>
+      <td style="padding:6px 12px;text-align:center">${sub.backdated || 0}</td>
+      <td style="padding:6px 12px;text-align:right">${money(sub.total_charged)}</td>
+      <td style="padding:6px 12px;text-align:right;color:#16a34a">${money(sub.total_received)}</td>
+      <td style="padding:6px 12px;text-align:right;font-weight:700;color:${(sub.outstanding||0) > 0 ? '#dc2626' : '#16a34a'}">${money(sub.outstanding)}</td>
+      <td style="padding:6px 12px"><div style="background:var(--surface3);border-radius:3px;height:14px;overflow:hidden"><div style="background:var(--accent);height:100%;width:${pct}%;border-radius:3px"></div></div></td>
+    </tr>`;
+  });
+
+  // Totals row
+  const totalCharged = groups.reduce((s, g) => s + (g.subtotals?.total_charged || 0), 0);
+  const totalReceived = groups.reduce((s, g) => s + (g.subtotals?.total_received || 0), 0);
+  html += `<tr style="border-top:2px solid var(--ink);background:var(--surface2);font-weight:700">
+    <td style="padding:8px 12px">TOTALS</td>
+    <td style="padding:8px 12px;text-align:center">${s.total_visits || 0}</td>
+    <td style="padding:8px 12px;text-align:center">${s.e1 || 0}</td>
+    <td style="padding:8px 12px;text-align:center">${s.e2 || 0}</td>
+    <td style="padding:8px 12px;text-align:center">${s.new_patients || 0}</td>
+    <td style="padding:8px 12px;text-align:center">${s.backdated || 0}</td>
+    <td style="padding:8px 12px;text-align:right">${money(totalCharged)}</td>
+    <td style="padding:8px 12px;text-align:right;color:#16a34a">${money(totalReceived)}</td>
+    <td style="padding:8px 12px;text-align:right;color:${(totalCharged - totalReceived) > 0 ? '#dc2626' : '#16a34a'}">${money(totalCharged - totalReceived)}</td>
+    <td></td>
+  </tr>`;
+  html += `</tbody></table></div></div>`;
+
+  // ── MONETARY SUMMARY ──
+  html += `<div class="card" style="margin-bottom:16px">
+    <div class="card-head"><div class="card-title">Financial Summary</div></div>
+    <div style="padding:16px;display:flex;gap:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:120px;text-align:center;padding:14px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:24px;font-weight:700">${money(s.total_charged)}</div>
+        <div style="font-size:11px;color:var(--ink3)">Total Charged</div>
+      </div>
+      <div style="flex:1;min-width:120px;text-align:center;padding:14px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:24px;font-weight:700">${money(s.total_approved)}</div>
+        <div style="font-size:11px;color:var(--ink3)">Approved</div>
+      </div>
+      <div style="flex:1;min-width:120px;text-align:center;padding:14px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:24px;font-weight:700;color:#16a34a">${money(s.total_ins_received)}</div>
+        <div style="font-size:11px;color:var(--ink3)">Insurance Received</div>
+      </div>
+      <div style="flex:1;min-width:120px;text-align:center;padding:14px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:24px;font-weight:700">${money(s.total_pt_received)}</div>
+        <div style="font-size:11px;color:var(--ink3)">Patient Received</div>
+      </div>
+      <div style="flex:1;min-width:120px;text-align:center;padding:14px;background:${(s.outstanding||0) > 0 ? 'rgba(220,38,38,0.08)' : 'rgba(22,163,74,0.08)'};border-radius:8px">
+        <div style="font-size:24px;font-weight:700;color:${(s.outstanding||0) > 0 ? '#dc2626' : '#16a34a'}">${money(s.outstanding)}</div>
+        <div style="font-size:11px;color:var(--ink3)">Outstanding</div>
+      </div>
+      <div style="flex:1;min-width:120px;text-align:center;padding:14px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:24px;font-weight:700">${s.total_charged > 0 ? ((s.total_received / s.total_charged) * 100).toFixed(1) + '%' : '—'}</div>
+        <div style="font-size:11px;color:var(--ink3)">Collection Rate</div>
+      </div>
+    </div>
+  </div>`;
+
+  // ── DETAIL: Click a day row to drill into it ──
+  html += `<div class="card">
+    <div class="card-head"><div class="card-title">Detail View</div><span style="font-size:12px;color:var(--ink3)">Click a day row above to drill down</span></div>
+    <div id="monthly-detail" style="padding:16px">
+      <div class="empty-state" style="padding:24px"><p>Click any day in the table above to see patient-level detail</p></div>
+    </div>
+  </div>`;
+
+  container.innerHTML = html;
+}
+
+function rbDrillIntoMonthDay(groupIndex) {
+  if (!lastToolReport || !lastToolReport.groups) return;
+  const g = lastToolReport.groups[groupIndex];
+  if (!g) return;
+  const records = g.records || [];
+  const sl = v => STATUS_LABELS[v] || v || '—';
+  const cols = getReportColumns('monthly_summary');
+
+  let html = `<div style="margin-bottom:8px;font-weight:600;font-size:14px">${g.label} — ${records.length} visits</div>`;
+  html += `<table style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr>`;
+  cols.forEach(c => { html += `<th style="padding:6px 10px;text-align:${c.align||'left'};font-size:12px;color:var(--ink3);border-bottom:2px solid var(--border)">${c.label}</th>`; });
+  html += `</tr></thead><tbody>`;
+  records.forEach(r => {
+    html += `<tr>`;
+    cols.forEach(c => {
+      const val = c.render ? c.render(r) : (r[c.key] ?? '—');
+      html += `<td style="padding:5px 10px;border-bottom:1px solid var(--surface3);text-align:${c.align||'left'}">${val}</td>`;
+    });
+    html += `</tr>`;
+  });
+  html += `</tbody></table>`;
+
+  document.getElementById('monthly-detail').innerHTML = html;
+  document.getElementById('monthly-detail').scrollIntoView({ behavior: 'smooth' });
 }
 
 // ════════════════════════════════════
@@ -4860,12 +5047,18 @@ function selectReportType(type, el) {
     patient_visits: 'patient', claims_by_diagnosis: 'diagnosis_category',
     outstanding_claims: 'workflow_status', payment_summary: 'month',
     daily_intake: 'service_date', denials: 'patient', status_activity: 'service_date',
-    reconciliation: 'patient'
+    reconciliation: 'patient',
+    monthly_summary: 'service_date'
   };
   gb.value = defaults[type] || 'none';
-  // Update hidden select
-  const sel = document.getElementById('tool-report-type');
-  if (sel) sel.value = type;
+  // Auto-set date range for monthly report
+  if (type === 'monthly_summary') {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    document.getElementById('tool-from').value = firstDay.toISOString().split('T')[0];
+    document.getElementById('tool-to').value = lastDay.toISOString().split('T')[0];
+  }
 }
 
 function setToolRange(days) {

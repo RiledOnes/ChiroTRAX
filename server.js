@@ -125,6 +125,8 @@ app.post('/api/auth/login', async (req, res) => {
     .eq('email', trimmed)
     .single();
 
+  console.log('LOGIN ATTEMPT:', trimmed, 'found:', !!data, 'error:', error?.message, 'has_hash:', !!data?.password_hash, 'hash_len:', data?.password_hash?.length);
+
   if (error || !data) {
     return res.status(403).json({ error: 'Invalid email or password' });
   }
@@ -139,6 +141,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   const valid = await bcrypt.compare(password, data.password_hash);
+  console.log('LOGIN BCRYPT:', 'password_len:', password.length, 'valid:', valid);
   if (!valid) {
     return res.status(403).json({ error: 'Invalid email or password' });
   }

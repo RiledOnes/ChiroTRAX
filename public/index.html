@@ -4972,9 +4972,81 @@ function rbDrillIntoMonthDay(groupIndex) {
   if (!g) return;
   const records = g.records || [];
   const sl = v => STATUS_LABELS[v] || v || '—';
+  const dayName = new Date(g.label + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  // Group by patient
+  const byPatient = {};
+  records.forEach(r => {
+    const key = r.patient_id || r.patient_name;
+    if (!byPatient[key]) byPatient[key] = { name: r.patient_name || '—', code: r.patient_code || '—', id: r.patient_id, visits: [] };
+    byPatient[key].visits.push(r);
+  });
+  const patientList = Object.values(byPatient).sort((a, b) => a.name.localeCompare(b.name));
+
+  let html = `<div style="margin-bottom:12px">
+    <div style="font-weight:700;font-size:16px;margin-bottom:4px">${dayName}</div>
+    <div style="font-size:13px;color:var(--ink3)">${records.length} visits from ${patientList.length} patients</div>
+  </div>`;
+
+  // Patient summary table — clickable rows
+  html += `<table style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr>
+    <th style="padding:8px 10px">Patient</th>
+    <th style="padding:8px 10px">Code</th>
+    <th style="padding:8px 10px;text-align:center">Visits</th>
+    <th style="padding:8px 10px;text-align:center">Manip</th>
+    <th style="padding:8px 10px;text-align:center">TE</th>
+    <th style="padding:8px 10px">Dx Category</th>
+    <th style="padding:8px 10px">Status</th>
+    <th style="padding:8px 10px">Claim #</th>
+    <th style="padding:8px 10px;text-align:center">Actions</th>
+  </tr></thead><tbody>`;
+
+  patientList.forEach(p => {
+    const v = p.visits[0];
+    const allManips = p.visits.map(x => x.manipulation_type).filter(Boolean).join(', ');
+    const allTe = p.visits.map(x => x.therapeutic_exercises).filter(x => x != null);
+    const teDisplay = allTe.length ? allTe.join(', ') : '—';
+    const dxCats = [...new Set(p.visits.map(x => x.diagnosis_category).filter(Boolean))].join(', ');
+    const statuses = [...new Set(p.visits.map(x => x.workflow_status).filter(Boolean))];
+    const claims = [...new Set(p.visits.map(x => x.claim_number).filter(Boolean))];
+
+    html += `<tr class="rb-drill-row" onclick="rbDrillIntoPatientDay(${groupIndex},'${p.id || ''}')">
+      <td style="padding:6px 10px;font-weight:600">${esc(p.name)}</td>
+      <td style="padding:6px 10px;color:var(--ink3)">${esc(p.code)}</td>
+      <td style="padding:6px 10px;text-align:center;font-weight:700">${p.visits.length}</td>
+      <td style="padding:6px 10px;text-align:center">${allManips || '—'}</td>
+      <td style="padding:6px 10px;text-align:center">${teDisplay}</td>
+      <td style="padding:6px 10px">${esc(dxCats || '—')}</td>
+      <td style="padding:6px 10px">${statuses.map(s => `<span class="badge badge-${s}" style="margin-right:2px">${sl(s)}</span>`).join('') || '—'}</td>
+      <td style="padding:6px 10px">${claims.join(', ') || '—'}</td>
+      <td style="padding:6px 10px;text-align:center">
+        ${p.id ? `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openPatientDetail('${p.id}')" style="font-size:11px">Profile</button>` : ''}
+      </td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+
+  // Patient detail area for next drill level
+  html += `<div id="monthly-patient-detail" style="margin-top:16px"></div>`;
+
+  document.getElementById('monthly-detail').innerHTML = html;
+  document.getElementById('monthly-detail').scrollIntoView({ behavior: 'smooth' });
+}
+
+function rbDrillIntoPatientDay(groupIndex, patientId) {
+  if (!lastToolReport || !lastToolReport.groups) return;
+  const g = lastToolReport.groups[groupIndex];
+  if (!g) return;
+  const records = (g.records || []).filter(r => (r.patient_id || '') === patientId);
+  if (!records.length) return;
+
+  const name = records[0].patient_name || '—';
+  const sl = v => STATUS_LABELS[v] || v || '—';
   const cols = getReportColumns('monthly_summary');
 
-  let html = `<div style="margin-bottom:8px;font-weight:600;font-size:14px">${g.label} — ${records.length} visits</div>`;
+  let html = `<div style="padding:12px;background:var(--accent-dim);border-radius:8px;margin-bottom:8px">
+    <div style="font-weight:700;font-size:14px">${esc(name)} — ${records.length} visit${records.length !== 1 ? 's' : ''} on ${g.label}</div>
+  </div>`;
   html += `<table style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr>`;
   cols.forEach(c => { html += `<th style="padding:6px 10px;text-align:${c.align||'left'};font-size:12px;color:var(--ink3);border-bottom:2px solid var(--border)">${c.label}</th>`; });
   html += `</tr></thead><tbody>`;
@@ -4988,8 +5060,13 @@ function rbDrillIntoMonthDay(groupIndex) {
   });
   html += `</tbody></table>`;
 
-  document.getElementById('monthly-detail').innerHTML = html;
-  document.getElementById('monthly-detail').scrollIntoView({ behavior: 'smooth' });
+  if (patientId) {
+    html += `<div style="margin-top:10px"><button class="btn btn-secondary btn-sm" onclick="openPatientDetail('${patientId}')">View Full Patient Profile</button>
+    <button class="btn btn-secondary btn-sm" onclick="exportPatientPDF('${patientId}')">Export Patient PDF</button></div>`;
+  }
+
+  document.getElementById('monthly-patient-detail').innerHTML = html;
+  document.getElementById('monthly-patient-detail').scrollIntoView({ behavior: 'smooth' });
 }
 
 // ════════════════════════════════════

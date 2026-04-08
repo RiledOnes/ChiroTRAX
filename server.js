@@ -254,6 +254,52 @@ app.post('/api/auth/reset-password', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Request access (public — no auth required)
+app.post('/api/auth/request-access', async (req, res) => {
+  const { name, email } = req.body;
+  if (!email || !name) return res.status(400).json({ error: 'Name and email required' });
+
+  const trimmed = email.trim().toLowerCase();
+
+  // Check if already approved
+  const { data: existing } = await supabase
+    .from('approved_users')
+    .select('email')
+    .eq('email', trimmed)
+    .single();
+  if (existing) return res.status(400).json({ error: 'This email already has access. Try signing in.' });
+
+  // Check if already requested
+  const { data: pending } = await supabase
+    .from('access_requests')
+    .select('id')
+    .eq('email', trimmed)
+    .eq('status', 'pending')
+    .single();
+  if (pending) return res.status(400).json({ error: 'Access request already pending. Please wait for approval.' });
+
+  // Create request
+  const { error } = await supabase
+    .from('access_requests')
+    .insert([{ name: name.trim(), email: trimmed, status: 'pending' }]);
+  if (error) return res.status(500).json({ error: 'Failed to submit request' });
+
+  // TODO: Send email notification to admin
+  console.log(`ACCESS REQUEST: ${name.trim()} (${trimmed}) — needs approval`);
+
+  res.json({ ok: true });
+});
+
+// Get pending access requests (admin only)
+app.get('/api/auth/access-requests', requireAuth, async (req, res) => {
+  const { data, error } = await supabase
+    .from('access_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data || []);
+});
+
 app.post('/api/auth/logout', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (token) await deleteSession(token);
@@ -268,6 +314,42 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
 // PROTECT ALL OTHER API ROUTES
 // ============================================
 app.use('/api', requireAuth);
+
+// ============================================
+// ADMIN: Approve/deny access requests (protected)
+// ============================================
+app.post('/api/auth/approve-access', async (req, res) => {
+  const { request_id, action } = req.body;
+  if (!request_id || !action) return res.status(400).json({ error: 'request_id and action required' });
+
+  const { data: request, error: fetchErr } = await supabase
+    .from('access_requests')
+    .select('*')
+    .eq('id', request_id)
+    .single();
+  if (fetchErr || !request) return res.status(404).json({ error: 'Request not found' });
+
+  if (action === 'approve') {
+    // Create approved_users entry
+    const { error: insertErr } = await supabase
+      .from('approved_users')
+      .insert([{ email: request.email, role: 'staff' }]);
+    if (insertErr) return res.status(500).json({ error: 'Failed to create user' });
+
+    await supabase.from('access_requests')
+      .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+      .eq('id', request_id);
+
+    res.json({ ok: true, message: `${request.email} approved` });
+  } else if (action === 'deny') {
+    await supabase.from('access_requests')
+      .update({ status: 'denied', reviewed_at: new Date().toISOString() })
+      .eq('id', request_id);
+    res.json({ ok: true, message: `${request.email} denied` });
+  } else {
+    res.status(400).json({ error: 'action must be approve or deny' });
+  }
+});
 
 // ============================================
 // HELPER: sanitize Supabase errors

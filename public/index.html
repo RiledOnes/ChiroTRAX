@@ -953,6 +953,23 @@
       </form>
       <div class="login-error" id="login-error"></div>
       <button class="login-link" onclick="showForgotPassword()">Forgot password?</button>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+        <span style="font-size:12px;color:var(--ink3)">Don't have an account?</span>
+        <button class="login-link" onclick="showRequestAccess()" style="margin-top:2px">Request Access</button>
+      </div>
+    </div>
+
+    <!-- Request Access -->
+    <div id="request-view" style="display:none">
+      <p class="login-sub">Request access to ChiroTrax</p>
+      <form id="request-form" onsubmit="handleRequestAccess(event)">
+        <input type="text" id="request-name" placeholder="Your full name" required style="width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--ink);font-size:14px;outline:none;margin-bottom:14px"/>
+        <input type="email" id="request-email" placeholder="you@example.com" required autocomplete="email"/>
+        <button type="submit" class="login-btn" id="request-btn">Request Access</button>
+      </form>
+      <div class="login-error" id="request-error"></div>
+      <div class="login-success" id="request-success"></div>
+      <button class="login-link" onclick="showLoginView()">Back to sign in</button>
     </div>
 
     <!-- Set Password (first-time) -->
@@ -2173,6 +2190,13 @@ function showLoginView() {
   document.getElementById('setup-view').style.display = 'none';
   document.getElementById('forgot-view').style.display = 'none';
   document.getElementById('reset-view').style.display = 'none';
+  document.getElementById('request-view').style.display = 'none';
+}
+function showRequestAccess() {
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('request-view').style.display = '';
+  document.getElementById('request-error').textContent = '';
+  document.getElementById('request-success').textContent = '';
 }
 function showForgotPassword() {
   document.getElementById('login-view').style.display = 'none';
@@ -2325,6 +2349,36 @@ async function handleResetPassword(e) {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Reset Password';
+  }
+}
+
+async function handleRequestAccess(e) {
+  e.preventDefault();
+  const btn = document.getElementById('request-btn');
+  const errEl = document.getElementById('request-error');
+  const successEl = document.getElementById('request-success');
+  const name = document.getElementById('request-name').value.trim();
+  const email = document.getElementById('request-email').value.trim();
+  errEl.textContent = '';
+  successEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+
+  try {
+    const res = await fetch('/api/auth/request-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    successEl.textContent = 'Access request submitted! You will receive an email once approved.';
+    document.getElementById('request-form').reset();
+  } catch (err) {
+    errEl.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Request Access';
   }
 }
 

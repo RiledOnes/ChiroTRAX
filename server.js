@@ -56,10 +56,10 @@ app.use('/api/auth/', authLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Supabase client
+// Supabase client — use service_role key for server-side (bypasses RLS)
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 );
 
 // ============================================

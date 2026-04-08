@@ -945,10 +945,10 @@
 
     <!-- Sign In Form -->
     <div id="login-view">
-      <p class="login-sub">Sign in with your approved email</p>
+      <p class="login-sub">Sign in to ChiroTrax</p>
       <form id="login-form" onsubmit="handleLogin(event)">
-        <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="email"/>
-        <input type="password" id="login-password" placeholder="Password" autocomplete="current-password"/>
+        <input type="email" id="login-email" placeholder="Email address" required autocomplete="email"/>
+        <input type="text" id="login-password" placeholder="Password (leave blank for first login)" autocomplete="off" style="-webkit-text-security:disc"/>
         <button type="submit" class="login-btn" id="login-btn">Sign In</button>
       </form>
       <div class="login-error" id="login-error"></div>

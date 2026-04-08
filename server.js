@@ -56,10 +56,10 @@ app.use('/api/auth/', authLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Supabase client
+// Supabase client — use service_role key for server-side (bypasses RLS)
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 );
 
 // ============================================
@@ -1305,6 +1305,98 @@ app.post('/api/reports/run', async (req, res) => {
           };
         });
         break;
+      }
+
+      case 'monthly_summary': {
+        // Full monthly report: days open, patients, daily breakdown, billing
+        const mFrom = filters.from || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+        const mTo = filters.to || new Date().toISOString().split('T')[0];
+
+        const [irRes, brRes] = await Promise.all([
+          supabase.from('intake_records')
+            .select('id, intake_id, service_date, patient_id, patient_name, patient_code, manipulation_type, therapeutic_exercises, diagnosis_category, workflow_status, is_backdated, new_patient, no_fault, cpt_manipulation, cpt_te, in_charge_capture, in_billing_report, claim_number')
+            .gte('service_date', mFrom).lte('service_date', mTo)
+            .order('service_date', { ascending: true }),
+          supabase.from('billing_reports')
+            .select('patient_id, service_date, charge, approved, pri_ins_received, sec_ins_received, patient_received, claim_number')
+            .gte('service_date', mFrom).lte('service_date', mTo)
+        ]);
+
+        const ir = irRes.data || [];
+        const br = brRes.data || [];
+
+        // Build billing lookup by date
+        const brByDate = {};
+        br.forEach(b => {
+          if (!brByDate[b.service_date]) brByDate[b.service_date] = [];
+          brByDate[b.service_date].push(b);
+        });
+
+        // Group visits by date
+        const byDate = {};
+        ir.forEach(r => {
+          if (!byDate[r.service_date]) byDate[r.service_date] = [];
+          byDate[r.service_date].push(r);
+        });
+
+        const uniquePatients = new Set(ir.map(r => r.patient_id).filter(Boolean));
+        const totalE1 = ir.filter(r => r.manipulation_type === 'E1').length;
+        const totalE2 = ir.filter(r => r.manipulation_type === 'E2').length;
+        const totalNew = ir.filter(r => r.new_patient).length;
+        const totalBackdated = ir.filter(r => r.is_backdated).length;
+
+        // Billing totals
+        const totalCharged = br.reduce((s, b) => s + (parseFloat(b.charge) || 0), 0);
+        const totalApproved = br.reduce((s, b) => s + (parseFloat(b.approved) || 0), 0);
+        const totalInsReceived = br.reduce((s, b) => s + (parseFloat(b.pri_ins_received) || 0) + (parseFloat(b.sec_ins_received) || 0), 0);
+        const totalPtReceived = br.reduce((s, b) => s + (parseFloat(b.patient_received) || 0), 0);
+
+        // Daily breakdown
+        const dailyGroups = Object.keys(byDate).sort().map(date => {
+          const dayVisits = byDate[date];
+          const dayBilling = brByDate[date] || [];
+          const dayCharged = dayBilling.reduce((s, b) => s + (parseFloat(b.charge) || 0), 0);
+          const dayReceived = dayBilling.reduce((s, b) => s + (parseFloat(b.pri_ins_received) || 0) + (parseFloat(b.sec_ins_received) || 0) + (parseFloat(b.patient_received) || 0), 0);
+          return {
+            label: date,
+            subtotals: {
+              count: dayVisits.length,
+              unique_patients: new Set(dayVisits.map(v => v.patient_id).filter(Boolean)).size,
+              e1: dayVisits.filter(v => v.manipulation_type === 'E1').length,
+              e2: dayVisits.filter(v => v.manipulation_type === 'E2').length,
+              new_patients: dayVisits.filter(v => v.new_patient).length,
+              backdated: dayVisits.filter(v => v.is_backdated).length,
+              total_charged: dayCharged,
+              total_received: dayReceived,
+              outstanding: dayCharged - dayReceived
+            },
+            records: dayVisits.map(v => ({
+              ...v,
+              visit_date: v.service_date,
+              diagnosis_codes: Array.isArray(v.diagnosis_codes) ? v.diagnosis_codes.join(', ') : v.diagnosis_codes
+            }))
+          };
+        });
+
+        return res.json({
+          summary: {
+            period: { from: mFrom, to: mTo },
+            days_open: Object.keys(byDate).length,
+            total_visits: ir.length,
+            unique_patients: uniquePatients.size,
+            e1: totalE1,
+            e2: totalE2,
+            new_patients: totalNew,
+            backdated: totalBackdated,
+            total_charged: totalCharged,
+            total_approved: totalApproved,
+            total_ins_received: totalInsReceived,
+            total_pt_received: totalPtReceived,
+            total_received: totalInsReceived + totalPtReceived,
+            outstanding: totalCharged - totalInsReceived - totalPtReceived
+          },
+          groups: dailyGroups
+        });
       }
 
       default:

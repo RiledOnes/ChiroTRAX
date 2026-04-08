@@ -48,7 +48,7 @@ app.use('/api/', apiLimiter);
 // Stricter rate limit on auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 100,
   message: { error: 'Too many login attempts, please try again later.' }
 });
 app.use('/api/auth/', authLimiter);

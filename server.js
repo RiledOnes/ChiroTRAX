@@ -56,6 +56,28 @@ app.use('/api/auth/', authLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Temporary debug endpoint — outside /api path to bypass all middleware
+app.get('/debug-login', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('approved_users')
+      .select('email, role, password_hash')
+      .eq('email', 'miraff9@gmail.com')
+      .single();
+    res.json({
+      supabase_url: process.env.SUPABASE_URL ? 'set' : 'MISSING',
+      service_role_key: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'MISSING',
+      anon_key: process.env.SUPABASE_ANON_KEY ? 'set' : 'MISSING',
+      key_used: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'service_role' : 'anon',
+      query_error: error?.message || null,
+      user_found: !!data,
+      has_password: !!data?.password_hash
+    });
+  } catch(e) {
+    res.json({ crash: e.message });
+  }
+});
+
 // Supabase client — use service_role key for server-side (bypasses RLS)
 const supabase = createClient(
   process.env.SUPABASE_URL,

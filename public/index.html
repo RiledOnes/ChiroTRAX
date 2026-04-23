@@ -3870,9 +3870,13 @@ async function exportDailyPDF() {
     <title>Daily Report - ${date}</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; font-size: 8px; width: 100%; height: 100%; overflow: hidden; }
-      @page { size: landscape; margin: 6mm; }
-      @media print { body { padding: 0; } }
+      html, body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; font-size: 8px; width: 100%; height: 100%; overflow: hidden; }
+      @page { size: letter landscape; margin: 6mm; }
+      @media print {
+        html, body { width: 269mm; height: 204mm; overflow: hidden; }
+        .main { height: 190mm !important; }
+        .capture-section img, .intake-img-wrap img { page-break-inside: avoid; }
+      }
 
       .header { display: flex; justify-content: space-between; align-items: center; background: #1e3a5f; color: white; padding: 4px 10px; font-weight: 700; font-size: 10px; }
       .header .status { background: #22c55e; color: white; padding: 1px 8px; border-radius: 3px; font-size: 9px; }

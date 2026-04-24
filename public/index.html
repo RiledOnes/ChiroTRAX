@@ -3805,8 +3805,8 @@ async function handleEodUpload(event) {
 function calcBilled(v) {
   // Office visit: A2=$225, RE3=$175, blank=$0
   let total = 0;
-  if (v.office_visit === 'A2') total += 225;
-  else if (v.office_visit === 'RE3') total += 175;
+  if (v.a2) total += 225;
+  else if (v.re3) total += 175;
 
   // Manipulation: E1=$75, E2=$100, blank=$0
   if (v.manipulation_type === 'E1') total += 75;
@@ -3982,6 +3982,7 @@ async function exportDailyPDF() {
         const name = v.patients ? (v.patients.first_name + ' ' + v.patients.last_name).trim().toUpperCase() : (v.patient_name || '—').toUpperCase();
         const patCode = v.patients?.patient_code || '—';
         const intId = v.intake_id || String(i + 1).padStart(2, '0');
+        const officeVisit = v.a2 ? 'A2' : v.re3 ? 'RE3' : '';
         const dxCat = v.diagnosis_category || '';
         const dxCodes = Array.isArray(v.diagnosis_codes) ? v.diagnosis_codes.join(', ') : (v.diagnosis_codes || '');
         const dx = dxCat ? (dxCat + ': ' + dxCodes) : (dxCodes || '—');
@@ -3994,7 +3995,7 @@ async function exportDailyPDF() {
           <td>${v.visit_date || '—'}</td>
           <td>${esc(patCode)}</td>
           <td><strong>${esc(name)}</strong></td>
-          <td>${v.office_visit || ''}</td>
+          <td>${officeVisit}</td>
           <td>${v.manipulation_type || '—'}</td>
           <td>${te}</td>
           <td class="dx">${esc(dx)}</td>

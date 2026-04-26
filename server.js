@@ -6,7 +6,10 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const { createClient } = require('@supabase/supabase-js');
+const { Resend } = require('resend');
 const path = require('path');
+
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 const app = express();
 
@@ -142,9 +145,72 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(403).json({ error: 'Invalid email or password' });
   }
 
-  const token = await createSession(data.email, data.role);
+  // Generate 6-digit verification code
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 min
 
-  res.json({ token, email: data.email, role: data.role });
+  // Invalidate old codes
+  await supabase.from('verification_codes').update({ used: true }).eq('email', trimmed).eq('used', false);
+
+  // Store new code
+  await supabase.from('verification_codes').insert([{ email: trimmed, code, expires_at: expiresAt }]);
+
+  // Send email
+  if (resend) {
+    try {
+      await resend.emails.send({
+        from: 'ChiroTrax <noreply@chirotrax.com>',
+        to: [trimmed],
+        subject: 'Your ChiroTrax verification code',
+        html: `<div style="font-family:Arial,sans-serif;max-width:400px;margin:0 auto;padding:20px">
+          <h2 style="color:#1e3a5f">ChiroTrax Verification</h2>
+          <p>Your login verification code is:</p>
+          <div style="font-size:32px;font-weight:700;letter-spacing:6px;padding:16px;background:#f1f5f9;border-radius:8px;text-align:center;color:#1e3a5f">${code}</div>
+          <p style="color:#64748b;font-size:13px;margin-top:16px">This code expires in 5 minutes. If you didn't request this, ignore this email.</p>
+        </div>`
+      });
+    } catch(e) { console.error('Email send error:', e); }
+  } else {
+    console.log(`VERIFICATION CODE for ${trimmed}: ${code}`);
+  }
+
+  res.json({ needsVerification: true, email: data.email });
+});
+
+// Verify email code
+app.post('/api/auth/verify-code', async (req, res) => {
+  const { email, code } = req.body;
+  if (!email || !code) return res.status(400).json({ error: 'Email and code required' });
+
+  const trimmed = email.trim().toLowerCase();
+
+  const { data, error } = await supabase
+    .from('verification_codes')
+    .select('*')
+    .eq('email', trimmed)
+    .eq('code', code.trim())
+    .eq('used', false)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error || !data) {
+    return res.status(403).json({ error: 'Invalid or expired code' });
+  }
+
+  // Mark code as used
+  await supabase.from('verification_codes').update({ used: true }).eq('id', data.id);
+
+  // Get user role
+  const { data: user } = await supabase
+    .from('approved_users')
+    .select('email, role')
+    .eq('email', trimmed)
+    .single();
+
+  const token = await createSession(user.email, user.role || 'staff');
+  res.json({ token, email: user.email, role: user.role });
 });
 
 // Set password (first-time setup)

@@ -980,6 +980,19 @@
       <button class="login-link" onclick="showLoginView()">Back to sign in</button>
     </div>
 
+    <!-- Verify Code -->
+    <div id="verify-view" style="display:none">
+      <p class="login-sub">Enter the 6-digit code sent to your email</p>
+      <form id="verify-form" onsubmit="handleVerifyCode(event)">
+        <input type="hidden" id="verify-email"/>
+        <input type="text" id="verify-code" placeholder="000000" required maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" style="text-align:center;font-size:24px;letter-spacing:8px;font-weight:700"/>
+        <button type="submit" class="login-btn" id="verify-btn">Verify</button>
+      </form>
+      <div class="login-error" id="verify-error"></div>
+      <p style="font-size:12px;color:var(--ink3);margin-top:10px">Code expires in 5 minutes</p>
+      <button class="login-link" onclick="showLoginView()">Back to sign in</button>
+    </div>
+
     <!-- Set Password (first-time) -->
     <div id="setup-view" style="display:none">
       <p class="login-sub">Create your password</p>
@@ -2199,6 +2212,7 @@ function showLoginView() {
   document.getElementById('forgot-view').style.display = 'none';
   document.getElementById('reset-view').style.display = 'none';
   document.getElementById('request-view').style.display = 'none';
+  document.getElementById('verify-view').style.display = 'none';
 }
 function showRequestAccess() {
   document.getElementById('login-view').style.display = 'none';
@@ -2246,6 +2260,17 @@ async function handleLogin(e) {
     // First-time user needs to set password
     if (data.needsPassword) {
       showSetupView(data.email);
+      return;
+    }
+
+    // Email verification required
+    if (data.needsVerification) {
+      document.getElementById('login-view').style.display = 'none';
+      document.getElementById('verify-view').style.display = '';
+      document.getElementById('verify-email').value = data.email;
+      document.getElementById('verify-code').value = '';
+      document.getElementById('verify-error').textContent = '';
+      document.getElementById('verify-code').focus();
       return;
     }
 
@@ -2387,6 +2412,38 @@ async function handleRequestAccess(e) {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Request Access';
+  }
+}
+
+async function handleVerifyCode(e) {
+  e.preventDefault();
+  const btn = document.getElementById('verify-btn');
+  const errEl = document.getElementById('verify-error');
+  const email = document.getElementById('verify-email').value;
+  const code = document.getElementById('verify-code').value.trim();
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Verifying...';
+
+  try {
+    const res = await fetch('/api/auth/verify-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Verification failed');
+
+    authToken = data.token;
+    authEmail = data.email;
+    sessionStorage.setItem('chirotrax_token', authToken);
+    sessionStorage.setItem('chirotrax_email', authEmail);
+    showApp();
+  } catch (err) {
+    errEl.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Verify';
   }
 }
 

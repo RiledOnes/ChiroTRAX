@@ -535,6 +535,14 @@
     .badge-claim_created { background: rgba(142,68,173,0.12); color: #8e44ad; }
     .badge-submitted { background: rgba(67,160,71,0.15); color: #2e7d32; }
     .badge-processed { background: rgba(67,160,71,0.25); color: #1b5e20; }
+    .badge-logged { background: rgba(230,126,34,0.12); color: #c76b10; }
+    .badge-prev_billed { background: rgba(158,158,158,0.15); color: #616161; }
+    .badge-already_entered { background: rgba(158,158,158,0.15); color: #616161; }
+    .badge-payment_received { background: rgba(67,160,71,0.25); color: #1b5e20; }
+    .badge-payment_partial { background: rgba(255,193,7,0.15); color: #f57f17; }
+    .badge-denied { background: rgba(244,67,54,0.12); color: #c62828; }
+    .badge-denied_resubmitted { background: rgba(255,152,0,0.15); color: #e65100; }
+    .badge-closed { background: rgba(158,158,158,0.1); color: #9e9e9e; }
 
     /* ---- DAILY INTAKE TABS ---- */
     .intake-tabs {
@@ -1155,9 +1163,9 @@
                   <th>Patient ID</th>
                   <th>Name</th>
                   <th>Svc Date</th>
-                  <th>Status</th>
                   <th>Manipulation</th>
                   <th>Exercises</th>
+                  <th>Workflow</th>
                   <th>Notes</th>
                   <th>Actions</th>
                 </tr>
@@ -2825,13 +2833,14 @@ function renderVisitRows(tbodyId, visits, compact) {
   }
   tbody.innerHTML = visits.map(v => {
     const svcDate = v.is_backdated ? `<span style="color:#d97706;font-weight:600" title="Backdated">${v.visit_date}</span>` : `<span class="muted">${v.visit_date || '—'}</span>`;
+    const wfLabel = formatStage(v.workflow_status || 'intake');
     return `<tr>
       <td><strong>${v.patients?.patient_code || '—'}</strong></td>
       <td>${v.patients?.last_name || ''}, ${v.patients?.first_name || ''}</td>
       <td>${svcDate}</td>
-      <td>${badge(v.patient_status)}</td>
       <td>${badge(v.manipulation_type)}</td>
       <td>${v.therapeutic_exercises != null ? v.therapeutic_exercises : '<span class="muted">—</span>'}</td>
+      <td><span class="badge badge-${v.workflow_status || 'intake'}">${wfLabel}</span></td>
       <td class="muted">${v.notes || '—'}</td>
       ${compact ? '' : `<td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openVisitModal(${JSON.stringify(v)})'>Edit</button></div></td>`}
     </tr>`;
@@ -3191,7 +3200,7 @@ function esc(str) {
 }
 
 function formatStage(s) {
-  const map = { intake: 'Intake', entered_ebs: 'Entered EBS', claim_created: 'Claim Created', submitted: 'Submitted', processed: 'Processed' };
+  const map = { intake: 'Intake', logged: 'Logged', entered_ebs: 'Entered EBS', claim_created: 'Claim Created', submitted: 'Submitted', processed: 'Processed', prev_billed: 'Prev Billed', already_entered: 'Already Entered', payment_received: 'Paid', payment_partial: 'Partial', denied: 'Denied', denied_resubmitted: 'Resubmitted', closed: 'Closed' };
   return map[s] || s;
 }
 

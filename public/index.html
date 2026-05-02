@@ -3948,7 +3948,7 @@ async function exportDailyPDF() {
 
       .sec-lbl { font-size: 9.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: #8a96a3; margin-bottom: 8px; flex-shrink: 0; display: block; }
 
-      .visits-wrap { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+      .visits-wrap { flex: 0 0 auto; overflow: visible; }
       table.visits { table-layout: fixed; border-collapse: collapse; font-size: 10.5px; width: 100%; }
       table.visits col.c-id  { width: 10%; }
       table.visits col.c-pn  { width: 8%; }
@@ -3960,7 +3960,7 @@ async function exportDailyPDF() {
       table.visits col.c-bll { width: 7%; }
       table.visits col.c-st  { width: 8%; }
       table.visits th { font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: #8a96a3; border-bottom: 0.5px solid #d4dae2; padding: 0 6px 7px; text-align: left; white-space: nowrap; }
-      table.visits td { padding: 5px 6px; border-bottom: 0.5px solid #f0f2f5; vertical-align: middle; overflow: hidden; }
+      table.visits td { padding: 3px 5px; border-bottom: 0.5px solid #f0f2f5; vertical-align: middle; overflow: hidden; }
       table.visits tbody tr:nth-child(odd) td { background: #fafbfc; }
       .td-id  { font-family: 'DM Mono', monospace; font-size: 9px; color: #8a96a3; }
       .td-pn  { font-family: 'DM Mono', monospace; font-size: 9.5px; color: #5a6a7a; }
@@ -3969,7 +3969,7 @@ async function exportDailyPDF() {
       .dx-lbl { font-size: 9px; font-weight: 500; color: #5a6a7a; }
       .dx-cod { font-family: 'DM Mono', monospace; font-size: 8px; color: #8a96a3; white-space: normal; word-break: break-all; }
 
-      .capture-section { flex: 0 0 auto; min-height: 150px; max-height: 38%; margin-top: 8px; display: flex; flex-direction: column; page-break-inside: avoid; overflow: hidden; }
+      .capture-section { flex: 0 0 auto; height: 155px; margin-top: 8px; display: flex; flex-direction: column; overflow: hidden; }
       .capture-section .cap-img { width: 100%; height: 100%; object-fit: contain; object-position: top left; display: block; }
       .cap-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: #c5d0dc; font-size: 9px; border: 0.5px solid #e4e8ee; border-radius: 4px; }
     </style></head><body>`;

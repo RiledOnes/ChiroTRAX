@@ -3901,7 +3901,7 @@ async function exportDailyPDF() {
     <title>Daily Report - ${date}</title>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
-      * { box-sizing: border-box; margin: 0; padding: 0; }
+      * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       @page { size: 277mm 210mm; margin: 0; }
       html, body { font-family: 'DM Sans', Arial, sans-serif; color: #1a2e4a; width: 277mm; height: 210mm; overflow: hidden; }
       body { display: flex; flex-direction: column; padding: 3mm; }

@@ -3923,8 +3923,8 @@ async function exportDailyPDF() {
       body { display: flex; flex-direction: column; }
 
       .main { display: flex; gap: 8px; flex: 1; min-height: 0; }
-      .col-left  { width: 40%; display: flex; flex-direction: column; gap: 6px; min-width: 0; overflow: hidden; }
-      .col-right { width: 60%; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+      .col-left  { width: 35%; display: flex; flex-direction: column; gap: 6px; min-width: 0; overflow: hidden; }
+      .col-right { width: 65%; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 
       .hdr { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 8px; border-bottom: 1.5px solid #1a2e4a; margin-bottom: 10px; flex-shrink: 0; }
       .hdr-l { display: flex; flex-direction: column; gap: 1px; }
@@ -3968,19 +3968,24 @@ async function exportDailyPDF() {
       .dx-lbl { font-size: 9px; font-weight: 500; color: #5a6a7a; }
       .dx-cod { font-family: 'DM Mono', monospace; font-size: 8px; color: #8a96a3; white-space: normal; word-break: break-all; }
 
-      .total-row { border-top: 1.5px solid #1a2e4a; padding-top: 10px; margin-top: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: baseline; flex-shrink: 0; }
-      .tot-l   { font-size: 10px; text-transform: uppercase; color: #7a8a9a; }
-      .tot-sub { font-size: 9.5px; color: #a0aab4; margin-left: 6px; }
-      .tot-amt { font-size: 18px; font-weight: 300; color: #1a2e4a; }
-
-      .capture-section { flex: 1; min-height: 0; display: flex; flex-direction: column; page-break-inside: avoid; overflow: hidden; }
+.capture-section { flex: 1; min-height: 0; display: flex; flex-direction: column; page-break-inside: avoid; overflow: hidden; }
       .capture-section .cap-img { width: 100%; flex: 1; min-height: 0; object-fit: contain; object-position: top left; display: block; }
       .cap-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: #c5d0dc; font-size: 9px; border: 0.5px solid #e4e8ee; border-radius: 4px; }
     </style></head><body>`;
 
+    // Header — full page width, above two-column layout
+    html += `<div class="hdr">
+      <div class="hdr-l">
+        <span class="hdr-svc">Service Date</span>
+        <span class="hdr-date">${dateLabel}</span>
+        <span class="hdr-title">Daily Intake Report</span>
+      </div>
+      <span class="status-pill">COMPLETE</span>
+    </div>`;
+
     html += `<div class="main">`;
 
-    // ═══ LEFT COLUMN (40%): Notes + Intake Form Image ═══
+    // ═══ LEFT COLUMN (35%): Notes + Intake Form Image ═══
     html += `<div class="col-left">`;
     const notesVisits = visits.filter(v => v.notes && v.notes.trim()).slice(0, 4);
     html += `<div class="notes-box">`;
@@ -3998,18 +4003,8 @@ async function exportDailyPDF() {
     }
     html += `</div>`;
 
-    // ═══ RIGHT COLUMN (60%): Header + Stats + Table + Total + Charge Capture ═══
+    // ═══ RIGHT COLUMN (65%): Stats + Table + Charge Capture ═══
     html += `<div class="col-right">`;
-
-    // Header (date + status pill, with bottom border rule)
-    html += `<div class="hdr">
-      <div class="hdr-l">
-        <span class="hdr-svc">Service Date</span>
-        <span class="hdr-date">${dateLabel}</span>
-        <span class="hdr-title">Daily Intake Report</span>
-      </div>
-      <span class="status-pill">COMPLETE</span>
-    </div>`;
 
     // Stats row — 6 equal cards
     html += `<div class="stats-row">
@@ -4056,12 +4051,6 @@ async function exportDailyPDF() {
       </tr>`;
     });
     html += `</tbody></table>`;
-
-    // Total row
-    html += `<div class="total-row">
-      <span class="tot-l">Total<span class="tot-sub">${sameDateCount} same-day · ${backDateCount} backdated</span></span>
-      <span class="tot-amt">$${grandTotal.toLocaleString()}</span>
-    </div>`;
 
     // Charge Capture — fills remaining vertical space
     html += `<div class="capture-section">`;

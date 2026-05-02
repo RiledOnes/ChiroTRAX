@@ -3874,155 +3874,202 @@ async function exportDailyPDF() {
       try { const full = await api('GET', `/api/intake-images/${img.id}`); captureImageData.push(full); } catch(e) {}
     }
 
+    // Pre-compute grand total for stats card (needed before HTML building)
+    let grandTotal = 0;
+    visits.forEach(v => { grandTotal += calcBilled(v); });
+
+    // Badge helpers — generate inline HTML strings
+    const _fBadge = v => {
+      if (v.a2)  return `<span style="background:#fef3e2;color:#a05e10;border:0.5px solid #f5c97a;font-size:9px;font-weight:500;padding:2px 6px;border-radius:4px">A2</span>`;
+      if (v.re3) return `<span style="background:#eef0fd;color:#3a47a8;border:0.5px solid #b0bbf0;font-size:9px;font-weight:500;padding:2px 6px;border-radius:4px">RE3</span>`;
+      return `<span style="color:#c5d0dc">—</span>`;
+    };
+    const _mBadge = m => {
+      if (m === 'E1') return `<span style="background:#f0f6fe;color:#1a5fa8;border:0.5px solid #a4c8f5;font-size:9px;font-weight:500;padding:2px 6px;border-radius:4px">E1</span>`;
+      if (m === 'E2') return `<span style="background:#f7f0fc;color:#6b28a0;border:0.5px solid #d0a8f0;font-size:9px;font-weight:500;padding:2px 6px;border-radius:4px">E2</span>`;
+      return `<span style="color:#c5d0dc">—</span>`;
+    };
+    const _tBadge = te => {
+      const n = typeof te === 'number' ? te : (parseInt(String(te ?? '').replace(/\D/g, '')) || 0);
+      if (!n) return `<span style="color:#c5d0dc">—</span>`;
+      const lbl = n > 1 ? `TE×${n}` : 'TE';
+      return `<span style="background:#f0faf5;color:#1a6645;border:0.5px solid #9ddfc0;font-size:9px;font-weight:500;padding:2px 6px;border-radius:4px;font-family:'DM Mono',monospace">${lbl}</span>`;
+    };
+    const _sBadge = ws => {
+      const SM = {
+        logged:        { label: 'Logged',      bg: '#f7f8fa', c: '#5a6a7a', br: '#c5d0dc' },
+        centered_ebs:  { label: 'EBS ✓',  bg: '#eaf7f0', c: '#1a6645', br: '#9ddfc0' },
+        entered_ebs:   { label: 'EBS ✓',  bg: '#eaf7f0', c: '#1a6645', br: '#9ddfc0' },
+        claim_created: { label: 'Claim',        bg: '#eef0fd', c: '#3a47a8', br: '#b0bbf0' },
+        pending:       { label: 'Pending',      bg: '#fef3e2', c: '#a05e10', br: '#f5c97a' },
+        prev_billed:   { label: 'Prev Billed',  bg: '#fef3e2', c: '#a05e10', br: '#f5c97a' },
+      };
+      const s = SM[ws] || { label: ws || '—', bg: '#f7f8fa', c: '#5a6a7a', br: '#c5d0dc' };
+      return `<span style="background:${s.bg};color:${s.c};border:0.5px solid ${s.br};font-size:8.5px;font-weight:500;padding:2px 6px;border-radius:4px;white-space:nowrap">${esc(s.label)}</span>`;
+    };
+
     // Build single-page landscape PDF
     let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
     <title>Daily Report - ${date}</title>
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      html, body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; font-size: 8px; width: 100%; height: 100%; overflow: hidden; }
-      @page { size: letter landscape; margin: 6mm; }
+      html, body { font-family: 'DM Sans', Arial, sans-serif; color: #1a2e4a; width: 100%; height: 100%; overflow: hidden; }
+      @page { size: letter landscape; margin: 3mm; }
       @media print {
-        html, body { width: 269mm; height: 204mm; overflow: hidden; }
-        .main { height: 190mm !important; }
-        .capture-section img, .intake-img-wrap img { page-break-inside: avoid; }
+        html, body { width: 277mm; height: 210mm; overflow: hidden; }
+        .intake-img-wrap, .capture-section { page-break-inside: avoid; overflow: hidden; }
       }
+      body { display: flex; flex-direction: column; }
 
-      .header { display: flex; justify-content: space-between; align-items: center; background: #1e3a5f; color: white; padding: 4px 10px; font-weight: 700; font-size: 10px; }
-      .header .status { background: #22c55e; color: white; padding: 1px 8px; border-radius: 3px; font-size: 9px; }
+      .main { display: flex; gap: 8px; flex: 1; min-height: 0; }
+      .col-left  { width: 40%; display: flex; flex-direction: column; gap: 6px; min-width: 0; overflow: hidden; }
+      .col-right { width: 60%; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 
-      .main { display: flex; gap: 6px; margin-top: 4px; height: calc(100vh - 30px); }
+      .hdr { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 8px; border-bottom: 1.5px solid #1a2e4a; margin-bottom: 10px; flex-shrink: 0; }
+      .hdr-l { display: flex; flex-direction: column; gap: 1px; }
+      .hdr-svc   { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; color: #8a96a3; }
+      .hdr-date  { font-size: 21px; font-weight: 300; color: #1a2e4a; line-height: 1.05; }
+      .hdr-title { font-size: 10px; font-weight: 500; text-transform: uppercase; color: #8a96a3; }
+      .status-pill { background: #eaf7f0; color: #1a6645; border: 0.5px solid #9ddfc0; border-radius: 20px; padding: 3px 12px; font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
 
-      /* Left column: notes + intake form image (40%) */
-      .col-left { width: 40%; display: flex; flex-direction: column; gap: 3px; min-width: 0; overflow: hidden; }
-      .intake-img-wrap { flex: 1; min-height: 0; position: relative; border: 1px solid #ccc; background: #f9f9f9; overflow: hidden; }
-      .intake-img-wrap img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; object-position: top left; }
-      .col-left .img-placeholder { flex: 1; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; color: #999; font-size: 9px; }
+      .notes-box { font-size: 8px; line-height: 1.4; color: #3a4a5a; flex-shrink: 0; overflow: hidden; }
 
-      /* Right column: notes + record count + digitalized list + charge capture (60%) */
-      .col-right { width: 60%; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .intake-img-wrap { flex: 1; min-height: 0; overflow: hidden; page-break-inside: avoid; }
+      .intake-img-wrap img { width: 100%; height: 100%; object-fit: contain; object-position: top left; display: block; }
+      .img-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: #c5d0dc; font-size: 9px; border: 0.5px solid #e4e8ee; border-radius: 4px; }
 
-      .section-label { background: #2563eb; color: white; padding: 2px 8px; font-weight: 700; font-size: 8px; display: block; flex-shrink: 0; }
-      .section-label.green { background: #16a34a; }
-      .section-label.purple { background: #7c3aed; }
-      .section-label.complete::after { content: 'COMPLETE'; float: right; }
+      .stats-row { display: flex; gap: 10px; flex-shrink: 0; margin-bottom: 10px; }
+      .stat-card { flex: 1; background: #f7f8fa; border-radius: 8px; border: 0.5px solid #e4e8ee; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+      .stat-lbl { font-size: 9.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; color: #8a96a3; }
+      .stat-val { font-size: 20px; font-weight: 300; color: #1a2e4a; line-height: 1.1; }
+      .stat-val.billed { color: #1a6645; }
+      .stat-sub { font-size: 9.5px; color: #a0aab4; }
 
-      .notes-box { border: 1px solid #ccc; padding: 3px 6px; font-size: 7px; line-height: 1.3; flex-shrink: 0; }
+      .sec-lbl { font-size: 9.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: #8a96a3; margin-bottom: 8px; flex-shrink: 0; display: block; }
 
-      .count-row { display: flex; gap: 6px; flex-shrink: 0; }
-      .count-box { border: 1px solid #ccc; padding: 3px 6px; font-size: 8px; flex: 1; }
-      .count-box table { width: 100%; border-collapse: collapse; }
-      .count-box td { padding: 1px 4px; }
-      .count-box td:last-child { text-align: right; font-weight: 700; }
+      table.visits { table-layout: fixed; border-collapse: collapse; font-size: 10.5px; width: 100%; flex-shrink: 0; }
+      table.visits col.c-id  { width: 10%; }
+      table.visits col.c-pn  { width: 8%; }
+      table.visits col.c-pat { width: 17%; }
+      table.visits col.c-flg { width: 8%; }
+      table.visits col.c-mnp { width: 7%; }
+      table.visits col.c-te  { width: 8%; }
+      table.visits col.c-dx  { width: 27%; }
+      table.visits col.c-bll { width: 7%; }
+      table.visits col.c-st  { width: 8%; }
+      table.visits th { font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: #8a96a3; border-bottom: 0.5px solid #d4dae2; padding: 0 6px 7px; text-align: left; white-space: nowrap; }
+      table.visits td { padding: 5px 6px; border-bottom: 0.5px solid #f0f2f5; vertical-align: middle; overflow: hidden; }
+      table.visits tbody tr:nth-child(odd) td { background: #fafbfc; }
+      .td-id  { font-family: 'DM Mono', monospace; font-size: 9px; color: #8a96a3; }
+      .td-pn  { font-family: 'DM Mono', monospace; font-size: 9.5px; color: #5a6a7a; }
+      .td-pat { font-size: 10.5px; font-weight: 500; color: #1a2e4a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }
+      .td-bll { font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500; color: #1a4a2e; }
+      .dx-lbl { font-size: 9px; font-weight: 500; color: #5a6a7a; }
+      .dx-cod { font-family: 'DM Mono', monospace; font-size: 8px; color: #8a96a3; white-space: normal; word-break: break-all; }
 
-      table.visits { width: 100%; border-collapse: collapse; font-size: 6.5px; }
-      table.visits th { background: #2563eb; color: white; padding: 1px 2px; text-align: left; font-weight: 600; font-size: 6.5px; white-space: nowrap; line-height: 1.1; }
-      table.visits td { border: 1px solid #ddd; padding: 0px 2px; font-size: 6.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; line-height: 1.05; }
-      table.visits td.dx { white-space: normal; font-size: 5.5px; max-width: 110px; line-height: 1.1; }
-      table.visits tr:nth-child(even) { background: #f8fafc; }
-      table.visits .highlight { background: #bfdbfe; font-weight: 600; }
+      .total-row { border-top: 1.5px solid #1a2e4a; padding-top: 10px; margin-top: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: baseline; flex-shrink: 0; }
+      .tot-l   { font-size: 10px; text-transform: uppercase; color: #7a8a9a; }
+      .tot-sub { font-size: 9.5px; color: #a0aab4; margin-left: 6px; }
+      .tot-amt { font-size: 18px; font-weight: 300; color: #1a2e4a; }
 
-      .total-row { text-align: right; font-weight: 700; font-size: 9px; padding: 2px 6px; border-top: 2px solid #333; flex-shrink: 0; }
-
-      /* Charge capture at bottom of right column */
-      .capture-section { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 3px; }
-      .capture-section img { width: 100%; flex: 1; min-height: 0; object-fit: contain; object-position: top left; border: 1px solid #ccc; background: #f9f9f9; }
-      .capture-placeholder { flex: 1; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; color: #999; font-size: 9px; }
+      .capture-section { flex: 1; min-height: 0; display: flex; flex-direction: column; page-break-inside: avoid; overflow: hidden; }
+      .capture-section .cap-img { width: 100%; flex: 1; min-height: 0; object-fit: contain; object-position: top left; display: block; }
+      .cap-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: #c5d0dc; font-size: 9px; border: 0.5px solid #e4e8ee; border-radius: 4px; }
     </style></head><body>`;
-
-    // ── HEADER BAR ──
-    html += `<div class="header">
-      <span>${dateLabel}</span>
-      <span>DAILY INTAKE REPORT</span>
-      <span>STATUS: <span class="status">COMPLETE</span></span>
-    </div>`;
 
     html += `<div class="main">`;
 
     // ═══ LEFT COLUMN (40%): Notes + Intake Form Image ═══
     html += `<div class="col-left">`;
-    const notesVisits = visits.filter(v => v.notes && v.notes.trim());
-    html += `<div class="section-label complete">NOTES</div>`;
+    const notesVisits = visits.filter(v => v.notes && v.notes.trim()).slice(0, 4);
     html += `<div class="notes-box">`;
     if (notesVisits.length) {
       notesVisits.forEach(v => {
         const name = v.patients ? (v.patients.first_name + ' ' + v.patients.last_name).trim() : (v.patient_name || '');
-        html += `${esc(name)} - ${esc(v.notes)}<br/>`;
+        html += `${esc(name)} — ${esc(v.notes)}<br/>`;
       });
-    } else { html += `&nbsp;`; }
+    } else { html += `<span style="color:#c5d0dc;font-size:8px">No notes</span>`; }
     html += `</div>`;
-    html += `<div class="section-label purple complete">INTAKE FORM</div>`;
     if (intakeImageData.length) {
       html += `<div class="intake-img-wrap"><img src="${intakeImageData[0].image_data}" alt="Intake Form"/></div>`;
     } else {
-      html += `<div class="img-placeholder">No intake form</div>`;
+      html += `<div class="img-placeholder">No intake form image</div>`;
     }
     html += `</div>`;
 
-    // ═══ RIGHT COLUMN (60%): Record Count + Digitalized List + Charge Capture ═══
+    // ═══ RIGHT COLUMN (60%): Header + Stats + Table + Total + Charge Capture ═══
     html += `<div class="col-right">`;
 
-    // Record Count Check — inline row
-    html += `<div class="section-label green complete">RECORD COUNT CHECK</div>`;
-    html += `<div class="count-row">
-      <div class="count-box"><table>
-        <tr><td>TOTAL</td><td>${visits.length}</td></tr>
-        <tr><td>SAME DATE</td><td>${sameDateCount}</td></tr>
-        <tr><td>BACK DATE</td><td>${backDateCount}</td></tr>
-      </table></div>
-      <div class="count-box"><table>
-        <tr><td>NEW PATIENTS</td><td>${newPt}</td></tr>
-        <tr><td>RETURNING</td><td>${returning || '—'}</td></tr>
-      </table></div>
-      <div class="count-box"><table>
-        <tr><td>E1 MANIP</td><td>${e1}</td></tr>
-        <tr><td>E2 MANIP</td><td>${e2}</td></tr>
-      </table></div>
+    // Header (date + status pill, with bottom border rule)
+    html += `<div class="hdr">
+      <div class="hdr-l">
+        <span class="hdr-svc">Service Date</span>
+        <span class="hdr-date">${dateLabel}</span>
+        <span class="hdr-title">Daily Intake Report</span>
+      </div>
+      <span class="status-pill">COMPLETE</span>
     </div>`;
 
-    // Digitalized List
-    html += `<div class="section-label complete">DIGITALIZED LIST</div>`;
-    let grandTotal = 0;
-    if (visits.length) {
-      html += `<table class="visits"><thead><tr>
-        <th>ID</th><th>SVC DATE</th><th>PAT NO</th><th>PATIENT NAME</th><th>A2/RE3</th>
-        <th>E1/E2</th><th>TE</th><th>DIAGNOSIS</th><th>BILLING</th><th>STATUS</th>
-      </tr></thead><tbody>`;
-      visits.forEach((v, i) => {
-        const name = v.patients ? (v.patients.first_name + ' ' + v.patients.last_name).trim().toUpperCase() : (v.patient_name || '—').toUpperCase();
-        const patCode = v.patients?.patient_code || '—';
-        const intId = v.intake_id || String(i + 1).padStart(2, '0');
-        const officeVisit = v.a2 ? 'A2' : v.re3 ? 'RE3' : '';
-        const dxCat = v.diagnosis_category || '';
-        const dxCodes = Array.isArray(v.diagnosis_codes) ? v.diagnosis_codes.join(', ') : (v.diagnosis_codes || '');
-        const dx = dxCat ? (dxCat + ': ' + dxCodes) : (dxCodes || '—');
-        const te = v.therapeutic_exercises != null ? ('TE ' + v.therapeutic_exercises) : '—';
-        const billed = calcBilled(v);
-        grandTotal += billed;
-        const isHighlight = v.new_patient || v.no_fault;
-        html += `<tr${isHighlight ? ' class="highlight"' : ''}>
-          <td>${esc(intId)}</td>
-          <td>${v.visit_date || '—'}</td>
-          <td>${esc(patCode)}</td>
-          <td><strong>${esc(name)}</strong></td>
-          <td>${officeVisit}</td>
-          <td>${v.manipulation_type || '—'}</td>
-          <td>${te}</td>
-          <td class="dx">${esc(dx)}</td>
-          <td><strong>$${billed}</strong></td>
-          <td>${v.workflow_status ? formatStage(v.workflow_status) : '—'}</td>
-        </tr>`;
-      });
-      html += `</tbody></table>`;
-    }
-    html += `<div class="total-row">TOTAL &nbsp; ${visits.length} &nbsp; (${sameDateCount} same-day + ${backDateCount} backdated) &nbsp;&nbsp; BILLED &nbsp; $${grandTotal.toLocaleString()}</div>`;
+    // Stats row — 6 equal cards
+    html += `<div class="stats-row">
+      <div class="stat-card"><span class="stat-lbl">Total</span><span class="stat-val">${visits.length}</span></div>
+      <div class="stat-card"><span class="stat-lbl">Same Day</span><span class="stat-val">${sameDateCount}</span><span class="stat-sub">${backDateCount} backdated</span></div>
+      <div class="stat-card"><span class="stat-lbl">New</span><span class="stat-val">${newPt}</span></div>
+      <div class="stat-card"><span class="stat-lbl">E1</span><span class="stat-val">${e1}</span><span class="stat-sub">98940</span></div>
+      <div class="stat-card"><span class="stat-lbl">E2</span><span class="stat-val">${e2}</span><span class="stat-sub">98941</span></div>
+      <div class="stat-card"><span class="stat-lbl">Billed</span><span class="stat-val billed">$${grandTotal.toLocaleString()}</span></div>
+    </div>`;
 
-    // Charge Capture — fills remaining space at bottom of right column
+    // Digitalized Records table
+    html += `<span class="sec-lbl">Digitalized Records</span>`;
+    html += `<table class="visits"><colgroup>
+      <col class="c-id"/><col class="c-pn"/><col class="c-pat"/><col class="c-flg"/>
+      <col class="c-mnp"/><col class="c-te"/><col class="c-dx"/><col class="c-bll"/><col class="c-st"/>
+    </colgroup><thead><tr>
+      <th>ID</th><th>Pat No</th><th>Patient</th><th>Flag</th>
+      <th>Manip</th><th>TE</th><th>Diagnosis</th><th>Billed</th><th>Status</th>
+    </tr></thead><tbody>`;
+    visits.forEach((v, i) => {
+      const name = v.patients ? (v.patients.first_name + ' ' + v.patients.last_name).trim().toUpperCase() : (v.patient_name || '—').toUpperCase();
+      const patCode = v.patients?.patient_code || '—';
+      const intId = v.intake_id || String(i + 1).padStart(2, '0');
+      const dxCat = v.diagnosis_category || '';
+      const dxCodes = Array.isArray(v.diagnosis_codes) ? v.diagnosis_codes.join(' ') : (v.diagnosis_codes || '');
+      let dxHTML;
+      if (dxCat === 'CUSTOM') {
+        dxHTML = `<div class="dx-lbl">${esc(dxCat)}</div><div class="dx-cod">${esc(dxCodes)}</div>`;
+      } else {
+        dxHTML = dxCat ? `<div class="dx-lbl">${esc(dxCat)}</div>` : `<span style="color:#c5d0dc">—</span>`;
+      }
+      const billed = calcBilled(v);
+      html += `<tr>
+        <td class="td-id">${esc(intId)}</td>
+        <td class="td-pn">${esc(patCode)}</td>
+        <td class="td-pat">${esc(name)}</td>
+        <td>${_fBadge(v)}</td>
+        <td>${_mBadge(v.manipulation_type)}</td>
+        <td>${_tBadge(v.therapeutic_exercises)}</td>
+        <td>${dxHTML}</td>
+        <td class="td-bll">$${billed}</td>
+        <td>${_sBadge(v.workflow_status)}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+
+    // Total row
+    html += `<div class="total-row">
+      <span class="tot-l">Total<span class="tot-sub">${sameDateCount} same-day · ${backDateCount} backdated</span></span>
+      <span class="tot-amt">$${grandTotal.toLocaleString()}</span>
+    </div>`;
+
+    // Charge Capture — fills remaining vertical space
     html += `<div class="capture-section">`;
-    html += `<div class="section-label complete">CHARGE CAPTURE REPORT</div>`;
+    html += `<span class="sec-lbl">Charge Capture</span>`;
     if (captureImageData.length) {
-      html += `<img src="${captureImageData[0].image_data}" alt="Charge Capture"/>`;
+      html += `<img class="cap-img" src="${captureImageData[0].image_data}" alt="Charge Capture"/>`;
     } else {
-      html += `<div class="capture-placeholder">No capture image</div>`;
+      html += `<div class="cap-placeholder">No charge capture image</div>`;
     }
     html += `</div>`;
 

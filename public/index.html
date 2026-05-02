@@ -3901,7 +3901,7 @@ async function exportDailyPDF() {
     <style>
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      html, body { font-family: 'DM Sans', Arial, sans-serif; color: #1a2e4a; overflow: hidden; }
+      html, body { font-family: 'DM Sans', Arial, sans-serif; color: #1a2e4a; width: 100%; height: 100%; overflow: hidden; }
       @page { size: letter landscape; margin: 3mm; }
       @media print { html, body { width: 277mm; height: 210mm; overflow: hidden; } }
 
@@ -3977,7 +3977,7 @@ async function exportDailyPDF() {
       .capture-section { flex: 1 1 auto; min-height: 140px; margin-top: 8px; display: flex; flex-direction: column; overflow: hidden; page-break-inside: avoid; }
       .cap-img { width: 100%; height: 100%; object-fit: contain; object-position: top left; display: block; }
       .cap-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: #c5d0dc; font-size: 9px; border: 0.5px solid #e4e8ee; border-radius: 4px; }
-    </style></head><body style="display:flex;flex-direction:column;height:100vh">`;
+    </style></head><body style="display:flex;flex-direction:column;height:100%">`;
 
     // ── HEADER ──
     html += `<div class="hdr-top">

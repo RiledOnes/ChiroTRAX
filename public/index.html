@@ -4008,7 +4008,13 @@ async function exportDailyPDF() {
       <th>Manip</th><th>TE</th><th>Diagnosis</th><th>Billed</th><th>Status</th>
     </tr></thead><tbody>`;
 
-    visits.forEach((v, i) => {
+    const sortedVisits = [...visits].sort((a, b) => {
+      const aId = parseInt(a.intake_id) || 0;
+      const bId = parseInt(b.intake_id) || 0;
+      return aId - bId;
+    });
+
+    sortedVisits.forEach((v, i) => {
       const name = v.patients
         ? (v.patients.first_name + ' ' + v.patients.last_name).trim().toUpperCase()
         : (v.patient_name || '—').toUpperCase();

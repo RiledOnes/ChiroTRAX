@@ -3841,9 +3841,10 @@ async function exportDailyPDF() {
   toast('Generating PDF...');
 
   try {
-    const [visits, images] = await Promise.all([
+    const [visits, images, summary] = await Promise.all([
       api('GET', `/api/visits?date=${date}`),
-      api('GET', `/api/intake-images?date=${date}`)
+      api('GET', `/api/intake-images?date=${date}`),
+      api('GET', `/api/daily-intake-summary?date=${date}`).catch(() => null)
     ]);
 
     const intakeImages = images.filter(i => i.image_tag === 'intake_form' || !i.image_tag);
@@ -3852,12 +3853,14 @@ async function exportDailyPDF() {
     const d = new Date(date + 'T12:00:00');
     const dateLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-    const sameDateCount = visits.filter(v => !v.is_backdated).length;
-    const backDateCount = visits.filter(v => v.is_backdated).length;
-    const newPt = visits.filter(v => v.new_patient).length;
-
     let grandTotal = 0;
     visits.forEach(v => { grandTotal += calcBilled(v); });
+
+    const totalRecords   = summary?.total_records       ?? visits.length;
+    const ebsCount       = summary?.entered_ebs_count   ?? 0;
+    const claimsCount    = summary?.claim_created_count ?? 0;
+    const loggedCount    = summary?.logged_count        ?? 0;
+    const intakeStatus   = summary?.intake_status       || 'PENDING';
 
     const intakeImageData = [];
     const captureImageData = [];
@@ -3963,13 +3966,13 @@ async function exportDailyPDF() {
         <span class="rpt-lbl">Daily Intake Report</span>
         <span class="date-val">${dateLabel}</span>
       </div>
-      <span class="pill">Complete</span>
+      <span class="pill">${intakeStatus}</span>
     </div>
     <div class="hdr-stats">
-      <div class="hdr-stat"><span class="sl">Total</span><span class="sv">${visits.length}</span></div>
-      <div class="hdr-stat"><span class="sl">Same Day</span><span class="sv">${sameDateCount}</span></div>
-      <div class="hdr-stat"><span class="sl">Backdated</span><span class="sv">${backDateCount}</span></div>
-      <div class="hdr-stat"><span class="sl">New Patients</span><span class="sv">${newPt}</span></div>
+      <div class="hdr-stat"><span class="sl">Total</span><span class="sv">${totalRecords}</span></div>
+      <div class="hdr-stat"><span class="sl">EBS</span><span class="sv">${ebsCount}</span></div>
+      <div class="hdr-stat"><span class="sl">Claims</span><span class="sv">${claimsCount}</span></div>
+      <div class="hdr-stat"><span class="sl">Logged</span><span class="sv">${loggedCount}</span></div>
       <div class="hdr-stat green"><span class="sl">Billed</span><span class="sv">$${grandTotal.toLocaleString()}</span></div>
     </div>`;
 
@@ -4008,11 +4011,9 @@ async function exportDailyPDF() {
       <th>Manip</th><th>TE</th><th>Diagnosis</th><th>Billed</th><th>Status</th>
     </tr></thead><tbody>`;
 
-    const sortedVisits = [...visits].sort((a, b) => {
-      const aId = parseInt(a.intake_id) || 0;
-      const bId = parseInt(b.intake_id) || 0;
-      return aId - bId;
-    });
+    const sortedVisits = [...visits].sort((a, b) =>
+      (a.intake_id || '').localeCompare(b.intake_id || '', undefined, { numeric: true, sensitivity: 'base' })
+    );
 
     sortedVisits.forEach((v, i) => {
       const name = v.patients

@@ -832,6 +832,18 @@ app.put('/api/visits/batch-advance', async (req, res) => {
 // ============================================
 
 // Get images for a business date
+app.get('/api/daily-intake-summary', async (req, res) => {
+  const { date } = req.query;
+  if (!date) return res.status(400).json({ error: 'date required' });
+  const { data, error } = await supabase
+    .from('daily_intake_summary')
+    .select('*')
+    .eq('service_date', date)
+    .maybeSingle();
+  if (error) return dbError(res, error);
+  res.json(data || null);
+});
+
 app.get('/api/intake-images', async (req, res) => {
   let query = supabase
     .from('daily_intake_images')

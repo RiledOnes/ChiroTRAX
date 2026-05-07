@@ -4251,6 +4251,7 @@ async function exportDailyPDF() {
     visits.forEach(v => { grandTotal += calcBilled(v); });
 
     const totalRecords   = summary?.total_records       ?? visits.length;
+    const sameDayCount   = visits.filter(v => !v.is_backdated).length;
     const ebsCount       = summary?.entered_ebs_count   ?? 0;
     const claimsCount    = summary?.claim_created_count ?? 0;
     const loggedCount    = summary?.logged_count        ?? 0;
@@ -4307,7 +4308,9 @@ async function exportDailyPDF() {
       .hdr-top .lft { display: flex; flex-direction: column; gap: 1px; }
       .hdr-top .rpt-lbl { font-size: 7.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(255,255,255,0.45); }
       .hdr-top .date-val { font-size: 12px; font-weight: 300; color: #fff; }
-      .pill { background: rgba(255,255,255,0.12); color: #9ddfc0; border: 0.5px solid rgba(157,223,192,0.35); border-radius: 20px; padding: 2px 10px; font-size: 8px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+      .pill { border-radius: 20px; padding: 2px 10px; font-size: 8px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+      .pill-complete { background: rgba(255,255,255,0.12); color: #9ddfc0; border: 0.5px solid rgba(157,223,192,0.35); }
+      .pill-pending  { background: rgba(251,191,36,0.18); color: #fbbf24; border: 0.5px solid rgba(251,191,36,0.45); }
 
       .hdr-stats { display: flex; border-bottom: 1.5px solid #1a2e4a; flex-shrink: 0; margin-bottom: 5px; }
       .hdr-stat { flex: 1; padding: 4px 10px; border-right: 0.5px solid #e4e8ee; display: flex; flex-direction: column; gap: 0; }
@@ -4328,7 +4331,7 @@ async function exportDailyPDF() {
 
       .sec-lbl { font-size: 8px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: #8a96a3; margin-bottom: 4px; display: block; flex-shrink: 0; }
 
-      .visits-wrap { flex: 0 0 58%; overflow: hidden; }
+      .visits-wrap { flex: 4 0 0; min-height: 0; overflow: hidden; }
       table.vt { table-layout: fixed; border-collapse: collapse; font-size: 8px; width: 100%; }
       table.vt col.c-id  { width: 11%; }
       table.vt col.c-pn  { width: 8%; }
@@ -4346,10 +4349,10 @@ async function exportDailyPDF() {
       .td-pn  { font-family: 'DM Mono', monospace; font-size: 7.5px; color: #5a6a7a; white-space: nowrap; }
       .td-pat { font-size: 8px; font-weight: 500; color: #1a2e4a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }
       .td-bll { font-family: 'DM Mono', monospace; font-size: 8px; font-weight: 500; color: #1a4a2e; white-space: nowrap; }
-      .dx-lbl { font-size: 7px; font-weight: 500; color: #5a6a7a; text-transform: uppercase; letter-spacing: 0.04em; }
-      .dx-cod { font-family: 'DM Mono', monospace; font-size: 6.5px; color: #8a96a3; word-break: break-all; line-height: 1.3; }
+      .dx-lbl { font-size: 7px; font-weight: 500; color: #5a6a7a; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+      .dx-cod { font-family: 'DM Mono', monospace; font-size: 6.5px; color: #8a96a3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 
-      .cap-section { flex: 1 1 auto; min-height: 0; margin-top: 5px; display: flex; flex-direction: column; overflow: hidden; }
+      .cap-section { flex: 1 0 0; min-height: 0; margin-top: 4px; display: flex; flex-direction: column; overflow: hidden; }
       .cap-section img { width: 100%; height: 100%; object-fit: contain; object-position: top left; display: block; }
       .cap-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: #c5d0dc; font-size: 8px; border: 0.5px solid #e4e8ee; border-radius: 3px; }
     </style></head><body>`;
@@ -4360,10 +4363,11 @@ async function exportDailyPDF() {
         <span class="rpt-lbl">Daily Intake Report</span>
         <span class="date-val">${dateLabel}</span>
       </div>
-      <span class="pill">${intakeStatus}</span>
+      <span class="pill ${intakeStatus === 'COMPLETE' ? 'pill-complete' : 'pill-pending'}">${intakeStatus}</span>
     </div>
     <div class="hdr-stats">
       <div class="hdr-stat"><span class="sl">Total</span><span class="sv">${totalRecords}</span></div>
+      <div class="hdr-stat"><span class="sl">Same Day</span><span class="sv">${sameDayCount}</span></div>
       <div class="hdr-stat"><span class="sl">EBS</span><span class="sv">${ebsCount}</span></div>
       <div class="hdr-stat"><span class="sl">Claims</span><span class="sv">${claimsCount}</span></div>
       <div class="hdr-stat"><span class="sl">Logged</span><span class="sv">${loggedCount}</span></div>

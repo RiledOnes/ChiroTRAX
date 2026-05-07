@@ -3902,8 +3902,8 @@ async function exportDailyPDF() {
     <style>
       @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
       * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      @page { size: 277mm 210mm; margin: 0; }
-      html, body { font-family: 'DM Sans', Arial, sans-serif; color: #1a2e4a; width: 277mm; height: 210mm; overflow: hidden; }
+      @page { size: letter landscape; margin: 0; }
+      html, body { font-family: 'DM Sans', Arial, sans-serif; color: #1a2e4a; width: 11in; height: 8.5in; overflow: hidden; }
       body { display: flex; flex-direction: column; padding: 3mm; }
 
       .hdr-top { background: #1a2e4a; padding: 4px 10px; border-radius: 4px 4px 0 0; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
@@ -3931,7 +3931,7 @@ async function exportDailyPDF() {
 
       .sec-lbl { font-size: 8px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: #8a96a3; margin-bottom: 4px; display: block; flex-shrink: 0; }
 
-      .visits-wrap { flex: 0 0 108mm; max-height: 108mm; overflow: hidden; }
+      .visits-wrap { flex: 0 0 58%; overflow: hidden; }
       table.vt { table-layout: fixed; border-collapse: collapse; font-size: 8px; width: 100%; }
       table.vt col.c-id  { width: 11%; }
       table.vt col.c-pn  { width: 8%; }

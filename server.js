@@ -23,7 +23,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'", "https://milosrgvnvhlwiitjlki.supabase.co"],
+      connectSrc: ["'self'"],
       scriptSrcAttr: null  // allow inline event handlers (onclick, onsubmit, etc.)
     }
   }
@@ -1502,11 +1502,6 @@ app.get('/api/intake/:id/status-history', async (req, res) => {
     .order('changed_at', { ascending: false });
   if (error) return dbError(res, error);
   res.json(data);
-});
-
-// EBS Workflow page
-app.get('/workflow', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'workflow.html'));
 });
 
 // SPA fallback — serve index.html for non-API routes

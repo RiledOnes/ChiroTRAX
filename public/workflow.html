@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EBS Workflow — ChiroTrax</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #f5f0e8;
+      --surface: #fffdf7;
+      --surface2: #ede7da;
+      --surface3: #e0d9ca;
+      --border: #d4ccb8;
+      --ink: #2c2a25;
+      --ink2: #6b6558;
+      --ink3: #9a9283;
+      --accent: #2e7d32;
+      --accent-dim: rgba(46,125,50,0.10);
+      --accent2: #43a047;
+      --accent2-dim: rgba(67,160,71,0.10);
+      --warn: #e67e22;
+      --warn-dim: rgba(230,126,34,0.10);
+      --danger: #c0392b;
+      --danger-dim: rgba(192,57,43,0.10);
+      --blue: #1565c0;
+      --blue-dim: rgba(21,101,192,0.10);
+      --purple: #8e44ad;
+      --purple-dim: rgba(142,68,173,0.10);
+      --teal: #16a085;
+      --teal-dim: rgba(22,160,133,0.10);
+      --coral: #c0392b;
+      --coral-dim: rgba(192,57,43,0.12);
+      --radius: 10px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── Layout ── */
+    .app { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 220px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      height: 100vh;
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    .logo { padding: 24px 20px 18px; border-bottom: 1px solid var(--border); }
+    .logo a { text-decoration: none; color: inherit; }
+    .logo h1 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    .logo h1 span { color: var(--accent); }
+    .logo sub { color: var(--ink3); font-size: 11px; font-weight: 400; display: block; margin-top: 2px; }
+
+    .nav { padding: 12px 10px; flex: 1; }
+    .nav-section {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--ink3); padding: 10px 10px 6px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 9px 10px; border-radius: 8px; cursor: pointer;
+      font-size: 13.5px; font-weight: 400; color: var(--ink2);
+      transition: all 0.15s; margin-bottom: 1px;
+      text-decoration: none;
+    }
+    .nav-item:hover { background: var(--surface2); color: var(--ink); }
+    .nav-item.active { background: var(--accent-dim); color: var(--accent); font-weight: 500; }
+    .nav-item .icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+
+    .sidebar-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      color: var(--ink3);
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .sidebar-footer .user-email { word-break: break-all; }
+    .logout-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--ink2); padding: 4px 10px; border-radius: 6px;
+      cursor: pointer; font-size: 11px; font-family: 'DM Sans', sans-serif;
+      align-self: flex-start;
+    }
+    .logout-btn:hover { background: var(--surface3); }
+
+    .main {
+      flex: 1; margin-left: 220px;
+      padding: 28px 32px;
+      max-width: calc(100vw - 220px);
+      min-height: 100vh;
+    }
+
+    /* ── Page Header ── */
+    .page-header {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; margin-bottom: 24px;
+    }
+    .page-header h2 {
+      font-family: 'Syne', sans-serif; font-size: 24px;
+      font-weight: 600; letter-spacing: -0.3px;
+    }
+    .page-header p { color: var(--ink2); font-size: 13px; margin-top: 3px; }
+    .date-controls { display: flex; align-items: center; gap: 10px; }
+    .date-controls input[type=date] {
+      padding: 8px 11px; border: 1px solid var(--border);
+      border-radius: 7px; font-size: 13.5px; font-family: 'DM Sans', sans-serif;
+      background: var(--surface2); color: var(--ink);
+      transition: border 0.15s;
+    }
+    .date-controls input[type=date]:focus { outline: none; border-color: var(--accent); }
+
+    /* ── Metrics Row ── */
+    .metrics-row {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 14px; margin-bottom: 10px;
+    }
+    .metric-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 20px;
+    }
+    .metric-card .m-label {
+      font-size: 11px; color: var(--ink3); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.8px;
+    }
+    .metric-card .m-value {
+      font-family: 'Syne', sans-serif; font-size: 38px;
+      font-weight: 700; line-height: 1; margin: 6px 0 4px;
+    }
+    .metric-card .m-sub { font-size: 11px; color: var(--ink3); }
+    .metric-card.warn  .m-value { color: var(--warn); }
+    .metric-card.green .m-value { color: var(--accent2); }
+    .metric-card.blue  .m-value { color: var(--blue); }
+
+    /* ── Progress Bar ── */
+    .progress-track {
+      height: 4px; background: var(--surface3);
+      border-radius: 2px; margin-bottom: 22px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; background: var(--accent2);
+      border-radius: 2px; width: 0%; transition: width 0.5s ease;
+    }
+
+    /* ── Tabs ── */
+    .tab-bar {
+      display: flex; border-bottom: 2px solid var(--border);
+      margin-bottom: 20px;
+    }
+    .tab {
+      background: transparent; border: none;
+      padding: 10px 20px; font-size: 13.5px;
+      font-family: 'DM Sans', sans-serif; color: var(--ink2);
+      cursor: pointer; border-bottom: 2px solid transparent;
+      margin-bottom: -2px; transition: all 0.15s;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .tab:hover { color: var(--ink); background: var(--surface2); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+
+    .tab-badge {
+      background: var(--warn-dim); color: var(--warn);
+      font-size: 11px; font-weight: 700; padding: 1px 7px;
+      border-radius: 10px; min-width: 20px; text-align: center;
+    }
+    .tab-badge:empty { display: none; }
+    .tab-badge.done { background: var(--accent2-dim); color: var(--accent2); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 18px; overflow: hidden;
+    }
+    .card-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px; border-bottom: 1px solid var(--border);
+    }
+    .card-title {
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.8px; color: var(--ink2);
+    }
+    .card-body { padding: 20px; }
+    .muted-text { font-size: 12px; color: var(--ink3); }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      text-align: left; padding: 9px 14px;
+      background: var(--surface2); color: var(--ink3);
+      font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.8px; border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    td {
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+      vertical-align: middle; color: var(--ink);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+    td.muted { color: var(--ink3); }
+    .empty-cell { text-align: center; padding: 40px 20px; color: var(--ink3); font-size: 13px; }
+
+    /* ── Pills ── */
+    .pill {
+      display: inline-flex; align-items: center;
+      padding: 2px 7px; border-radius: 4px;
+      font-size: 10.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+    .pill-logged   { background: var(--warn-dim);   color: var(--warn); }
+    .pill-ebs      { background: var(--accent2-dim); color: var(--accent2); }
+    .pill-claim    { background: var(--blue-dim);    color: var(--blue); }
+    .pill-pending  { background: var(--purple-dim);  color: var(--purple); }
+    .pill-prev     { background: var(--surface3);    color: var(--ink3); }
+    .pill-bd       { background: var(--coral-dim);   color: var(--coral); }
+    .pill-a2       { background: var(--purple-dim);  color: var(--purple); }
+    .pill-re3      { background: var(--teal-dim);    color: var(--teal); }
+    .pill-new      { background: var(--danger-dim);  color: var(--danger); }
+    .pill-new-code { background: var(--danger-dim);  color: var(--danger); font-family: monospace; }
+    .pill-flags    { display: flex; gap: 4px; flex-wrap: wrap; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 8px; font-size: 13px;
+      font-weight: 500; cursor: pointer; border: none;
+      transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary  { background: var(--accent); color: white; }
+    .btn-primary:hover:not(:disabled) { background: #256427; }
+    .btn-secondary { background: var(--surface2); color: var(--ink); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--surface3); }
+    .btn-ghost    { background: transparent; color: var(--ink2); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--ink); background: var(--surface2); }
+    .btn-danger   { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(192,57,43,0.2); }
+    .btn-danger:hover { background: var(--danger); color: white; }
+    .btn-sm  { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
+    .btn-xs  { padding: 3px 8px;  font-size: 11px; border-radius: 5px; }
+    .actions { display: flex; gap: 5px; align-items: center; }
+
+    /* ── Monospace ── */
+    .mono {
+      font-family: 'Courier New', monospace; font-size: 12px;
+      color: var(--ink2); background: var(--surface2);
+      padding: 1px 5px; border-radius: 3px;
+    }
+
+    /* ── Forms ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 12px; font-weight: 500; color: var(--ink2); }
+    input, select, textarea {
+      padding: 8px 11px; border: 1px solid var(--border);
+      border-radius: 7px; font-size: 13.5px;
+      font-family: 'DM Sans', sans-serif;
+      background: var(--surface2); color: var(--ink);
+      transition: border 0.15s, background 0.15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: var(--accent); background: var(--surface3);
+    }
+    input::placeholder, textarea::placeholder { color: var(--ink3); }
+    textarea { resize: vertical; min-height: 80px; }
+    input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--accent); }
+    .check-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 14px; }
+    .check-label {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; cursor: pointer; color: var(--ink2);
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55); z-index: 100;
+      align-items: center; justify-content: center;
+      backdrop-filter: blur(3px);
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 26px;
+      width: 520px; max-width: 96vw; max-height: 90vh;
+      overflow-y: auto; box-shadow: var(--shadow);
+      animation: slideUp 0.2s ease;
+    }
+    @keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    .modal-header {
+      display: flex; justify-content: space-between;
+      align-items: flex-start; margin-bottom: 20px;
+    }
+    .modal-header h3 { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 600; line-height: 1.3; }
+    .modal-close {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--ink2); width: 28px; height: 28px;
+      border-radius: 6px; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-left: 12px;
+    }
+    .modal-close:hover { color: var(--ink); }
+    .modal-footer {
+      display: flex; gap: 8px; justify-content: flex-end;
+      margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 20px; right: 20px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--ink); padding: 11px 18px; border-radius: 9px;
+      font-size: 13.5px; z-index: 200; opacity: 0;
+      transform: translateY(8px); transition: all 0.25s;
+      pointer-events: none; box-shadow: var(--shadow);
+    }
+    .toast.show  { opacity: 1; transform: translateY(0); }
+    .toast.success { border-color: var(--accent2); color: var(--accent2); }
+    .toast.error   { border-color: var(--danger);  color: var(--danger); }
+
+    /* ── Add Record Form ── */
+    .add-form-wrap {
+      display: none; border-bottom: 1px solid var(--border);
+      background: var(--surface2); padding: 20px;
+    }
+    .add-form-wrap.open { display: block; }
+    .add-form-actions {
+      display: flex; gap: 8px; justify-content: flex-end;
+      margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+    }
+
+    /* ── Phase 2 ── */
+    .brief-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 20px; margin-bottom: 20px;
+    }
+    .brief-label {
+      font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.8px; color: var(--ink3); margin-bottom: 8px;
+    }
+    .brief-cpt-list { display: flex; flex-direction: column; gap: 6px; }
+    .brief-cpt {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; background: var(--surface2);
+      border-radius: 7px; border: 1px solid var(--border);
+    }
+    .brief-cpt-code {
+      font-family: 'Courier New', monospace; font-size: 13px;
+      font-weight: 700; color: var(--accent); min-width: 50px;
+    }
+    .brief-cpt-desc { font-size: 13px; color: var(--ink2); }
+    .brief-dos {
+      font-size: 18px; font-family: 'Syne', sans-serif; font-weight: 600;
+      padding: 12px 16px; background: var(--surface2);
+      border-radius: 8px; border: 1px solid var(--border);
+      margin-bottom: 14px;
+    }
+    .brief-dos.backdated {
+      color: var(--danger); background: var(--danger-dim);
+      border-color: rgba(192,57,43,0.3);
+    }
+    .brief-info-block {
+      font-size: 13px; color: var(--ink2); padding: 10px 14px;
+      background: var(--surface2); border-radius: 7px;
+    }
+    .brief-dx-codes { display: flex; flex-wrap: wrap; gap: 5px; }
+    .brief-dx-code {
+      font-family: 'Courier New', monospace; font-size: 12px;
+      background: var(--surface2); border: 1px solid var(--border);
+      padding: 2px 8px; border-radius: 4px; color: var(--ink2);
+    }
+    .brief-patient-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 18px; flex-wrap: wrap;
+    }
+    .brief-patient-name { font-size: 16px; font-weight: 600; }
+
+    .p2-actions {
+      padding: 16px 20px; border-top: 1px solid var(--border);
+      display: flex; gap: 12px;
+    }
+    .p2-pass-btn { flex: 1; justify-content: center; font-size: 14px; padding: 10px; }
+    .p2-flag-btn { flex: 1; justify-content: center; font-size: 14px; padding: 10px; }
+
+    .p2-queue-list { max-height: 300px; overflow-y: auto; }
+    .p2-queue-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background 0.12s;
+    }
+    .p2-queue-item:last-child { border-bottom: none; }
+    .p2-queue-item:hover { background: var(--surface2); }
+    .p2-queue-item.current { background: var(--accent-dim); }
+    .q-id   { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink3); min-width: 70px; }
+    .q-name { font-size: 13px; flex: 1; }
+    .q-code { font-size: 12px; color: var(--ink3); }
+
+    /* ── Phase 3 ── */
+    .flag-item {
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 16px; margin-bottom: 12px; background: var(--surface2);
+    }
+    .flag-item:last-child { margin-bottom: 0; }
+    .flag-item-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .flag-item-name { font-weight: 500; font-size: 14px; flex: 1; }
+    .flag-note-block {
+      background: rgba(230,126,34,0.1); border: 1px solid rgba(230,126,34,0.25);
+      border-radius: 7px; padding: 10px 14px;
+      font-size: 13px; color: var(--ink2);
+      margin-bottom: 12px; white-space: pre-wrap;
+    }
+    .flag-item-actions { display: flex; gap: 8px; }
+
+    /* ── Empty States ── */
+    .empty-state {
+      text-align: center; padding: 52px 20px; color: var(--ink3);
+    }
+    .empty-state .es-icon { font-size: 32px; margin-bottom: 10px; }
+    .empty-state p { font-size: 14px; color: var(--ink2); margin-bottom: 4px; }
+    .empty-state small { font-size: 12px; color: var(--ink3); display: block; margin-top: 2px; }
+  </style>
+</head>
+<body>
+
+<script>
+  /* Auth gate — redirect to login if no token */
+  (function() {
+    if (!sessionStorage.getItem('chirotrax_token')) window.location.href = '/';
+  })();
+</script>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<!-- Flag Modal -->
+<div id="flag-modal" class="modal-overlay" onclick="onOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="flag-modal-title">Flag Record</h3>
+      <button class="modal-close" onclick="closeFlagModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label for="flag-note">Review note for Theresa</label>
+      <textarea id="flag-note" rows="4" placeholder="Describe the issue or mismatch…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeFlagModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveFlag()">Save Flag</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <a href="/"><h1>Chiro<span>Trax</span></h1><sub>Office Manager</sub></a>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Navigation</div>
+      <a class="nav-item" href="/"><span class="icon">⬛</span> Dashboard</a>
+      <div class="nav-section">Billing</div>
+      <a class="nav-item active"><span class="icon">✓</span> EBS Workflow</a>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="user-email" id="user-email"></span>
+      <button class="logout-btn" onclick="handleLogout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <!-- Page Header -->
+    <div class="page-header">
+      <div>
+        <h2>EBS Workflow</h2>
+        <p id="header-sub">Select a date to load intake records</p>
+      </div>
+      <div class="date-controls">
+        <input type="date" id="date-picker"/>
+        <button class="btn btn-primary" onclick="loadData()">Load</button>
+      </div>
+    </div>
+
+    <!-- Metrics Row -->
+    <div class="metrics-row">
+      <div class="metric-card">
+        <div class="m-label">Total</div>
+        <div class="m-value" id="m-total">—</div>
+      </div>
+      <div class="metric-card warn">
+        <div class="m-label">Logged</div>
+        <div class="m-value" id="m-logged">—</div>
+        <div class="m-sub">pending EBS entry</div>
+      </div>
+      <div class="metric-card green">
+        <div class="m-label">In EBS</div>
+        <div class="m-value" id="m-ebs">—</div>
+        <div class="m-sub">verified</div>
+      </div>
+      <div class="metric-card blue">
+        <div class="m-label">Flagged</div>
+        <div class="m-value" id="m-flagged">—</div>
+        <div class="m-sub">needs review</div>
+      </div>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <button class="tab active" id="tab-btn-p1" onclick="showTab('p1')">
+        Phase 1 — Intake Records <span class="tab-badge" id="badge-p1"></span>
+      </button>
+      <button class="tab" id="tab-btn-p2" onclick="showTab('p2')">
+        Phase 2 — EBS Verification <span class="tab-badge" id="badge-p2"></span>
+      </button>
+      <button class="tab" id="tab-btn-p3" onclick="showTab('p3')">
+        Phase 3 — Flags &amp; Review <span class="tab-badge" id="badge-p3"></span>
+      </button>
+    </div>
+
+    <!-- ══════════════════════════════════ -->
+    <!-- PHASE 1 — Intake Records          -->
+    <!-- ══════════════════════════════════ -->
+    <div id="tab-p1" class="tab-panel active">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">Intake Records</span>
+          <button class="btn btn-sm btn-ghost" onclick="toggleAddForm()">+ Add Record</button>
+        </div>
+
+        <!-- Collapsible Add Form -->
+        <div class="add-form-wrap" id="add-form-wrap">
+          <form id="add-record-form" onsubmit="handleAddRecord(event)">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Patient Name *</label>
+                <input type="text" id="ar-name" required placeholder="e.g. Jane Smith"/>
+              </div>
+              <div class="form-group">
+                <label>Patient Code *</label>
+                <input type="text" id="ar-code" required value="XXX-XX" placeholder="e.g. 631-01"/>
+              </div>
+              <div class="form-group">
+                <label>Service Date</label>
+                <input type="date" id="ar-svc-date" onchange="checkBackdated()"/>
+              </div>
+              <div class="form-group">
+                <label>Manipulation Type</label>
+                <select id="ar-manip">
+                  <option value="E2">E2 — 3–4 regions (98941)</option>
+                  <option value="E1">E1 — 1–2 regions (98940)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>TE Units (0 = none)</label>
+                <input type="number" id="ar-te" min="0" max="10" value="0"/>
+              </div>
+              <div class="form-group">
+                <label>Diagnosis Category</label>
+                <select id="ar-diag-cat">
+                  <option value="ALL">ALL</option>
+                  <option value="LB">LB</option>
+                  <option value="NECK">NECK</option>
+                  <option value="MC-LB">MC-LB</option>
+                  <option value="CUSTOM">CUSTOM (last visit codes)</option>
+                </select>
+              </div>
+            </div>
+            <div class="check-row">
+              <label class="check-label"><input type="checkbox" id="ar-a2"/> A2 — New patient office visit (99204)</label>
+              <label class="check-label"><input type="checkbox" id="ar-re3"/> RE3 — Established office visit (99213)</label>
+              <label class="check-label" style="color:var(--ink3)">
+                <input type="checkbox" id="ar-backdated" disabled style="accent-color:var(--danger)"/>
+                Backdated (auto-detected)
+              </label>
+            </div>
+            <div class="add-form-actions">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="toggleAddForm()">Cancel</button>
+              <button type="submit" id="ar-submit" class="btn btn-primary btn-sm">Add Record</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Records Table -->
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Intake ID</th>
+                <th>Patient</th>
+                <th>Code</th>
+                <th>Type</th>
+                <th>TE</th>
+                <th>Flags</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="p1-tbody">
+              <tr><td colspan="8" class="empty-cell">Select a date and click Load to begin.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════ -->
+    <!-- PHASE 2 — EBS Verification Loop   -->
+    <!-- ══════════════════════════════════ -->
+    <div id="tab-p2" class="tab-panel">
+
+      <!-- Complete state -->
+      <div id="p2-complete" class="card" style="display:none">
+        <div class="card-body empty-state">
+          <div class="es-icon">✅</div>
+          <p>All records entered in EBS</p>
+          <small>Phase 2 complete for this date.</small>
+        </div>
+      </div>
+
+      <!-- Active state -->
+      <div id="p2-active">
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-head">
+            <span class="card-title">Entry Brief</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span class="muted-text" id="p2-pos"></span>
+              <button class="btn btn-xs btn-ghost" onclick="p2Nav(-1)">← Prev</button>
+              <button class="btn btn-xs btn-ghost" onclick="p2Nav(1)">Next →</button>
+            </div>
+          </div>
+          <div class="card-body" id="p2-brief">
+            <div class="empty-state">
+              <p>Load records to begin EBS verification.</p>
+            </div>
+          </div>
+          <div class="p2-actions" id="p2-actions" style="display:none">
+            <button class="btn btn-primary p2-pass-btn" onclick="p2Pass()">✓ Pass — Mark Entered EBS</button>
+            <button class="btn btn-danger p2-flag-btn" onclick="p2Flag()">⚑ Mismatch — Flag Issue</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Queue</span>
+            <span class="muted-text" id="p2-queue-label"></span>
+          </div>
+          <div class="p2-queue-list" id="p2-queue-list">
+            <div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">No records in queue.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════ -->
+    <!-- PHASE 3 — Flags & Review          -->
+    <!-- ══════════════════════════════════ -->
+    <div id="tab-p3" class="tab-panel">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">Flags &amp; Review</span>
+          <span class="muted-text">Theresa review items</span>
+        </div>
+        <div class="card-body" id="p3-list">
+          <div class="empty-state">
+            <p>Select a date and load records.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────
+// Config & State
+// ─────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://milosrgvnvhlwiitjlki.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pbG9zcmd2bnZobHdpaXRqbGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwODgwNTAsImV4cCI6MjA4ODY2NDA1MH0.c7sP81ThGHrX3fGo_iajgsBm54PScFkRKEUou05kxLI';
+const authToken = sessionStorage.getItem('chirotrax_token');
+
+let records  = [];
+let patients = [];
+let p2Queue  = [];
+let p2Index  = 0;
+let flagTarget = null;
+
+const DIAG = {
+  ALL:    ['M54.50','M54.6','M54.2','M62.838','M99.03','M99.02','M99.01'],
+  LB:     ['M54.50','M54.6','M46.1','M62.838','M99.03','M99.05','M99.02'],
+  NECK:   ['M54.2','M54.6','M62.838','M99.01','M99.02'],
+  'MC-LB':['M99.03','M54.50','M99.05','M46.1'],
+};
+
+// ─────────────────────────────────────────────────────────
+// Supabase REST helper
+// ─────────────────────────────────────────────────────────
+async function sb(method, table, query = '', body = null) {
+  const headers = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Content-Type': 'application/json',
+  };
+  if (method === 'PATCH' || method === 'POST') headers['Prefer'] = 'return=representation';
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + table + query, {
+    method, headers, body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || err.hint || 'Supabase error ' + res.status);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+// Express API helper (auth check / logout)
+async function api(method, path, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+  const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  if (res.status === 401) { handleLogout(); throw new Error('Session expired'); }
+  return res.json();
+}
+
+// ─────────────────────────────────────────────────────────
+// Auth
+// ─────────────────────────────────────────────────────────
+async function initAuth() {
+  try {
+    const me = await api('GET', '/api/auth/me');
+    if (me && me.email) document.getElementById('user-email').textContent = me.email;
+  } catch {
+    sessionStorage.removeItem('chirotrax_token');
+    window.location.href = '/';
+  }
+}
+
+function handleLogout() {
+  api('POST', '/api/auth/logout').finally(() => {
+    sessionStorage.removeItem('chirotrax_token');
+    window.location.href = '/';
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// Toast
+// ─────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+// ─────────────────────────────────────────────────────────
+// Tabs
+// ─────────────────────────────────────────────────────────
+function showTab(id) {
+  ['p1','p2','p3'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('active', t === id);
+    document.getElementById('tab-btn-' + t).classList.toggle('active', t === id);
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// Metrics
+// ─────────────────────────────────────────────────────────
+function updateMetrics() {
+  const total   = records.length;
+  const logged  = records.filter(r => r.workflow_status === 'logged').length;
+  const ebs     = records.filter(r => r.workflow_status === 'entered_ebs').length;
+  const flagged = records.filter(r => r.needs_ebs_review).length;
+
+  document.getElementById('m-total').textContent   = total;
+  document.getElementById('m-logged').textContent  = logged;
+  document.getElementById('m-ebs').textContent     = ebs;
+  document.getElementById('m-flagged').textContent = flagged;
+
+  const pct = total > 0 ? Math.round((ebs / total) * 100) : 0;
+  document.getElementById('progress-fill').style.width = pct + '%';
+
+  const date = document.getElementById('date-picker').value;
+  document.getElementById('header-sub').textContent = total > 0
+    ? date + ' · ' + total + ' records · ' + pct + '% entered EBS'
+    : 'Select a date to load intake records';
+
+  // Tab badges
+  setBadge('badge-p1', logged,        logged === 0);
+  setBadge('badge-p2', p2Queue.length, p2Queue.length === 0);
+  setBadge('badge-p3', flagged,       false);
+}
+
+function setBadge(id, count, done) {
+  const el = document.getElementById(id);
+  el.textContent = count > 0 ? count : (done ? '✓' : '');
+  el.className = 'tab-badge' + (done ? ' done' : '');
+}
+
+// ─────────────────────────────────────────────────────────
+// Status pill helper
+// ─────────────────────────────────────────────────────────
+function statusPill(s) {
+  const map = {
+    logged:       ['pill-logged', 'Logged'],
+    entered_ebs:  ['pill-ebs',   'In EBS'],
+    claim_created:['pill-claim', 'Claim'],
+    pending:      ['pill-pending','Pending'],
+    prev_billed:  ['pill-prev',  'Prev Billed'],
+  };
+  const [cls, label] = map[s] || ['pill-prev', s || '—'];
+  return '<span class="pill ' + cls + '">' + label + '</span>';
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─────────────────────────────────────────────────────────
+// Load Data
+// ─────────────────────────────────────────────────────────
+async function loadData() {
+  const date = document.getElementById('date-picker').value;
+  if (!date) { toast('Select a date first', 'error'); return; }
+
+  try {
+    const [recs, pts] = await Promise.all([
+      sb('GET', 'intake_records', '?sheet_date=eq.' + date + '&order=intake_id.asc'),
+      sb('GET', 'patients', '?select=id,patient_code,first_name,last_name,preferred_name,billing_name,nickname'),
+    ]);
+    records  = recs  || [];
+    patients = pts   || [];
+
+    // Pre-fill service date in add form
+    document.getElementById('ar-svc-date').value = date;
+
+    buildP2Queue();
+    updateMetrics();
+    renderP1();
+    renderP2();
+    renderP3();
+  } catch (e) {
+    toast('Load failed: ' + e.message, 'error');
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Phase 1 — Render Table
+// ─────────────────────────────────────────────────────────
+function renderP1() {
+  const tbody = document.getElementById('p1-tbody');
+  if (!records.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-cell">No records for this date.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = records.map(r => {
+    const isNewCode = r.patient_code === 'XXX-XX';
+    const codeCell = isNewCode
+      ? '<span class="pill pill-new-code">XXX-XX</span>'
+      : '<code class="mono">' + esc(r.patient_code || '—') + '</code>';
+
+    const flags = [];
+    if (r.is_backdated)  flags.push('<span class="pill pill-bd">BD</span>');
+    if (r.a2)            flags.push('<span class="pill pill-a2">A2</span>');
+    if (r.re3)           flags.push('<span class="pill pill-re3">RE3</span>');
+    if (isNewCode)       flags.push('<span class="pill pill-new">NEW</span>');
+
+    const te = r.therapeutic_exercises > 0
+      ? '&times;&nbsp;' + r.therapeutic_exercises
+      : '<span style="color:var(--ink3)">—</span>';
+
+    const ebsBtn = r.workflow_status === 'logged'
+      ? '<button class="btn btn-xs btn-primary" onclick="markEBS(\'' + r.intake_id + '\')">EBS</button>'
+      : '';
+
+    const claimCell = r.claim_number
+      ? '<code class="mono">' + esc(r.claim_number) + '</code>'
+      : '<button class="btn btn-xs btn-ghost" onclick="assignClaim(\'' + r.intake_id + '\')">Claim #</button>';
+
+    return '<tr>'
+      + '<td><code class="mono" style="color:var(--ink3)">' + esc(r.intake_id) + '</code></td>'
+      + '<td>' + esc(r.patient_name || '—') + '</td>'
+      + '<td>' + codeCell + '</td>'
+      + '<td><strong>' + esc(r.manipulation_type || '—') + '</strong></td>'
+      + '<td class="muted">' + te + '</td>'
+      + '<td><div class="pill-flags">' + (flags.join('') || '<span style="color:var(--ink3)">—</span>') + '</div></td>'
+      + '<td>' + statusPill(r.workflow_status) + '</td>'
+      + '<td><div class="actions">'
+      + ebsBtn
+      + '<button class="btn btn-xs btn-ghost" title="Flag for review" onclick="openFlagModal(\'' + r.intake_id + '\')">🚩</button>'
+      + claimCell
+      + '</div></td>'
+      + '</tr>';
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────
+// Mark EBS
+// ─────────────────────────────────────────────────────────
+async function markEBS(intakeId) {
+  try {
+    const updated = await sb('PATCH', 'intake_records', '?intake_id=eq.' + intakeId, { workflow_status: 'entered_ebs' });
+    applyUpdate(intakeId, updated);
+    buildP2Queue();
+    updateMetrics();
+    renderP1();
+    renderP2();
+    const ebsCount = records.filter(r => r.workflow_status === 'entered_ebs').length;
+    toast(ebsCount + ' of ' + records.length + ' entered EBS · ' + (records.length - ebsCount) + ' to go', 'success');
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Assign Claim Number
+// ─────────────────────────────────────────────────────────
+async function assignClaim(intakeId) {
+  const claimNum = prompt('Enter claim number for ' + intakeId + ':');
+  if (!claimNum || !claimNum.trim()) return;
+  try {
+    const updated = await sb('PATCH', 'intake_records', '?intake_id=eq.' + intakeId, { claim_number: claimNum.trim() });
+    applyUpdate(intakeId, updated);
+    renderP1();
+    toast('Claim number saved', 'success');
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+// Helper: merge updated row back into local array
+function applyUpdate(intakeId, updated) {
+  if (!updated || !updated[0]) return;
+  const idx = records.findIndex(r => r.intake_id === intakeId);
+  if (idx >= 0) records[idx] = Object.assign({}, records[idx], updated[0]);
+}
+
+// ─────────────────────────────────────────────────────────
+// Flag Modal
+// ─────────────────────────────────────────────────────────
+function openFlagModal(intakeId) {
+  flagTarget = intakeId;
+  const rec = records.find(r => r.intake_id === intakeId);
+  document.getElementById('flag-modal-title').textContent =
+    intakeId + ' — ' + (rec ? rec.patient_name + ' (' + rec.patient_code + ')' : '');
+  document.getElementById('flag-note').value = rec && rec.ebs_review_note ? rec.ebs_review_note : '';
+  document.getElementById('flag-modal').classList.add('open');
+}
+
+function closeFlagModal() {
+  document.getElementById('flag-modal').classList.remove('open');
+  flagTarget = null;
+}
+
+function onOverlayClick(e) {
+  if (e.target === e.currentTarget) closeFlagModal();
+}
+
+async function saveFlag() {
+  if (!flagTarget) return;
+  const note = document.getElementById('flag-note').value.trim();
+  try {
+    const updated = await sb('PATCH', 'intake_records', '?intake_id=eq.' + flagTarget, {
+      needs_ebs_review: true,
+      ebs_review_note: note || null,
+    });
+    applyUpdate(flagTarget, updated);
+    closeFlagModal();
+    updateMetrics();
+    renderP1();
+    renderP3();
+    toast('Flag saved', 'success');
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Add Record Form
+// ─────────────────────────────────────────────────────────
+function toggleAddForm() {
+  document.getElementById('add-form-wrap').classList.toggle('open');
+}
+
+function checkBackdated() {
+  const sheet = document.getElementById('date-picker').value;
+  const svc   = document.getElementById('ar-svc-date').value;
+  document.getElementById('ar-backdated').checked = !!(svc && sheet && svc !== sheet);
+}
+
+function genIntakeId(svcDate) {
+  const d  = new Date(svcDate + 'T12:00:00');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const yy = String(d.getFullYear()).slice(2);
+  const pfx = mm + dd + yy;
+  const n = records.filter(r => r.intake_id && r.intake_id.startsWith(pfx)).length;
+  return pfx + '_' + String(n + 1).padStart(2, '0');
+}
+
+async function findOrCreatePatient(code, name) {
+  let pt = patients.find(p => p.patient_code === code);
+  if (pt) return pt.id;
+
+  const found = await sb('GET', 'patients',
+    '?patient_code=eq.' + encodeURIComponent(code) + '&select=id,patient_code,first_name,last_name,preferred_name,billing_name,nickname');
+  if (found && found.length > 0) {
+    patients.push(found[0]);
+    return found[0].id;
+  }
+
+  // Insert new patient
+  const parts = name.trim().split(/\s+/);
+  const first = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0] || 'Unknown';
+  const last  = parts.length > 1 ? parts[parts.length - 1] : 'Unknown';
+  const inserted = await sb('POST', 'patients', '', { patient_code: code, first_name: first, last_name: last });
+  if (inserted && inserted[0]) {
+    patients.push(inserted[0]);
+    return inserted[0].id;
+  }
+  throw new Error('Could not create patient record');
+}
+
+async function handleAddRecord(e) {
+  e.preventDefault();
+  const btn = document.getElementById('ar-submit');
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+
+  try {
+    const name      = document.getElementById('ar-name').value.trim();
+    const code      = document.getElementById('ar-code').value.trim().toUpperCase();
+    const sheetDate = document.getElementById('date-picker').value;
+    const svcDate   = document.getElementById('ar-svc-date').value || sheetDate;
+    const manip     = document.getElementById('ar-manip').value;
+    const te        = parseInt(document.getElementById('ar-te').value) || 0;
+    const diagCat   = document.getElementById('ar-diag-cat').value;
+    const a2        = document.getElementById('ar-a2').checked;
+    const re3       = document.getElementById('ar-re3').checked;
+    const backdated = svcDate !== sheetDate;
+
+    // Resolve diagnosis codes
+    let diagCodes = DIAG[diagCat] || [];
+    if (diagCat === 'CUSTOM') {
+      const prev = await sb('GET', 'intake_records',
+        '?patient_code=eq.' + encodeURIComponent(code)
+        + '&service_date=lt.' + sheetDate
+        + '&order=service_date.desc&limit=1&select=diagnosis_codes');
+      diagCodes = (prev && prev[0] && prev[0].diagnosis_codes) ? prev[0].diagnosis_codes : [];
+    }
+
+    const patientId = await findOrCreatePatient(code, name);
+    const intakeId  = genIntakeId(svcDate);
+
+    const inserted = await sb('POST', 'intake_records', '', {
+      intake_id: intakeId,
+      patient_id: patientId,
+      patient_code: code,
+      patient_name: name,
+      service_date: svcDate,
+      sheet_date: sheetDate,
+      manipulation_type: manip,
+      therapeutic_exercises: te,
+      diagnosis_category: diagCat,
+      diagnosis_codes: diagCodes,
+      a2, re3,
+      is_backdated: backdated,
+      workflow_status: 'logged',
+    });
+
+    if (inserted && inserted[0]) {
+      records.push(inserted[0]);
+      records.sort((a, b) => a.intake_id > b.intake_id ? 1 : -1);
+    }
+
+    buildP2Queue();
+    updateMetrics();
+    renderP1();
+    renderP2();
+    toggleAddForm();
+    e.target.reset();
+    document.getElementById('ar-code').value = 'XXX-XX';
+    document.getElementById('ar-svc-date').value = sheetDate;
+    toast('Record ' + intakeId + ' added', 'success');
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Add Record';
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Phase 2 — Queue
+// ─────────────────────────────────────────────────────────
+function buildP2Queue() {
+  const logged = records.filter(r => r.workflow_status === 'logged');
+  p2Queue = [
+    ...logged.filter(r => !r.is_backdated),
+    ...logged.filter(r =>  r.is_backdated),
+  ];
+  if (p2Index >= p2Queue.length) p2Index = 0;
+}
+
+function renderP2() {
+  const empty = p2Queue.length === 0;
+  document.getElementById('p2-complete').style.display = (empty && records.length > 0) ? '' : 'none';
+  document.getElementById('p2-active').style.display   = empty ? 'none' : '';
+
+  if (empty) return;
+
+  renderBrief();
+  renderQueue();
+}
+
+function renderBrief() {
+  if (!p2Queue.length) return;
+  const rec = p2Queue[p2Index];
+  if (!rec) return;
+
+  document.getElementById('p2-pos').textContent = (p2Index + 1) + ' of ' + p2Queue.length;
+
+  // CPT codes
+  const cpt1 = rec.manipulation_type === 'E1' ? '98940' : '98941';
+  const cpt1desc = rec.manipulation_type === 'E1'
+    ? 'Manipulation — 1–2 regions' : 'Manipulation — 3–4 regions';
+
+  let cpts = '<div class="brief-cpt"><span class="brief-cpt-code">' + cpt1 + '</span>'
+    + '<span class="brief-cpt-desc">' + cpt1desc + '</span></div>';
+
+  if (rec.therapeutic_exercises > 0) {
+    cpts += '<div class="brief-cpt"><span class="brief-cpt-code">97110</span>'
+      + '<span class="brief-cpt-desc">Therapeutic exercises &times; ' + rec.therapeutic_exercises + ' units</span></div>';
+  }
+  if (rec.a2) {
+    cpts += '<div class="brief-cpt"><span class="brief-cpt-code">99204</span>'
+      + '<span class="brief-cpt-desc">New patient office visit</span></div>';
+  } else if (rec.re3) {
+    cpts += '<div class="brief-cpt"><span class="brief-cpt-code">99213</span>'
+      + '<span class="brief-cpt-desc">Established patient office visit</span></div>';
+  }
+
+  // DOS
+  const dosClass = rec.is_backdated ? ' backdated' : '';
+  const dosExtra = rec.is_backdated ? ' <span class="pill pill-bd" style="font-size:11px">BACKDATED</span>' : '';
+  const dosHtml = '<div class="brief-dos' + dosClass + '">'
+    + esc(rec.service_date) + dosExtra + '</div>';
+
+  // Last visit (same patient_code, entered_ebs or claim_created, within loaded records)
+  const lastVisit = records
+    .filter(r =>
+      r.patient_code === rec.patient_code &&
+      r.intake_id !== rec.intake_id &&
+      (r.workflow_status === 'entered_ebs' || r.workflow_status === 'claim_created'))
+    .sort((a, b) => a.service_date > b.service_date ? -1 : 1)[0];
+
+  const lastHtml = lastVisit
+    ? esc(lastVisit.service_date) + ' — ' + statusPill(lastVisit.workflow_status)
+    : '<span style="color:var(--ink3)">No prior records this date</span>';
+
+  // Diagnosis codes
+  const codes = Array.isArray(rec.diagnosis_codes) ? rec.diagnosis_codes : [];
+  const dxHtml = codes.length
+    ? codes.map(c => '<span class="brief-dx-code">' + esc(c) + '</span>').join('')
+    : '<span style="color:var(--ink3)">No diagnosis codes on file</span>';
+  const catLabel = rec.diagnosis_category
+    ? ' <span class="muted-text">(' + esc(rec.diagnosis_category) + ')</span>' : '';
+
+  document.getElementById('p2-brief').innerHTML =
+    '<div class="brief-patient-header">'
+    + '<span class="brief-patient-name">' + esc(rec.patient_name || '—') + '</span>'
+    + '<span style="color:var(--ink3);font-size:13px">' + esc(rec.patient_code || '') + '</span>'
+    + '<code class="mono" style="color:var(--ink3)">' + esc(rec.intake_id) + '</code>'
+    + (rec.is_backdated ? '<span class="pill pill-bd">BD</span>' : '')
+    + (rec.a2  ? '<span class="pill pill-a2">A2</span>' : '')
+    + (rec.re3 ? '<span class="pill pill-re3">RE3</span>' : '')
+    + '</div>'
+    + '<div class="brief-grid">'
+    + '<div><div class="brief-label">CPT Codes</div><div class="brief-cpt-list">' + cpts + '</div></div>'
+    + '<div>'
+    + '<div><div class="brief-label">Date of Service</div>' + dosHtml + '</div>'
+    + '<div><div class="brief-label">Last Visit (this date)</div>'
+    + '<div class="brief-info-block">' + lastHtml + '</div></div>'
+    + '</div>'
+    + '</div>'
+    + '<div><div class="brief-label">Diagnosis Codes' + catLabel + '</div>'
+    + '<div class="brief-dx-codes">' + dxHtml + '</div></div>';
+
+  document.getElementById('p2-actions').style.display = '';
+}
+
+function renderQueue() {
+  document.getElementById('p2-queue-label').textContent = p2Queue.length + ' remaining';
+  const list = document.getElementById('p2-queue-list');
+  if (!p2Queue.length) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">Queue empty.</div>';
+    return;
+  }
+  list.innerHTML = p2Queue.map((r, i) => {
+    const bd = r.is_backdated ? '<span class="pill pill-bd" style="font-size:9px;padding:1px 5px">BD</span>' : '';
+    return '<div class="p2-queue-item' + (i === p2Index ? ' current' : '') + '" onclick="p2Jump(' + i + ')">'
+      + '<span class="q-id">' + esc(r.intake_id) + '</span>'
+      + '<span class="q-name">' + esc(r.patient_name || '—') + '</span>'
+      + '<span class="q-code">' + esc(r.patient_code || '') + '</span>'
+      + bd
+      + '</div>';
+  }).join('');
+}
+
+function p2Nav(dir) {
+  if (!p2Queue.length) return;
+  p2Index = Math.max(0, Math.min(p2Queue.length - 1, p2Index + dir));
+  renderBrief();
+  renderQueue();
+}
+
+function p2Jump(i) {
+  p2Index = i;
+  renderBrief();
+  renderQueue();
+}
+
+async function p2Pass() {
+  if (!p2Queue.length) return;
+  await markEBS(p2Queue[p2Index].intake_id);
+  // markEBS rebuilds queue and re-renders Phase 2
+}
+
+function p2Flag() {
+  if (!p2Queue.length) return;
+  openFlagModal(p2Queue[p2Index].intake_id);
+}
+
+// ─────────────────────────────────────────────────────────
+// Phase 3 — Flags & Review
+// ─────────────────────────────────────────────────────────
+function renderP3() {
+  const el = document.getElementById('p3-list');
+  const flagged = records.filter(r => r.needs_ebs_review);
+
+  if (!flagged.length) {
+    el.innerHTML = '<div class="empty-state">'
+      + '<div class="es-icon">✅</div>'
+      + '<p>No records flagged for review</p>'
+      + '<small>All clear for this date.</small>'
+      + '</div>';
+    return;
+  }
+
+  el.innerHTML = flagged.map(r => {
+    const noteBlock = r.ebs_review_note
+      ? '<div class="flag-note-block">' + esc(r.ebs_review_note) + '</div>'
+      : '<div style="font-size:12px;color:var(--ink3);margin-bottom:10px">No note recorded.</div>';
+    return '<div class="flag-item">'
+      + '<div class="flag-item-header">'
+      + '<span class="flag-item-name">' + esc(r.patient_name || '—') + '</span>'
+      + '<code class="mono" style="color:var(--ink3);font-size:11px">' + esc(r.intake_id) + '</code>'
+      + '<code class="mono" style="color:var(--ink3)">' + esc(r.patient_code || '') + '</code>'
+      + statusPill(r.workflow_status)
+      + '</div>'
+      + noteBlock
+      + '<div class="flag-item-actions">'
+      + '<button class="btn btn-xs btn-ghost" onclick="openFlagModal(\'' + r.intake_id + '\')">Edit Note</button>'
+      + '<button class="btn btn-xs btn-secondary" onclick="clearFlag(\'' + r.intake_id + '\')">Clear Flag</button>'
+      + '</div></div>';
+  }).join('');
+}
+
+async function clearFlag(intakeId) {
+  try {
+    const updated = await sb('PATCH', 'intake_records', '?intake_id=eq.' + intakeId, {
+      needs_ebs_review: false, ebs_review_note: null,
+    });
+    applyUpdate(intakeId, updated);
+    updateMetrics();
+    renderP1();
+    renderP3();
+    toast('Flag cleared', 'success');
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────
+document.getElementById('date-picker').value = new Date().toISOString().slice(0, 10);
+initAuth();
+</script>
+</body>
+</html>

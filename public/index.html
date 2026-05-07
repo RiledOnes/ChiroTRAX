@@ -941,6 +941,63 @@
     .tool-group.collapsed .tool-group-header span:first-child::before { content: '▶ '; }
     .tool-group:not(.collapsed) .tool-group-header span:first-child::before { content: '▼ '; }
     .tool-group .tool-group-header span:first-child { display: inline; }
+
+    /* ---- EBS WORKFLOW ---- */
+    .ebs-metrics-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 10px; }
+    .ebs-metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; }
+    .ebs-metric .ebs-m-label { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--ink3); }
+    .ebs-metric .ebs-m-val { font-family: 'Syne', sans-serif; font-size: 30px; font-weight: 700; line-height: 1; margin: 5px 0 3px; }
+    .ebs-metric .ebs-m-sub { font-size: 11px; color: var(--ink3); }
+    .ebs-metric.warn  .ebs-m-val { color: var(--warn); }
+    .ebs-metric.green .ebs-m-val { color: var(--accent2); }
+    .ebs-metric.blue  .ebs-m-val { color: #1565c0; }
+    .ebs-metric.red   .ebs-m-val { color: var(--danger); }
+    .ebs-progress-track { height: 4px; background: var(--surface3); border-radius: 2px; margin-bottom: 18px; overflow: hidden; }
+    .ebs-progress-fill { height: 100%; background: var(--accent2); border-radius: 2px; width: 0%; transition: width 0.5s ease; }
+    .ebs-phase-tabs { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 16px; }
+    .ebs-phase-tab { background: transparent; border: none; padding: 9px 18px; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--ink2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; display: flex; align-items: center; gap: 7px; }
+    .ebs-phase-tab:hover { color: var(--ink); background: var(--surface2); }
+    .ebs-phase-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+    .ebs-badge { background: rgba(230,126,34,0.15); color: var(--warn); font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
+    .ebs-badge:empty { display: none; }
+    .ebs-badge.done { background: rgba(67,160,71,0.15); color: var(--accent2); }
+    .ep { display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 4px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+    .ep-logged  { background: rgba(230,126,34,0.12); color: #c76b10; }
+    .ep-ebs     { background: rgba(67,160,71,0.12);  color: #2e7d32; }
+    .ep-claim   { background: rgba(21,101,192,0.12); color: #1565c0; }
+    .ep-pending { background: rgba(142,68,173,0.12); color: #8e44ad; }
+    .ep-prev    { background: var(--surface3); color: var(--ink3); }
+    .ep-bd      { background: rgba(192,57,43,0.12);  color: #c0392b; }
+    .ep-a2      { background: rgba(142,68,173,0.12); color: #8e44ad; }
+    .ep-re3     { background: rgba(22,160,133,0.12); color: #16a085; }
+    .ep-new     { background: rgba(192,57,43,0.12);  color: #c0392b; }
+    .pills-row  { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+    .ebs-brief-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 16px; }
+    .ebs-brief-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--ink3); margin-bottom: 6px; }
+    .ebs-cpt-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--surface2); border-radius: 6px; border: 1px solid var(--border); margin-bottom: 5px; }
+    .ebs-cpt-code { font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700; color: var(--accent); min-width: 48px; }
+    .ebs-cpt-desc { font-size: 12.5px; color: var(--ink2); }
+    .ebs-dos { font-size: 16px; font-family: 'Syne', sans-serif; font-weight: 600; padding: 10px 14px; background: var(--surface2); border-radius: 7px; border: 1px solid var(--border); margin-bottom: 12px; }
+    .ebs-dos.bd { color: var(--danger); background: rgba(192,57,43,0.08); border-color: rgba(192,57,43,0.25); }
+    .ebs-info { font-size: 12.5px; color: var(--ink2); padding: 9px 12px; background: var(--surface2); border-radius: 6px; }
+    .ebs-dx-codes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .ebs-dx-code { font-family: 'Courier New', monospace; font-size: 11.5px; background: var(--surface2); border: 1px solid var(--border); padding: 2px 7px; border-radius: 3px; color: var(--ink2); }
+    .ebs-p2-actions { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 12px; }
+    .ebs-p2-actions .btn { flex: 1; justify-content: center; }
+    .ebs-queue-list { max-height: 260px; overflow-y: auto; }
+    .ebs-queue-item { display: flex; align-items: center; gap: 10px; padding: 9px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; font-size: 13px; }
+    .ebs-queue-item:last-child { border-bottom: none; }
+    .ebs-queue-item:hover { background: var(--surface2); }
+    .ebs-queue-item.cur { background: var(--accent-dim); }
+    .ebs-q-id { font-family: 'Courier New', monospace; font-size: 11px; color: var(--ink3); min-width: 68px; }
+    .ebs-q-name { flex: 1; }
+    .ebs-q-code { font-size: 11.5px; color: var(--ink3); }
+    .ebs-flag-item { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; background: var(--surface2); }
+    .ebs-flag-item:last-child { margin-bottom: 0; }
+    .ebs-flag-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    .ebs-flag-name { font-weight: 500; font-size: 14px; flex: 1; }
+    .ebs-flag-note { background: rgba(230,126,34,0.1); border: 1px solid rgba(230,126,34,0.25); border-radius: 6px; padding: 9px 13px; font-size: 13px; color: var(--ink2); margin-bottom: 10px; white-space: pre-wrap; }
+    .ebs-flag-actions { display: flex; gap: 8px; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 </head>
@@ -1150,7 +1207,7 @@
         <button class="intake-tab active" onclick="switchDailyTab('visits', this)">Visits <span class="tab-count" id="tab-visits-count">0</span></button>
         <button class="intake-tab" onclick="switchDailyTab('images', this)">Images <span class="tab-count" id="tab-images-count">0</span></button>
         <button class="intake-tab" onclick="switchDailyTab('bulk', this)">Bulk CSV <span class="tab-count" id="tab-bulk-count">0</span></button>
-        <button class="intake-tab" onclick="switchDailyTab('workflow', this)">Workflow Pipeline</button>
+        <button class="intake-tab" onclick="switchDailyTab('workflow', this)">EBS Workflow</button>
       </div>
 
       <!-- TAB: Visits -->
@@ -1248,71 +1305,119 @@
         </div>
       </div>
 
-      <!-- TAB: Workflow Pipeline (all dates) -->
+      <!-- TAB: EBS Workflow -->
       <div class="tab-panel" id="tab-workflow">
-        <div class="workflow-pipeline" id="wf-pipeline">
-          <div class="wf-stage active" data-stage="" onclick="filterByStage('', this)">
-            <div class="wf-count" id="wf-all">—</div>
-            <div class="wf-label">All</div>
+
+        <!-- Metrics -->
+        <div class="ebs-metrics-row">
+          <div class="ebs-metric">
+            <div class="ebs-m-label">Total</div>
+            <div class="ebs-m-val" id="ebs-m-total">—</div>
           </div>
-          <div class="wf-stage" data-stage="intake" onclick="filterByStage('intake', this)">
-            <div class="wf-count" id="wf-intake">—</div>
-            <div class="wf-label">Intake</div>
+          <div class="ebs-metric warn">
+            <div class="ebs-m-label">Logged</div>
+            <div class="ebs-m-val" id="ebs-m-logged">—</div>
+            <div class="ebs-m-sub">pending entry</div>
           </div>
-          <div class="wf-arrow">→</div>
-          <div class="wf-stage" data-stage="entered_ebs" onclick="filterByStage('entered_ebs', this)">
-            <div class="wf-count" id="wf-entered_ebs">—</div>
-            <div class="wf-label">Entered EBS</div>
+          <div class="ebs-metric green">
+            <div class="ebs-m-label">In EBS</div>
+            <div class="ebs-m-val" id="ebs-m-ebs">—</div>
+            <div class="ebs-m-sub">verified</div>
           </div>
-          <div class="wf-arrow">→</div>
-          <div class="wf-stage" data-stage="claim_created" onclick="filterByStage('claim_created', this)">
-            <div class="wf-count" id="wf-claim_created">—</div>
-            <div class="wf-label">Claim Created</div>
-          </div>
-          <div class="wf-arrow">→</div>
-          <div class="wf-stage" data-stage="submitted" onclick="filterByStage('submitted', this)">
-            <div class="wf-count" id="wf-submitted">—</div>
-            <div class="wf-label">Submitted</div>
-          </div>
-          <div class="wf-arrow">→</div>
-          <div class="wf-stage" data-stage="processed" onclick="filterByStage('processed', this)">
-            <div class="wf-count" id="wf-processed">—</div>
-            <div class="wf-label">Processed</div>
+          <div class="ebs-metric red">
+            <div class="ebs-m-label">Flagged</div>
+            <div class="ebs-m-val" id="ebs-m-flagged">—</div>
+            <div class="ebs-m-sub">needs review</div>
           </div>
         </div>
-        <div class="card">
-          <div class="batch-bar" id="batch-bar">
-            <span class="bb-count" id="bb-count">0 selected</span>
-            <div class="bb-actions">
-              <button class="btn btn-secondary btn-sm" onclick="batchAdvance('entered_ebs')">→ Entered EBS</button>
-              <button class="btn btn-secondary btn-sm" onclick="batchAdvance('claim_created')">→ Claim Created</button>
-              <button class="btn btn-secondary btn-sm" onclick="batchAdvance('submitted')">→ Submitted</button>
-              <button class="btn btn-primary btn-sm" onclick="batchAdvance('processed')">→ Processed</button>
-              <button class="btn btn-ghost btn-sm" onclick="clearSelection()">Clear</button>
+        <div class="ebs-progress-track"><div class="ebs-progress-fill" id="ebs-progress"></div></div>
+
+        <!-- Phase sub-tabs -->
+        <div class="ebs-phase-tabs">
+          <button class="ebs-phase-tab active" id="ebs-ptab-p1" onclick="showEBSPhase('p1')">
+            Phase 1 — Records <span class="ebs-badge" id="ebs-badge-p1"></span>
+          </button>
+          <button class="ebs-phase-tab" id="ebs-ptab-p2" onclick="showEBSPhase('p2')">
+            Phase 2 — Verify <span class="ebs-badge" id="ebs-badge-p2"></span>
+          </button>
+          <button class="ebs-phase-tab" id="ebs-ptab-p3" onclick="showEBSPhase('p3')">
+            Phase 3 — Flags <span class="ebs-badge" id="ebs-badge-p3"></span>
+          </button>
+        </div>
+
+        <!-- Phase 1: Records table -->
+        <div id="ebs-panel-p1">
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">Intake Records — <span id="ebs-date-label" style="font-weight:400;color:var(--ink2)"></span></span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Intake ID</th><th>Patient</th><th>Code</th><th>Type</th>
+                    <th>TE</th><th>Flags</th><th>Status</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="ebs-tbody">
+                  <tr><td colspan="8"><div class="empty-state"><div class="icon">📋</div><p>Select a date and click the EBS Workflow tab to load records.</p></div></td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th><input type="checkbox" class="row-check" id="check-all-wf" onchange="toggleAllChecks(this)"/></th>
-                  <th>Intake ID</th>
-                  <th>Patient</th>
-                  <th>Service Date</th>
-                  <th>Manip</th>
-                  <th>Exercises</th>
-                  <th>Dx Codes</th>
-                  <th>Billed</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="wf-intake-tbody">
-                <tr><td colspan="10"><div class="empty-state"><div class="icon">📤</div><p>No intake records yet.</p></div></td></tr>
-              </tbody>
-            </table>
+        </div>
+
+        <!-- Phase 2: EBS Verification -->
+        <div id="ebs-panel-p2" style="display:none">
+          <div id="ebs-p2-done" class="card" style="display:none">
+            <div class="card-body empty-state">
+              <div class="icon">✅</div><p>All records entered in EBS</p>
+              <small>Phase 2 complete for this date.</small>
+            </div>
+          </div>
+          <div id="ebs-p2-active">
+            <div class="card" style="margin-bottom:16px">
+              <div class="card-head">
+                <span class="card-title">Entry Brief</span>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <span style="font-size:12px;color:var(--ink3)" id="ebs-q-pos"></span>
+                  <button class="btn btn-xs btn-ghost" onclick="ebsNav(-1)">← Prev</button>
+                  <button class="btn btn-xs btn-ghost" onclick="ebsNav(1)">Next →</button>
+                </div>
+              </div>
+              <div class="card-body" id="ebs-brief">
+                <div class="empty-state"><div class="icon">📋</div><p>Load records to begin EBS verification.</p></div>
+              </div>
+              <div class="ebs-p2-actions" id="ebs-p2-actions" style="display:none">
+                <button class="btn btn-primary" onclick="ebsPass()">✓ Pass — Mark Entered EBS</button>
+                <button class="btn btn-danger" onclick="ebsFlagCurrent()">⚑ Mismatch — Flag Issue</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head">
+                <span class="card-title">Queue</span>
+                <span style="font-size:12px;color:var(--ink3)" id="ebs-q-count"></span>
+              </div>
+              <div class="ebs-queue-list" id="ebs-queue-list">
+                <div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">No records in queue.</div>
+              </div>
+            </div>
           </div>
         </div>
+
+        <!-- Phase 3: Flags & Review -->
+        <div id="ebs-panel-p3" style="display:none">
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">Flags &amp; Review</span>
+              <span style="font-size:12px;color:var(--ink3)">Theresa review items</span>
+            </div>
+            <div class="card-body" id="ebs-flags-list">
+              <div class="empty-state"><p>No flagged records for this date.</p></div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -1821,6 +1926,24 @@
 <!-- ════════════════════════════════════════════ -->
 <!-- MODALS                                       -->
 <!-- ════════════════════════════════════════════ -->
+
+<!-- EBS FLAG MODAL -->
+<div class="modal-overlay" id="ebs-flag-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="ebs-flag-title">Flag Record</h3>
+      <button class="modal-close" onclick="closeModal('ebs-flag-modal')">×</button>
+    </div>
+    <div class="form-group">
+      <label for="ebs-flag-note">Review note for Theresa</label>
+      <textarea id="ebs-flag-note" rows="4" placeholder="Describe the issue or mismatch…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('ebs-flag-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="ebsSaveFlag()">Save Flag</button>
+    </div>
+  </div>
+</div>
 
 <!-- VISIT MODAL -->
 <div class="modal-overlay" id="visit-modal">
@@ -2572,7 +2695,7 @@ function switchDailyTab(tab, el) {
   // Load tab-specific data
   if (tab === 'images') loadIntakeImages();
   if (tab === 'bulk') loadIntakeRecordsForDate();
-  if (tab === 'workflow') loadWorkflowTab();
+  if (tab === 'workflow') loadEBSWorkflow();
 }
 
 async function loadDailyPage() {
@@ -2585,7 +2708,7 @@ async function loadDailyPage() {
   // If images tab is active, reload
   if (document.getElementById('tab-images').classList.contains('active')) loadIntakeImages();
   if (document.getElementById('tab-bulk').classList.contains('active')) loadIntakeRecordsForDate();
-  if (document.getElementById('tab-workflow').classList.contains('active')) loadWorkflowTab();
+  if (document.getElementById('tab-workflow').classList.contains('active')) loadEBSWorkflow();
 }
 
 async function loadDailyTabCounts(date) {
@@ -2633,43 +2756,312 @@ async function loadIntakeRecordsForDate() {
   }
 }
 
-async function loadWorkflowTab() {
-  await Promise.all([loadWorkflowCounts(), loadAllIntakeRecords()]);
-}
+// ════════════════════════════════════
+// EBS WORKFLOW
+// ════════════════════════════════════
+let ebsRecords = [];
+let ebsQueue   = [];
+let ebsQIdx    = 0;
+let ebsFlagId  = null;
 
-async function loadAllIntakeRecords() {
+async function loadWorkflowTab() { await loadEBSWorkflow(); }
+
+async function loadEBSWorkflow() {
+  const date = document.getElementById('intake-date').value;
+  if (!date) return;
   try {
-    const url = currentStageFilter
-      ? `/api/visits?workflow_status=${currentStageFilter}`
-      : '/api/visits';
-    intakeRecords = await api('GET', url);
-    renderWorkflowTable();
+    const raw = await api('GET', `/api/visits?date=${date}`);
+    ebsRecords = (raw || []).map(r => ({
+      ...r,
+      diagnosis_codes: typeof r.diagnosis_codes === 'string'
+        ? (r.diagnosis_codes ? r.diagnosis_codes.split(',').map(s => s.trim()).filter(Boolean) : [])
+        : (Array.isArray(r.diagnosis_codes) ? r.diagnosis_codes : [])
+    }));
+    ebsRecords.sort((a, b) => (a.intake_id || '') > (b.intake_id || '') ? 1 : -1);
+    ebsBuildQueue();
+    ebsUpdateMetrics();
+    ebsRenderP1();
+    ebsRenderP2();
+    ebsRenderP3();
+    document.getElementById('ebs-date-label').textContent = date;
   } catch(e) {
-    document.getElementById('wf-intake-tbody').innerHTML =
-      '<tr><td colspan="10"><div class="empty-state"><div class="icon">📤</div><p>No intake records yet.</p></div></td></tr>';
+    toast('EBS load failed: ' + e.message, 'error');
   }
 }
 
-function renderWorkflowTable() {
-  const tbody = document.getElementById('wf-intake-tbody');
-  if (!intakeRecords.length) {
-    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="icon">📤</div><p>No records found.</p><small>${currentStageFilter ? 'No records at this stage.' : 'Upload CSV records to get started.'}</small></div></td></tr>`;
+function ebsBuildQueue() {
+  const logged = ebsRecords.filter(r => r.workflow_status === 'logged');
+  ebsQueue = [
+    ...logged.filter(r => !r.is_backdated),
+    ...logged.filter(r =>  r.is_backdated),
+  ];
+  if (ebsQIdx >= ebsQueue.length) ebsQIdx = 0;
+}
+
+function ebsUpdateMetrics() {
+  const total   = ebsRecords.length;
+  const logged  = ebsRecords.filter(r => r.workflow_status === 'logged').length;
+  const inEbs   = ebsRecords.filter(r => r.workflow_status === 'entered_ebs').length;
+  const claimed = ebsRecords.filter(r => r.workflow_status === 'claim_created').length;
+  const flagged = ebsRecords.filter(r => r.needs_ebs_review).length;
+  document.getElementById('ebs-m-total').textContent   = total;
+  document.getElementById('ebs-m-logged').textContent  = logged;
+  document.getElementById('ebs-m-ebs').textContent     = inEbs + claimed;
+  document.getElementById('ebs-m-flagged').textContent = flagged;
+  const pct = total > 0 ? Math.round(((inEbs + claimed) / total) * 100) : 0;
+  document.getElementById('ebs-progress').style.width  = pct + '%';
+  ebsSetBadge('ebs-badge-p1', logged,          logged === 0);
+  ebsSetBadge('ebs-badge-p2', ebsQueue.length, ebsQueue.length === 0);
+  ebsSetBadge('ebs-badge-p3', flagged,         false);
+}
+
+function ebsSetBadge(id, n, done) {
+  const el = document.getElementById(id);
+  el.textContent = n > 0 ? n : (done ? '✓' : '');
+  el.className = 'ebs-badge' + (done ? ' done' : '');
+}
+
+function ebsStatusPill(s) {
+  const m = { logged:'ep-logged', entered_ebs:'ep-ebs', claim_created:'ep-claim', pending:'ep-pending', prev_billed:'ep-prev', intake:'ep-logged' };
+  const labels = { logged:'Logged', entered_ebs:'In EBS', claim_created:'Claim', pending:'Pending', prev_billed:'Prev Billed', intake:'Intake' };
+  return `<span class="ep ${m[s]||'ep-prev'}">${labels[s]||s||'—'}</span>`;
+}
+
+function ebsApplyUpdate(id, updated) {
+  if (!updated) return;
+  const idx = ebsRecords.findIndex(r => r.id === id);
+  if (idx >= 0) {
+    const u = updated;
+    if (u.diagnosis_codes && typeof u.diagnosis_codes === 'string') {
+      u.diagnosis_codes = u.diagnosis_codes ? u.diagnosis_codes.split(',').map(s => s.trim()).filter(Boolean) : [];
+    }
+    ebsRecords[idx] = Object.assign({}, ebsRecords[idx], u);
+  }
+}
+
+// Phase 1
+function ebsRenderP1() {
+  const tbody = document.getElementById('ebs-tbody');
+  if (!ebsRecords.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="icon">📋</div><p>No records for this date.</p></div></td></tr>`;
     return;
   }
-  tbody.innerHTML = intakeRecords.map(r => `
-    <tr>
-      <td><input type="checkbox" class="row-check" data-id="${r.id}" ${selectedIntakeIds.has(r.id) ? 'checked' : ''} onchange="toggleCheck('${r.id}', this.checked)"/></td>
-      <td><strong>${esc(r.intake_id || '—')}</strong></td>
-      <td>${visitName(r)}</td>
-      <td class="muted">${r.visit_date || '—'}</td>
-      <td>${r.manipulation_type ? badge(r.manipulation_type) : '<span class="muted">—</span>'}</td>
-      <td>${r.therapeutic_exercises != null ? r.therapeutic_exercises : '<span class="muted">—</span>'}</td>
-      <td class="muted">${esc(r.diagnosis_codes || '—')}</td>
-      <td>${r.amount_billed != null ? '$' + Number(r.amount_billed).toFixed(2) : '<span class="muted">—</span>'}</td>
-      <td><span class="badge badge-${r.workflow_status || 'intake'}">${formatStage(r.workflow_status || 'intake')}</span></td>
-      <td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openIntakeModal(${JSON.stringify(r).replace(/'/g, "&#39;")})'>Edit</button></div></td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = ebsRecords.map(r => {
+    const isNew = r.patient_code === 'XXX-XX';
+    const codeCell = isNew
+      ? `<span class="ep ep-new" style="font-family:monospace">XXX-XX</span>`
+      : `<code style="font-family:monospace;font-size:12px;color:var(--ink2)">${esc(r.patient_code||'—')}</code>`;
+    const flags = [];
+    if (r.is_backdated) flags.push(`<span class="ep ep-bd">BD</span>`);
+    if (r.a2)           flags.push(`<span class="ep ep-a2">A2</span>`);
+    if (r.re3)          flags.push(`<span class="ep ep-re3">RE3</span>`);
+    if (isNew)          flags.push(`<span class="ep ep-new">NEW</span>`);
+    const te = r.therapeutic_exercises > 0 ? `×${r.therapeutic_exercises}` : '<span class="muted">—</span>';
+    const ebsBtn = r.workflow_status === 'logged'
+      ? `<button class="btn btn-xs btn-primary" onclick="ebsMark('${r.id}')">EBS</button>` : '';
+    const claimCell = r.claim_number
+      ? `<code style="font-size:11.5px;color:var(--ink2)">${esc(r.claim_number)}</code>`
+      : `<button class="btn btn-xs btn-ghost" onclick="ebsAssignClaim('${r.id}')">Claim #</button>`;
+    return `<tr>
+      <td><code style="font-size:11px;color:var(--ink3)">${esc(r.intake_id||'—')}</code></td>
+      <td>${esc(r.patient_name||'—')}</td>
+      <td>${codeCell}</td>
+      <td><strong>${esc(r.manipulation_type||'—')}</strong></td>
+      <td class="muted" style="font-size:12px">${te}</td>
+      <td><div class="pills-row">${flags.join('')||'<span class="muted">—</span>'}</div></td>
+      <td>${ebsStatusPill(r.workflow_status)}</td>
+      <td><div class="actions">${ebsBtn}<button class="btn btn-xs btn-ghost" title="Flag" onclick="ebsOpenFlag('${r.id}')">🚩</button>${claimCell}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function ebsMark(id) {
+  try {
+    const updated = await api('PUT', `/api/visits/${id}`, { workflow_status: 'entered_ebs' });
+    ebsApplyUpdate(id, updated);
+    ebsBuildQueue();
+    ebsUpdateMetrics();
+    ebsRenderP1();
+    ebsRenderP2();
+    const n = ebsRecords.filter(r => r.workflow_status === 'entered_ebs').length;
+    toast(`${n} of ${ebsRecords.length} entered EBS · ${ebsRecords.length - n} to go`, 'success');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function ebsAssignClaim(id) {
+  const rec = ebsRecords.find(r => r.id === id);
+  const num = prompt(`Enter claim number for ${rec?.intake_id || id}:`);
+  if (!num || !num.trim()) return;
+  try {
+    const payload = { claim_number: num.trim() };
+    if (rec?.workflow_status === 'entered_ebs') payload.workflow_status = 'claim_created';
+    const updated = await api('PUT', `/api/visits/${id}`, payload);
+    ebsApplyUpdate(id, updated);
+    ebsBuildQueue();
+    ebsUpdateMetrics();
+    ebsRenderP1();
+    toast('Claim number saved' + (payload.workflow_status ? ' — status → Claim Created' : ''), 'success');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// Flag modal
+function ebsOpenFlag(id) {
+  ebsFlagId = id;
+  const rec = ebsRecords.find(r => r.id === id);
+  document.getElementById('ebs-flag-title').textContent =
+    `${rec?.intake_id||id} — ${rec?.patient_name||''} (${rec?.patient_code||''})`;
+  document.getElementById('ebs-flag-note').value = rec?.ebs_review_note || '';
+  document.getElementById('ebs-flag-modal').classList.add('open');
+}
+
+async function ebsSaveFlag() {
+  if (!ebsFlagId) return;
+  const note = document.getElementById('ebs-flag-note').value.trim();
+  try {
+    const updated = await api('PUT', `/api/visits/${ebsFlagId}`, { needs_ebs_review: true, ebs_review_note: note || null });
+    ebsApplyUpdate(ebsFlagId, updated);
+    closeModal('ebs-flag-modal');
+    ebsFlagId = null;
+    ebsUpdateMetrics();
+    ebsRenderP1();
+    ebsRenderP3();
+    toast('Flag saved', 'success');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// Phase 2
+function ebsRenderP2() {
+  const empty = ebsQueue.length === 0;
+  document.getElementById('ebs-p2-done').style.display   = (empty && ebsRecords.length > 0) ? '' : 'none';
+  document.getElementById('ebs-p2-active').style.display = empty ? 'none' : '';
+  if (!empty) { ebsRenderBrief(); ebsRenderQueue(); }
+}
+
+function ebsRenderBrief() {
+  if (!ebsQueue.length) return;
+  const rec = ebsQueue[ebsQIdx];
+  if (!rec) return;
+  document.getElementById('ebs-q-pos').textContent = `${ebsQIdx + 1} of ${ebsQueue.length}`;
+  const cpt1 = rec.manipulation_type === 'E1' ? '98940' : '98941';
+  const cpt1d = rec.manipulation_type === 'E1' ? 'Manipulation — 1–2 regions' : 'Manipulation — 3–4 regions';
+  let cpts = `<div class="ebs-cpt-row"><span class="ebs-cpt-code">${cpt1}</span><span class="ebs-cpt-desc">${cpt1d}</span></div>`;
+  if (rec.therapeutic_exercises > 0)
+    cpts += `<div class="ebs-cpt-row"><span class="ebs-cpt-code">97110</span><span class="ebs-cpt-desc">Therapeutic exercises &times; ${rec.therapeutic_exercises} units</span></div>`;
+  if (rec.a2)
+    cpts += `<div class="ebs-cpt-row"><span class="ebs-cpt-code">99204</span><span class="ebs-cpt-desc">New patient office visit</span></div>`;
+  else if (rec.re3)
+    cpts += `<div class="ebs-cpt-row"><span class="ebs-cpt-code">99213</span><span class="ebs-cpt-desc">Established patient office visit</span></div>`;
+  const dosClass = rec.is_backdated ? ' bd' : '';
+  const dosBd    = rec.is_backdated ? ' <span class="ep ep-bd">BACKDATED</span>' : '';
+  const lastVisit = ebsRecords
+    .filter(r => r.patient_code === rec.patient_code && r.id !== rec.id &&
+      (r.workflow_status === 'entered_ebs' || r.workflow_status === 'claim_created'))
+    .sort((a, b) => (a.service_date||'') > (b.service_date||'') ? -1 : 1)[0];
+  const lastHtml = lastVisit
+    ? `${esc(lastVisit.service_date)} — ${ebsStatusPill(lastVisit.workflow_status)}`
+    : '<span class="muted">No prior records this date</span>';
+  const codes  = Array.isArray(rec.diagnosis_codes) ? rec.diagnosis_codes : [];
+  const dxHtml = codes.length
+    ? codes.map(c => `<span class="ebs-dx-code">${esc(c)}</span>`).join('')
+    : '<span class="muted">No diagnosis codes on file</span>';
+  const catLabel = rec.diagnosis_category
+    ? ` <span style="font-size:10px;color:var(--ink3)">(${esc(rec.diagnosis_category)})</span>` : '';
+  document.getElementById('ebs-brief').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <strong style="font-size:15px">${esc(rec.patient_name||'—')}</strong>
+      <span class="muted" style="font-size:13px">${esc(rec.patient_code||'')}</span>
+      <code style="font-size:11px;color:var(--ink3)">${esc(rec.intake_id||'')}</code>
+      ${rec.is_backdated?'<span class="ep ep-bd">BD</span>':''}${rec.a2?'<span class="ep ep-a2">A2</span>':''}${rec.re3?'<span class="ep ep-re3">RE3</span>':''}
+    </div>
+    <div class="ebs-brief-grid">
+      <div><div class="ebs-brief-label">CPT Codes</div>${cpts}</div>
+      <div>
+        <div class="ebs-brief-label">Date of Service</div>
+        <div class="ebs-dos${dosClass}">${esc(rec.service_date||'—')}${dosBd}</div>
+        <div class="ebs-brief-label" style="margin-top:10px">Last Visit (this date)</div>
+        <div class="ebs-info">${lastHtml}</div>
+      </div>
+    </div>
+    <div><div class="ebs-brief-label">Diagnosis Codes${catLabel}</div><div class="ebs-dx-codes">${dxHtml}</div></div>`;
+  document.getElementById('ebs-p2-actions').style.display = 'flex';
+}
+
+function ebsRenderQueue() {
+  document.getElementById('ebs-q-count').textContent = `${ebsQueue.length} remaining`;
+  const list = document.getElementById('ebs-queue-list');
+  if (!ebsQueue.length) {
+    list.innerHTML = `<div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">Queue empty.</div>`;
+    return;
+  }
+  list.innerHTML = ebsQueue.map((r, i) =>
+    `<div class="ebs-queue-item ${i===ebsQIdx?'cur':''}" onclick="ebsJump(${i})">
+      <span class="ebs-q-id">${esc(r.intake_id||'—')}</span>
+      <span class="ebs-q-name">${esc(r.patient_name||'—')}</span>
+      <span class="ebs-q-code">${esc(r.patient_code||'')}</span>
+      ${r.is_backdated?'<span class="ep ep-bd" style="font-size:9px;padding:1px 4px">BD</span>':''}
+    </div>`
+  ).join('');
+}
+
+function ebsNav(dir) {
+  if (!ebsQueue.length) return;
+  ebsQIdx = Math.max(0, Math.min(ebsQueue.length - 1, ebsQIdx + dir));
+  ebsRenderBrief(); ebsRenderQueue();
+}
+
+function ebsJump(i) { ebsQIdx = i; ebsRenderBrief(); ebsRenderQueue(); }
+
+async function ebsPass() {
+  if (!ebsQueue.length) return;
+  await ebsMark(ebsQueue[ebsQIdx].id);
+}
+
+function ebsFlagCurrent() {
+  if (!ebsQueue.length) return;
+  ebsOpenFlag(ebsQueue[ebsQIdx].id);
+}
+
+// Phase 3
+function ebsRenderP3() {
+  const el = document.getElementById('ebs-flags-list');
+  const flagged = ebsRecords.filter(r => r.needs_ebs_review);
+  if (!flagged.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">✅</div><p>No records flagged for review</p><small>All clear for this date.</small></div>`;
+    return;
+  }
+  el.innerHTML = flagged.map(r => `
+    <div class="ebs-flag-item">
+      <div class="ebs-flag-header">
+        <span class="ebs-flag-name">${esc(r.patient_name||'—')}</span>
+        <code style="font-size:11px;color:var(--ink3)">${esc(r.intake_id||'')}</code>
+        <code style="font-size:12px;color:var(--ink3)">${esc(r.patient_code||'')}</code>
+        ${ebsStatusPill(r.workflow_status)}
+      </div>
+      ${r.ebs_review_note?`<div class="ebs-flag-note">${esc(r.ebs_review_note)}</div>`:'<p style="font-size:12px;color:var(--ink3);margin-bottom:10px">No note recorded.</p>'}
+      <div class="ebs-flag-actions">
+        <button class="btn btn-xs btn-ghost" onclick="ebsOpenFlag('${r.id}')">Edit Note</button>
+        <button class="btn btn-xs btn-secondary" onclick="ebsClearFlag('${r.id}')">Clear Flag</button>
+      </div>
+    </div>`
+  ).join('');
+}
+
+async function ebsClearFlag(id) {
+  try {
+    const updated = await api('PUT', `/api/visits/${id}`, { needs_ebs_review: false, ebs_review_note: null });
+    ebsApplyUpdate(id, updated);
+    ebsUpdateMetrics();
+    ebsRenderP1();
+    ebsRenderP3();
+    toast('Flag cleared', 'success');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+function showEBSPhase(phase) {
+  ['p1','p2','p3'].forEach(p => {
+    document.getElementById('ebs-panel-' + p).style.display = p === phase ? '' : 'none';
+    document.getElementById('ebs-ptab-' + p).classList.toggle('active', p === phase);
+  });
 }
 
 function badge(val, type) {
@@ -3355,7 +3747,7 @@ async function batchAdvance(newStatus) {
     const result = await api('PUT', '/api/visits/batch-advance', { ids, new_status: newStatus });
     toast(`${result.updated} records moved to "${formatStage(newStatus)}"`, 'success');
     clearSelection();
-    await loadWorkflowTab();
+    if (document.getElementById('tab-workflow').classList.contains('active')) await loadEBSWorkflow();
   } catch(e) { toast('Batch update failed: ' + e.message, 'error'); }
 }
 
@@ -3395,7 +3787,7 @@ async function saveIntakeRecord() {
     await api('PUT', `/api/visits/${id}`, body);
     toast('Record updated!', 'success');
     closeModal('intake-modal');
-    await loadWorkflowTab();
+    if (document.getElementById('tab-workflow').classList.contains('active')) await loadEBSWorkflow();
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 

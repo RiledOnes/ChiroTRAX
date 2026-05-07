@@ -951,6 +951,7 @@
     .ebs-metric.warn  .ebs-m-val { color: var(--warn); }
     .ebs-metric.green .ebs-m-val { color: var(--accent2); }
     .ebs-metric.blue  .ebs-m-val { color: #1565c0; }
+    .ebs-metric.red   .ebs-m-val { color: var(--danger); }
     .ebs-progress-track { height: 4px; background: var(--surface3); border-radius: 2px; margin-bottom: 18px; overflow: hidden; }
     .ebs-progress-fill { height: 100%; background: var(--accent2); border-radius: 2px; width: 0%; transition: width 0.5s ease; }
     .ebs-phase-tabs { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 16px; }
@@ -1323,7 +1324,7 @@
             <div class="ebs-m-val" id="ebs-m-ebs">—</div>
             <div class="ebs-m-sub">verified</div>
           </div>
-          <div class="ebs-metric blue">
+          <div class="ebs-metric red">
             <div class="ebs-m-label">Flagged</div>
             <div class="ebs-m-val" id="ebs-m-flagged">—</div>
             <div class="ebs-m-sub">needs review</div>
@@ -2801,12 +2802,13 @@ function ebsUpdateMetrics() {
   const total   = ebsRecords.length;
   const logged  = ebsRecords.filter(r => r.workflow_status === 'logged').length;
   const inEbs   = ebsRecords.filter(r => r.workflow_status === 'entered_ebs').length;
+  const claimed = ebsRecords.filter(r => r.workflow_status === 'claim_created').length;
   const flagged = ebsRecords.filter(r => r.needs_ebs_review).length;
   document.getElementById('ebs-m-total').textContent   = total;
   document.getElementById('ebs-m-logged').textContent  = logged;
-  document.getElementById('ebs-m-ebs').textContent     = inEbs;
+  document.getElementById('ebs-m-ebs').textContent     = inEbs + claimed;
   document.getElementById('ebs-m-flagged').textContent = flagged;
-  const pct = total > 0 ? Math.round((inEbs / total) * 100) : 0;
+  const pct = total > 0 ? Math.round(((inEbs + claimed) / total) * 100) : 0;
   document.getElementById('ebs-progress').style.width  = pct + '%';
   ebsSetBadge('ebs-badge-p1', logged,          logged === 0);
   ebsSetBadge('ebs-badge-p2', ebsQueue.length, ebsQueue.length === 0);
@@ -2891,10 +2893,14 @@ async function ebsAssignClaim(id) {
   const num = prompt(`Enter claim number for ${rec?.intake_id || id}:`);
   if (!num || !num.trim()) return;
   try {
-    const updated = await api('PUT', `/api/visits/${id}`, { claim_number: num.trim() });
+    const payload = { claim_number: num.trim() };
+    if (rec?.workflow_status === 'entered_ebs') payload.workflow_status = 'claim_created';
+    const updated = await api('PUT', `/api/visits/${id}`, payload);
     ebsApplyUpdate(id, updated);
+    ebsBuildQueue();
+    ebsUpdateMetrics();
     ebsRenderP1();
-    toast('Claim number saved', 'success');
+    toast('Claim number saved' + (payload.workflow_status ? ' — status → Claim Created' : ''), 'success');
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 

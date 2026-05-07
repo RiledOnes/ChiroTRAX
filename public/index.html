@@ -1217,6 +1217,7 @@
             <table>
               <thead>
                 <tr>
+                  <th>ID</th>
                   <th>Patient ID</th>
                   <th>Name</th>
                   <th>Svc Date</th>
@@ -3218,7 +3219,7 @@ async function loadVisits() {
 
 function renderVisitRows(tbodyId, visits, compact) {
   const tbody = document.getElementById(tbodyId);
-  const cols = compact ? 6 : 8;
+  const cols = compact ? 7 : 9;
   if (!visits.length) {
     tbody.innerHTML = `<tr><td colspan="${cols}"><div class="empty-state"><div class="icon">📋</div><p>No visits found for this date.</p></div></td></tr>`;
     return;
@@ -3227,6 +3228,7 @@ function renderVisitRows(tbodyId, visits, compact) {
     const svcDate = v.is_backdated ? `<span style="color:#d97706;font-weight:600" title="Backdated">${v.visit_date}</span>` : `<span class="muted">${v.visit_date || '—'}</span>`;
     const wfLabel = formatStage(v.workflow_status || 'intake');
     return `<tr>
+      <td><span class="muted" style="font-family:monospace;font-size:11px">${esc(v.intake_id || '—')}</span></td>
       <td><strong>${v.patients?.patient_code || '—'}</strong></td>
       <td>${v.patients?.last_name || ''}, ${v.patients?.first_name || ''}</td>
       <td>${svcDate}</td>

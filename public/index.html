@@ -3535,6 +3535,24 @@ async function loadVisits() {
   try {
     const visits = await api('GET', `/api/visits?date=${date}`);
     document.getElementById('tab-visits-count').textContent = visits.length;
+
+    // Parallel-fetch prior records for each unique patient to detect dx changes
+    const patientIds = [...new Set(visits.filter(v => v.patient_id).map(v => v.patient_id))];
+    const priorMap = {};
+    await Promise.all(patientIds.map(async pid => {
+      try {
+        const history = await api('GET', `/api/visits?patient_id=${pid}`);
+        const prior = (history || []).find(v => v.sheet_date !== date);
+        if (prior) priorMap[pid] = prior;
+      } catch(e) {}
+    }));
+    visits.forEach(v => {
+      const prior = v.patient_id ? priorMap[v.patient_id] : null;
+      v._dx_changed = !!(prior?.diagnosis_category && v.diagnosis_category &&
+                        v.diagnosis_category !== prior.diagnosis_category);
+      v._prior_dx_cat = prior?.diagnosis_category || null;
+    });
+
     visitAllRows = visits;
     visitSortCol = null; visitSortDir = 1;
     document.querySelectorAll('.col-filter').forEach(i => i.value = '');
@@ -3559,6 +3577,7 @@ function renderVisitRows(tbodyId, visits, compact) {
   tbody.innerHTML = visits.map(v => {
     const svcDate = v.is_backdated ? `<span style="color:#d97706;font-weight:600" title="Backdated">${v.visit_date}</span>` : `<span class="muted">${v.visit_date || '—'}</span>`;
     const dxCat = v.diagnosis_category ? `<span class="badge" style="font-size:10px">${esc(v.diagnosis_category)}</span> ` : '';
+    const dxChangedFlag = v._dx_changed ? `<span title="Was: ${esc(v._prior_dx_cat||'')}" style="background:rgba(220,38,38,0.12);color:#dc2626;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:3px;cursor:default">⚠ ${esc(v._prior_dx_cat||'?')}→${esc(v.diagnosis_category)}</span>` : '';
     const dxCodes = v.diagnosis_codes ? `<span style="font-size:11px;color:var(--ink2)">${esc(typeof v.diagnosis_codes === 'string' ? v.diagnosis_codes : v.diagnosis_codes.join(', '))}</span>` : '<span class="muted">—</span>';
     const wfStatus = v.workflow_status || 'logged';
     const statusSelect = `<select class="badge badge-${wfStatus}" style="border:none;background:transparent;cursor:pointer;font-size:11px;font-weight:600;padding:2px 4px" onchange="updateVisitStatus('${v.id}', this)">
@@ -3571,7 +3590,7 @@ function renderVisitRows(tbodyId, visits, compact) {
       <td>${svcDate}</td>
       <td>${badge(v.manipulation_type)}</td>
       <td>${v.therapeutic_exercises != null ? v.therapeutic_exercises : '<span class="muted">—</span>'}</td>
-      <td style="max-width:180px">${dxCat}${dxCodes}</td>
+      <td style="max-width:200px">${dxCat}${dxChangedFlag}<br/>${dxCodes}</td>
       <td>${statusSelect}</td>
       <td data-col="a2">${v.a2 ? '<span class="badge" style="font-size:10px;background:rgba(46,125,50,0.12);color:#2e7d32">A2</span>' : '<span class="muted">—</span>'}</td>
       <td data-col="re3">${v.re3 ? '<span class="badge" style="font-size:10px;background:rgba(21,101,192,0.12);color:#1565c0">RE3</span>' : '<span class="muted">—</span>'}</td>

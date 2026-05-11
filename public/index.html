@@ -2790,17 +2790,17 @@ async function loadEBSWorkflow() {
 }
 
 function ebsBuildQueue() {
-  const logged = ebsRecords.filter(r => r.workflow_status === 'logged');
+  const needsEntry = ebsRecords.filter(r => r.workflow_status === 'logged' || r.workflow_status === 'intake');
   ebsQueue = [
-    ...logged.filter(r => !r.is_backdated),
-    ...logged.filter(r =>  r.is_backdated),
+    ...needsEntry.filter(r => !r.is_backdated),
+    ...needsEntry.filter(r =>  r.is_backdated),
   ];
   if (ebsQIdx >= ebsQueue.length) ebsQIdx = 0;
 }
 
 function ebsUpdateMetrics() {
   const total   = ebsRecords.length;
-  const logged  = ebsRecords.filter(r => r.workflow_status === 'logged').length;
+  const logged  = ebsRecords.filter(r => r.workflow_status === 'logged' || r.workflow_status === 'intake').length;
   const inEbs   = ebsRecords.filter(r => r.workflow_status === 'entered_ebs').length;
   const claimed = ebsRecords.filter(r => r.workflow_status === 'claim_created').length;
   const flagged = ebsRecords.filter(r => r.needs_ebs_review).length;
@@ -2857,7 +2857,7 @@ function ebsRenderP1() {
     if (r.re3)          flags.push(`<span class="ep ep-re3">RE3</span>`);
     if (isNew)          flags.push(`<span class="ep ep-new">NEW</span>`);
     const te = r.therapeutic_exercises > 0 ? `×${r.therapeutic_exercises}` : '<span class="muted">—</span>';
-    const ebsBtn = r.workflow_status === 'logged'
+    const ebsBtn = (r.workflow_status === 'logged' || r.workflow_status === 'intake')
       ? `<button class="btn btn-xs btn-primary" onclick="ebsMark('${r.id}')">EBS</button>` : '';
     const claimCell = r.claim_number
       ? `<code style="font-size:11.5px;color:var(--ink2)">${esc(r.claim_number)}</code>`

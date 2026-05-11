@@ -1948,64 +1948,82 @@
 
 <!-- VISIT MODAL -->
 <div class="modal-overlay" id="visit-modal">
-  <div class="modal">
+  <div class="modal" style="max-width:560px">
     <div class="modal-header">
       <h3 id="visit-modal-title">Log Visit</h3>
       <button class="modal-close" onclick="closeModal('visit-modal')">✕</button>
     </div>
     <input type="hidden" id="visit-edit-id"/>
-    <div class="form-grid">
-      <div class="form-group">
-        <label>Patient *</label>
-        <div class="search-select" id="ss-visit-patient">
-          <input type="text" id="visit-patient-search" placeholder="Type to search patients..." autocomplete="off" oninput="filterSearchSelect('ss-visit-patient')" onfocus="openSearchSelect('ss-visit-patient')"/>
-          <input type="hidden" id="visit-patient-id"/>
-          <div class="ss-list"></div>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Intake Date *</label>
-        <input type="date" id="visit-date"/>
-      </div>
-      <div class="form-group">
-        <label>Service Date (if different)</label>
-        <input type="date" id="visit-service-date"/>
-      </div>
-      <div class="form-group">
-        <label>Patient Status</label>
-        <select id="visit-status">
-          <option value="">— None —</option>
-          <option value="new">New Patient</option>
-          <option value="existing">Existing Patient</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Manipulation Type</label>
-        <select id="visit-manip">
-          <option value="">— None —</option>
-          <option value="E1">E1 — Spinal Manipulation</option>
-          <option value="E2">E2 — Complex Manipulation</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Therapeutic Exercises (0–10)</label>
-        <input type="number" id="visit-exercises" min="0" max="10" placeholder="0"/>
-      </div>
-      <div class="form-group">
-        <label>Workflow Status</label>
-        <select id="visit-wf-status">
-          <option value="logged">Logged</option>
-          <option value="entered_ebs">Entered in EBS</option>
-          <option value="claim_created">Claim Created</option>
-          <option value="pending">Pending</option>
-          <option value="prev_billed">Previously Billed</option>
-        </select>
-      </div>
-      <div class="form-group full">
-        <label>Notes</label>
-        <textarea id="visit-notes" placeholder="Any additional notes for this visit..."></textarea>
-      </div>
+    <div class="search-select" id="ss-visit-patient" style="margin-bottom:14px">
+      <input type="text" id="visit-patient-search" placeholder="Search patient by name or code..." autocomplete="off" oninput="filterSearchSelect('ss-visit-patient')" onfocus="openSearchSelect('ss-visit-patient')" style="width:100%"/>
+      <input type="hidden" id="visit-patient-id"/>
+      <div class="ss-list"></div>
     </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <colgroup><col style="width:40%"/><col style="width:60%"/></colgroup>
+      <tbody>
+        <tr>
+          <td style="padding:7px 0;color:var(--ink2);font-weight:500">Intake Date *</td>
+          <td style="padding:7px 0"><input type="date" id="visit-date" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/></td>
+        </tr>
+        <tr>
+          <td style="padding:7px 0;color:var(--ink2);font-weight:500">Service Date <span style="font-weight:400;color:var(--ink3)">(if backdated)</span></td>
+          <td style="padding:7px 0"><input type="date" id="visit-service-date" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/></td>
+        </tr>
+        <tr>
+          <td style="padding:7px 0;color:var(--ink2);font-weight:500">Patient Status</td>
+          <td style="padding:7px 0">
+            <select id="visit-status" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
+              <option value="">— None —</option>
+              <option value="new">New Patient</option>
+              <option value="existing">Existing Patient</option>
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:7px 0;color:var(--ink2);font-weight:500">Manipulation</td>
+          <td style="padding:7px 0">
+            <select id="visit-manip" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
+              <option value="">— None —</option>
+              <option value="E1">E1 — Spinal (98940)</option>
+              <option value="E2">E2 — Complex (98941)</option>
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:7px 0;color:var(--ink2);font-weight:500">Therap. Exercises</td>
+          <td style="padding:7px 0"><input type="number" id="visit-exercises" min="0" max="10" placeholder="0" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/></td>
+        </tr>
+        <tr>
+          <td style="padding:7px 0;color:var(--ink2);font-weight:500">A2 <span style="font-weight:400;color:var(--ink3)">(New pt office visit 99204)</span></td>
+          <td style="padding:7px 0"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="visit-a2" style="width:16px;height:16px;accent-color:var(--accent)"/> <span style="color:var(--ink3);font-size:12px">Include A2 code</span></label></td>
+        </tr>
+        <tr>
+          <td style="padding:7px 0;color:var(--ink2);font-weight:500">RE3 <span style="font-weight:400;color:var(--ink3)">(Returning pt office visit 99213)</span></td>
+          <td style="padding:7px 0"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="visit-re3" style="width:16px;height:16px;accent-color:var(--accent)"/> <span style="color:var(--ink3);font-size:12px">Include RE3 code</span></label></td>
+        </tr>
+        <tr>
+          <td style="padding:7px 0;color:var(--ink2);font-weight:500">No Fault</td>
+          <td style="padding:7px 0"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="visit-no-fault" style="width:16px;height:16px;accent-color:var(--accent)"/> <span style="color:var(--ink3);font-size:12px">No-fault / MVA claim</span></label></td>
+        </tr>
+        <tr>
+          <td style="padding:7px 0;color:var(--ink2);font-weight:500">Workflow Status</td>
+          <td style="padding:7px 0">
+            <select id="visit-wf-status" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
+              <option value="logged">Logged</option>
+              <option value="entered_ebs">Entered in EBS</option>
+              <option value="claim_created">Claim Created</option>
+              <option value="pending">Pending</option>
+              <option value="prev_billed">Previously Billed</option>
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:7px 0;color:var(--ink2);font-weight:500;vertical-align:top;padding-top:12px">Notes</td>
+          <td style="padding:7px 0"><textarea id="visit-notes" placeholder="Additional notes..." style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px;resize:vertical;min-height:60px"></textarea></td>
+        </tr>
+      </tbody>
+    </table>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('visit-modal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveVisit()">Save Visit</button>
@@ -2612,9 +2630,12 @@ function closeModal(id) {
 function openVisitModal(visit = null) {
   populatePatientSelects();
   clearForm(['visit-edit-id','visit-status','visit-manip','visit-notes']);
-  document.getElementById('visit-wf-status').value = 'logged';
   setSearchSelectValue('ss-visit-patient', '', '');
   document.getElementById('visit-exercises').value = '';
+  document.getElementById('visit-a2').checked = false;
+  document.getElementById('visit-re3').checked = false;
+  document.getElementById('visit-no-fault').checked = false;
+  document.getElementById('visit-wf-status').value = 'logged';
   const intakeDate = document.getElementById('intake-date')?.value || today();
   document.getElementById('visit-date').value = intakeDate;
   document.getElementById('visit-service-date').value = '';
@@ -2630,6 +2651,9 @@ function openVisitModal(visit = null) {
     document.getElementById('visit-exercises').value = visit.therapeutic_exercises ?? '';
     document.getElementById('visit-notes').value = visit.notes || '';
     document.getElementById('visit-wf-status').value = visit.workflow_status || 'logged';
+    document.getElementById('visit-a2').checked = !!visit.a2;
+    document.getElementById('visit-re3').checked = !!visit.re3;
+    document.getElementById('visit-no-fault').checked = !!visit.no_fault;
   }
   document.getElementById('visit-modal').classList.add('open');
 }
@@ -3257,7 +3281,7 @@ async function saveVisit() {
   const editId = document.getElementById('visit-edit-id').value;
   const intakeDate = document.getElementById('visit-date').value;
   const serviceDate = document.getElementById('visit-service-date').value;
-  const isBackdated = serviceDate && serviceDate !== intakeDate;
+  const isBackdated = !!(serviceDate && serviceDate !== intakeDate);
   const body = {
     patient_id: document.getElementById('visit-patient-id').value,
     visit_date: serviceDate || intakeDate,
@@ -3266,6 +3290,9 @@ async function saveVisit() {
     patient_status: document.getElementById('visit-status').value || null,
     manipulation_type: document.getElementById('visit-manip').value || null,
     therapeutic_exercises: parseInt(document.getElementById('visit-exercises').value) || 0,
+    a2: document.getElementById('visit-a2').checked,
+    re3: document.getElementById('visit-re3').checked,
+    no_fault: document.getElementById('visit-no-fault').checked,
     notes: document.getElementById('visit-notes').value || null,
     workflow_status: document.getElementById('visit-wf-status').value || 'logged'
   };

@@ -1990,6 +1990,16 @@
         <label>Therapeutic Exercises (0–10)</label>
         <input type="number" id="visit-exercises" min="0" max="10" placeholder="0"/>
       </div>
+      <div class="form-group">
+        <label>Workflow Status</label>
+        <select id="visit-wf-status">
+          <option value="logged">Logged</option>
+          <option value="entered_ebs">Entered in EBS</option>
+          <option value="claim_created">Claim Created</option>
+          <option value="pending">Pending</option>
+          <option value="prev_billed">Previously Billed</option>
+        </select>
+      </div>
       <div class="form-group full">
         <label>Notes</label>
         <textarea id="visit-notes" placeholder="Any additional notes for this visit..."></textarea>
@@ -2601,6 +2611,7 @@ function closeModal(id) {
 function openVisitModal(visit = null) {
   populatePatientSelects();
   clearForm(['visit-edit-id','visit-status','visit-manip','visit-notes']);
+  document.getElementById('visit-wf-status').value = 'logged';
   setSearchSelectValue('ss-visit-patient', '', '');
   document.getElementById('visit-exercises').value = '';
   const intakeDate = document.getElementById('intake-date')?.value || today();
@@ -2617,6 +2628,7 @@ function openVisitModal(visit = null) {
     document.getElementById('visit-manip').value = visit.manipulation_type || '';
     document.getElementById('visit-exercises').value = visit.therapeutic_exercises ?? '';
     document.getElementById('visit-notes').value = visit.notes || '';
+    document.getElementById('visit-wf-status').value = visit.workflow_status || 'logged';
   }
   document.getElementById('visit-modal').classList.add('open');
 }
@@ -3252,7 +3264,8 @@ async function saveVisit() {
     patient_status: document.getElementById('visit-status').value || null,
     manipulation_type: document.getElementById('visit-manip').value || null,
     therapeutic_exercises: parseInt(document.getElementById('visit-exercises').value) || 0,
-    notes: document.getElementById('visit-notes').value || null
+    notes: document.getElementById('visit-notes').value || null,
+    workflow_status: document.getElementById('visit-wf-status').value || 'logged'
   };
   if (!body.patient_id || !intakeDate) { toast('Patient and intake date are required.', 'error'); return; }
   try {
@@ -3677,7 +3690,7 @@ function parseCSV(text) {
       insurance_provider: row.insurance_provider || null,
       amount_billed: row.amount_billed ? parseFloat(row.amount_billed) : null,
       notes: row.notes || null,
-      workflow_status: 'intake'
+      workflow_status: row.workflow_status || 'logged'
     };
     records.push(rec);
   }

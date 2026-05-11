@@ -2072,7 +2072,7 @@
               <td style="padding:7px 0"><input type="number" id="visit-exercises" min="0" max="10" placeholder="0" oninput="updateVisitLiveTotal()" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/></td>
             </tr>
             <tr>
-              <td style="padding:7px 0;color:var(--ink2);font-weight:500">Diagnosis Category</td>
+              <td style="padding:7px 0;color:var(--ink2);font-weight:500">Diagnosis Category <span id="visit-dx-diff-form-flag" style="display:none;background:rgba(220,38,38,0.12);color:#dc2626;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;vertical-align:middle">⚠ CHANGED</span></td>
               <td style="padding:7px 0">
                 <select id="visit-dx-cat" onchange="visitDxCatChanged()" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
                   <option value="ALL">ALL</option>
@@ -2772,13 +2772,18 @@ function visitDxCatChanged() {
 }
 
 function visitCheckDxDiff() {
-  const flag = document.getElementById('visit-dx-diff-flag');
-  if (!flag) return;
   const panel = document.getElementById('visit-prior-panel');
-  if (!panel?.dataset?.prior) { flag.style.display = 'none'; return; }
-  const prior = JSON.parse(panel.dataset.prior);
-  const currentCat = document.getElementById('visit-dx-cat').value;
-  flag.style.display = (prior.diagnosis_category && currentCat && currentCat !== prior.diagnosis_category) ? 'inline' : 'none';
+  const show = (() => {
+    if (!panel?.dataset?.prior) return false;
+    const prior = JSON.parse(panel.dataset.prior);
+    const currentCat = document.getElementById('visit-dx-cat').value;
+    return !!(prior.diagnosis_category && currentCat && currentCat !== prior.diagnosis_category);
+  })();
+  const d = show ? 'inline' : 'none';
+  const flag1 = document.getElementById('visit-dx-diff-flag');
+  const flag2 = document.getElementById('visit-dx-diff-form-flag');
+  if (flag1) flag1.style.display = d;
+  if (flag2) flag2.style.display = d;
 }
 
 function updateVisitEntryBrief() {

@@ -55,7 +55,21 @@
       height: 100vh;
       overflow-y: auto;
       z-index: 10;
+      transition: width 0.2s ease;
+      overflow: hidden;
     }
+    .sidebar.collapsed { width: 52px; }
+    .sidebar.collapsed .nav-section { display: none; }
+    .sidebar.collapsed .nav-item { justify-content: center; padding: 10px 0; }
+    .sidebar.collapsed .nav-item .icon { width: auto; font-size: 18px; }
+    .sidebar.collapsed .nav-item span:not(.icon) { display: none; }
+    .sidebar.collapsed .logo h1 { display: none; }
+    .sidebar.collapsed .logo sub { display: none; }
+    .sidebar.collapsed .user-bar { flex-direction: column; padding: 8px 4px; }
+    .sidebar.collapsed .user-email { display: none; }
+    .sidebar.collapsed .logout-btn { font-size: 10px; padding: 3px; }
+    .sidebar.collapsed .sidebar-footer { display: none; }
+    .sidebar-toggle { position: absolute; top: 8px; right: -12px; width: 24px; height: 24px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; z-index: 20; box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
 
     .logo {
       padding: 24px 20px 18px;
@@ -104,7 +118,9 @@
       padding: 28px 32px;
       max-width: calc(100vw - 220px);
       min-height: 100vh;
+      transition: margin-left 0.2s ease, max-width 0.2s ease;
     }
+    .main.sidebar-collapsed { margin-left: 52px; max-width: calc(100vw - 52px); }
 
     .page { display: none; }
     .page.active { display: block; animation: fadeIn 0.2s ease; }
@@ -199,6 +215,18 @@
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: var(--surface2); }
     td.muted { color: var(--ink3); }
+
+    /* ---- SORT / FILTER / RESIZE ---- */
+    .sort-icon { font-size: 10px; color: var(--ink3); margin-left: 3px; }
+    th[data-col] { cursor: pointer; user-select: none; }
+    th[data-col]:hover { background: var(--surface2); }
+    th.sort-asc .sort-icon::after { content: ' ↑'; color: var(--accent); }
+    th.sort-desc .sort-icon::after { content: ' ↓'; color: var(--accent); }
+    .col-filter { width: 100%; padding: 3px 5px; font-size: 11px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; color: var(--ink); box-sizing: border-box; }
+    .col-filter:focus { outline: none; border-color: var(--accent); }
+    .col-resizer { position: absolute; right: 0; top: 0; width: 5px; height: 100%; cursor: col-resize; z-index: 1; }
+    .col-resizer:hover, .col-resizer.resizing { background: var(--accent); opacity: 0.4; }
+    #visits-filter-row td { padding: 3px 4px; background: var(--surface); }
 
     /* ---- BADGES ---- */
     .badge {
@@ -1079,6 +1107,7 @@
 
   <!-- SIDEBAR -->
   <aside class="sidebar">
+    <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">◀</button>
     <div class="logo">
       <h1>Chiro<span>Trax</span></h1>
       <sub>Office Manager</sub>
@@ -1213,19 +1242,44 @@
       <!-- TAB: Visits -->
       <div class="tab-panel active" id="tab-visits">
         <div class="card">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:8px;position:relative">
+            <button class="btn btn-ghost btn-sm" onclick="toggleColPicker()" id="col-picker-btn">Columns ▾</button>
+            <div id="col-picker" style="display:none;position:absolute;top:100%;right:0;z-index:50;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;min-width:160px;box-shadow:0 4px 16px rgba(0,0,0,0.12)">
+              <div style="font-size:11px;font-weight:600;color:var(--ink3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Show / Hide</div>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="intake_id" onchange="toggleVisitCol(this)" checked> Intake ID</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="patient_code" onchange="toggleVisitCol(this)" checked> Pat ID</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="patient_name" onchange="toggleVisitCol(this)" checked> Name</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="visit_date" onchange="toggleVisitCol(this)" checked> Date</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="manipulation_type" onchange="toggleVisitCol(this)" checked> Manip</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="therapeutic_exercises" onchange="toggleVisitCol(this)" checked> TE</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="diagnosis_category" onchange="toggleVisitCol(this)" checked> Diagnosis</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="workflow_status" onchange="toggleVisitCol(this)" checked> Status</label>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Patient ID</th>
-                  <th>Name</th>
-                  <th>Svc Date</th>
-                  <th>Manipulation</th>
-                  <th>Exercises</th>
-                  <th>Diagnosis</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+              <thead id="visits-thead">
+                <tr id="visits-sort-row">
+                  <th data-col="intake_id" style="position:relative;min-width:80px">Intake ID <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th data-col="patient_code" style="position:relative;min-width:70px">Pat ID <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th data-col="patient_name" style="position:relative;min-width:100px">Name <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th data-col="visit_date" style="position:relative;min-width:80px">Date <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th data-col="manipulation_type" style="position:relative;min-width:70px">Manip <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th data-col="therapeutic_exercises" style="position:relative;min-width:40px">TE <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th data-col="diagnosis_category" style="position:relative;min-width:120px">Diagnosis <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th data-col="workflow_status" style="position:relative;min-width:100px">Status <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th style="position:relative;min-width:60px">Actions<div class="col-resizer"></div></th>
+                </tr>
+                <tr id="visits-filter-row">
+                  <td><input class="col-filter" data-col="intake_id" placeholder="Filter…" oninput="applyVisitFilters()"/></td>
+                  <td><input class="col-filter" data-col="patient_code" placeholder="Filter…" oninput="applyVisitFilters()"/></td>
+                  <td><input class="col-filter" data-col="patient_name" placeholder="Filter…" oninput="applyVisitFilters()"/></td>
+                  <td><input class="col-filter" data-col="visit_date" placeholder="Filter…" oninput="applyVisitFilters()"/></td>
+                  <td><input class="col-filter" data-col="manipulation_type" placeholder="E1/E2…" oninput="applyVisitFilters()"/></td>
+                  <td><input class="col-filter" data-col="therapeutic_exercises" placeholder="#" oninput="applyVisitFilters()"/></td>
+                  <td><input class="col-filter" data-col="diagnosis_category" placeholder="Filter…" oninput="applyVisitFilters()"/></td>
+                  <td><input class="col-filter" data-col="workflow_status" placeholder="Filter…" oninput="applyVisitFilters()"/></td>
+                  <td></td>
                 </tr>
               </thead>
               <tbody id="visits-tbody">
@@ -2632,6 +2686,10 @@ const CPT_FEES = { '98940':75, '98941':100, '97110':75, '99204':225, '99213':175
 // ════════════════════════════════════
 let allPatients = [];
 let allDiagnoses = [];
+let visitSortCol = null;   // column key
+let visitSortDir = 1;      // 1 = asc, -1 = desc
+let visitFilterVals = {};  // { colKey: filterString }
+let visitAllRows = [];     // full unfiltered dataset
 
 // ════════════════════════════════════
 // NAVIGATION
@@ -3452,7 +3510,13 @@ async function loadVisits() {
   try {
     const visits = await api('GET', `/api/visits?date=${date}`);
     document.getElementById('tab-visits-count').textContent = visits.length;
+    visitAllRows = visits;
+    visitSortCol = null; visitSortDir = 1;
+    document.querySelectorAll('.col-filter').forEach(i => i.value = '');
+    visitFilterVals = {};
     renderVisitRows('visits-tbody', visits, false);
+    initVisitColResizers();
+    applyColVisibility();
   } catch(e) { toast('Failed to load visits: ' + e.message, 'error'); }
 }
 
@@ -5953,12 +6017,154 @@ function printToolReport() {
 }
 
 // ════════════════════════════════════
+// SIDEBAR TOGGLE
+// ════════════════════════════════════
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const main = document.querySelector('.main');
+  const btn = document.getElementById('sidebar-toggle');
+  const collapsed = sidebar.classList.toggle('collapsed');
+  main.classList.toggle('sidebar-collapsed', collapsed);
+  btn.textContent = collapsed ? '▶' : '◀';
+  localStorage.setItem('sidebarCollapsed', collapsed);
+}
+
+// ════════════════════════════════════
+// VISITS TABLE: COLUMN VISIBILITY
+// ════════════════════════════════════
+let visitHiddenCols = new Set();
+
+function toggleColPicker() {
+  const picker = document.getElementById('col-picker');
+  picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+  // Close on outside click
+  if (picker.style.display === 'block') {
+    setTimeout(() => document.addEventListener('click', closeColPickerOutside, { once: true }), 0);
+  }
+}
+function closeColPickerOutside(e) {
+  const picker = document.getElementById('col-picker');
+  if (!picker?.contains(e.target) && e.target.id !== 'col-picker-btn') picker.style.display = 'none';
+}
+function toggleVisitCol(checkbox) {
+  const col = checkbox.dataset.col;
+  if (checkbox.checked) visitHiddenCols.delete(col);
+  else visitHiddenCols.add(col);
+  applyColVisibility();
+}
+function applyColVisibility() {
+  // Hide/show header th and filter td by data-col
+  document.querySelectorAll('#visits-sort-row th[data-col], #visits-filter-row td').forEach((el, i) => {
+    const col = el.dataset?.col;
+    if (!col) return;
+    el.style.display = visitHiddenCols.has(col) ? 'none' : '';
+  });
+  // Hide/show body cells by column index
+  const ths = [...document.querySelectorAll('#visits-sort-row th')];
+  document.querySelectorAll('#visits-tbody tr').forEach(tr => {
+    [...tr.cells].forEach((td, i) => {
+      const th = ths[i];
+      const col = th?.dataset?.col;
+      if (col) td.style.display = visitHiddenCols.has(col) ? 'none' : '';
+    });
+  });
+}
+
+// ════════════════════════════════════
+// VISITS TABLE: SORT / FILTER / RESIZE
+// ════════════════════════════════════
+function visitsSortBy(col) {
+  if (visitSortCol === col) visitSortDir *= -1;
+  else { visitSortCol = col; visitSortDir = 1; }
+  document.querySelectorAll('#visits-sort-row th[data-col]').forEach(th => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (th.dataset.col === col) th.classList.add(visitSortDir === 1 ? 'sort-asc' : 'sort-desc');
+  });
+  applyVisitFilters();
+}
+
+function applyVisitFilters() {
+  document.querySelectorAll('.col-filter').forEach(inp => {
+    visitFilterVals[inp.dataset.col] = inp.value.toLowerCase().trim();
+  });
+  let rows = [...visitAllRows];
+  // Filter
+  rows = rows.filter(v => {
+    return Object.entries(visitFilterVals).every(([col, val]) => {
+      if (!val) return true;
+      const cellVal = visitCellText(v, col).toLowerCase();
+      return cellVal.includes(val);
+    });
+  });
+  // Sort
+  if (visitSortCol) {
+    rows.sort((a, b) => {
+      const av = visitCellText(a, visitSortCol).toLowerCase();
+      const bv = visitCellText(b, visitSortCol).toLowerCase();
+      return av < bv ? -visitSortDir : av > bv ? visitSortDir : 0;
+    });
+  }
+  renderVisitRows('visits-tbody', rows, false);
+  applyColVisibility();
+}
+
+function visitCellText(v, col) {
+  switch(col) {
+    case 'intake_id': return v.intake_id || '';
+    case 'patient_code': return v.patients?.patient_code || '';
+    case 'patient_name': return `${v.patients?.last_name||''} ${v.patients?.first_name||''}`;
+    case 'visit_date': return v.visit_date || '';
+    case 'manipulation_type': return v.manipulation_type || '';
+    case 'therapeutic_exercises': return String(v.therapeutic_exercises ?? '');
+    case 'diagnosis_category': return v.diagnosis_category || '';
+    case 'workflow_status': return v.workflow_status || '';
+    default: return '';
+  }
+}
+
+function initVisitColResizers() {
+  document.querySelectorAll('#visits-sort-row .col-resizer').forEach(handle => {
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const th = handle.parentElement;
+      const startX = e.pageX;
+      const startW = th.offsetWidth;
+      handle.classList.add('resizing');
+      const onMove = ev => { th.style.width = Math.max(40, startW + ev.pageX - startX) + 'px'; };
+      const onUp = () => {
+        handle.classList.remove('resizing');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+  document.querySelectorAll('#visits-sort-row th[data-col]').forEach(th => {
+    th.addEventListener('click', e => {
+      if (e.target.classList.contains('col-resizer')) return;
+      visitsSortBy(th.dataset.col);
+    });
+  });
+}
+
+// ════════════════════════════════════
 // INIT
 // ════════════════════════════════════
 setupDragDrop();
 setupImageDragDrop();
 setupClipboardPaste();
 checkSession();
+
+// Restore sidebar state on load
+(function() {
+  if (localStorage.getItem('sidebarCollapsed') === 'true') {
+    document.querySelector('.sidebar')?.classList.add('collapsed');
+    document.querySelector('.main')?.classList.add('sidebar-collapsed');
+    const btn = document.getElementById('sidebar-toggle');
+    if (btn) btn.textContent = '▶';
+  }
+})();
 </script>
 </body>
 </html>

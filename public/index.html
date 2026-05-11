@@ -1222,13 +1222,13 @@
                   <th>Svc Date</th>
                   <th>Manipulation</th>
                   <th>Exercises</th>
-                  <th>Workflow</th>
-                  <th>Notes</th>
+                  <th>Diagnosis</th>
+                  <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="visits-tbody">
-                <tr><td colspan="7"><div class="empty-state"><div class="icon">📅</div><p>No visits for this date.</p></div></td></tr>
+                <tr><td colspan="8"><div class="empty-state"><div class="icon">📅</div><p>No visits for this date.</p></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -3436,20 +3436,43 @@ function renderVisitRows(tbodyId, visits, compact) {
     tbody.innerHTML = `<tr><td colspan="${cols}"><div class="empty-state"><div class="icon">📋</div><p>No visits found for this date.</p></div></td></tr>`;
     return;
   }
+  const statusOpts = [
+    ['logged','Logged'],['entered_ebs','Entered EBS'],['claim_created','Claim Created'],
+    ['pending','Pending'],['prev_billed','Prev Billed']
+  ].map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
   tbody.innerHTML = visits.map(v => {
     const svcDate = v.is_backdated ? `<span style="color:#d97706;font-weight:600" title="Backdated">${v.visit_date}</span>` : `<span class="muted">${v.visit_date || '—'}</span>`;
-    const wfLabel = formatStage(v.workflow_status || 'intake');
+    const dxCat = v.diagnosis_category ? `<span class="badge" style="font-size:10px">${esc(v.diagnosis_category)}</span> ` : '';
+    const dxCodes = v.diagnosis_codes ? `<span style="font-size:11px;color:var(--ink2)">${esc(typeof v.diagnosis_codes === 'string' ? v.diagnosis_codes : v.diagnosis_codes.join(', '))}</span>` : '<span class="muted">—</span>';
+    const wfStatus = v.workflow_status || 'logged';
+    const statusSelect = `<select class="badge badge-${wfStatus}" style="border:none;background:transparent;cursor:pointer;font-size:11px;font-weight:600;padding:2px 4px" onchange="updateVisitStatus('${v.id}', this)">
+      ${['logged','entered_ebs','claim_created','pending','prev_billed'].map(s => `<option value="${s}"${s===wfStatus?' selected':''}>${formatStage(s)}</option>`).join('')}
+    </select>`;
     return `<tr>
-      <td><strong>${v.patients?.patient_code || '—'}</strong></td>
-      <td>${v.patients?.last_name || ''}, ${v.patients?.first_name || ''}</td>
+      <td><strong>${esc(v.patients?.patient_code || '—')}</strong></td>
+      <td>${esc(v.patients?.last_name || '')}, ${esc(v.patients?.first_name || '')}</td>
       <td>${svcDate}</td>
       <td>${badge(v.manipulation_type)}</td>
       <td>${v.therapeutic_exercises != null ? v.therapeutic_exercises : '<span class="muted">—</span>'}</td>
-      <td><span class="badge badge-${v.workflow_status || 'intake'}">${wfLabel}</span></td>
-      <td class="muted">${v.notes || '—'}</td>
+      <td style="max-width:180px">${dxCat}${dxCodes}</td>
+      <td>${statusSelect}</td>
       ${compact ? '' : `<td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openVisitModal(${JSON.stringify(v)})'>Edit</button></div></td>`}
     </tr>`;
   }).join('');
+}
+
+async function updateVisitStatus(id, selectEl) {
+  const newStatus = selectEl.value;
+  const prevStatus = selectEl.className.match(/badge-(\S+)/)?.[1] || 'logged';
+  try {
+    await api('PUT', `/api/visits/${id}`, { workflow_status: newStatus });
+    selectEl.className = `badge badge-${newStatus}`;
+    if (document.getElementById('tab-workflow').classList.contains('active')) loadEBSWorkflow();
+    toast('Status updated', 'success');
+  } catch(e) {
+    selectEl.value = prevStatus;
+    toast('Error: ' + e.message, 'error');
+  }
 }
 
 async function saveVisit() {

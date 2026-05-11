@@ -458,9 +458,12 @@ app.get('/api/visits', async (req, res) => {
 app.post('/api/visits', async (req, res) => {
   // Map incoming frontend fields to intake_records columns
   const body = { ...req.body };
-  if (body.visit_date) { body.service_date = body.visit_date; delete body.visit_date; }
-  if (body.patient_status) { body.visit_status = body.patient_status; delete body.patient_status; }
-  if (body.office_visit) { body.cpt_office_visit = body.office_visit; delete body.office_visit; }
+  if (body.visit_date) body.service_date = body.visit_date;
+  delete body.visit_date;
+  body.visit_status = body.patient_status || null;
+  delete body.patient_status;
+  if (body.office_visit) body.cpt_office_visit = body.office_visit;
+  delete body.office_visit;
   // Auto-generate intake_id if not provided (MMDDYY_NN format based on sheet_date or service_date)
   if (!body.intake_id) {
     const idDate = body.sheet_date || body.service_date;
@@ -504,9 +507,12 @@ app.put('/api/visits/:id', async (req, res) => {
   const body = { ...req.body };
   const changedBy = body.changed_by || req.user?.email || 'system';
   delete body.changed_by;
-  if (body.visit_date) { body.service_date = body.visit_date; delete body.visit_date; }
-  if (body.patient_status) { body.visit_status = body.patient_status; delete body.patient_status; }
-  if (body.office_visit) { body.cpt_office_visit = body.office_visit; delete body.office_visit; }
+  if (body.visit_date) body.service_date = body.visit_date;
+  delete body.visit_date;
+  body.visit_status = body.patient_status || null;
+  delete body.patient_status;
+  if (body.office_visit) body.cpt_office_visit = body.office_visit;
+  delete body.office_visit;
   // Convert diagnosis_codes string to array if needed
   if (body.diagnosis_codes && typeof body.diagnosis_codes === 'string') {
     body.diagnosis_codes = body.diagnosis_codes.split(',').map(s => s.trim()).filter(Boolean);

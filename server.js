@@ -22,8 +22,8 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "blob:", "https://*.supabase.co"],
+      connectSrc: ["'self'", "https://*.supabase.co"],
       scriptSrcAttr: null  // allow inline event handlers (onclick, onsubmit, etc.)
     }
   }
@@ -1520,6 +1520,207 @@ app.get('/api/intake/:id/status-history', async (req, res) => {
     .order('changed_at', { ascending: false });
   if (error) return dbError(res, error);
   res.json(data);
+});
+
+// ============================================
+// EBS SCREENSHOT ROUTES
+// ============================================
+
+// POST /api/ebs-screenshots/upload
+app.post('/api/ebs-screenshots/upload', requireAuth, async (req, res) => {
+  const { base64, mimeType, intake_id, patient_code, service_date, is_correction, correction_of } = req.body;
+
+  if (!base64 || !intake_id || !patient_code || !service_date) {
+    return res.status(400).json({ error: 'Missing required fields: base64, intake_id, patient_code, service_date' });
+  }
+
+  const allowedTypes = ['image/jpeg', 'image/png'];
+  if (!allowedTypes.includes(mimeType)) {
+    return res.status(400).json({ error: 'Please convert to JPG or PNG before uploading.' });
+  }
+
+  let buffer;
+  try {
+    buffer = Buffer.from(base64, 'base64');
+  } catch {
+    return res.status(400).json({ error: 'Invalid base64 data' });
+  }
+
+  if (buffer.length > 10 * 1024 * 1024) {
+    return res.status(400).json({ error: 'File size exceeds 10MB limit' });
+  }
+
+  const ext = mimeType === 'image/png' ? 'png' : 'jpg';
+  const ts = Date.now();
+  const prefix = is_correction ? 'correction_' : '';
+  const storagePath = `${service_date}/${intake_id}/${prefix}${ts}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('ebs-screenshots')
+    .upload(storagePath, buffer, { contentType: mimeType, upsert: false });
+
+  if (uploadError) {
+    console.error('Storage upload error:', uploadError);
+    return res.status(500).json({ error: 'Failed to upload screenshot: ' + uploadError.message });
+  }
+
+  const { data: signedData } = await supabase.storage
+    .from('ebs-screenshots')
+    .createSignedUrl(storagePath, 3600);
+
+  const screenshot_url = signedData?.signedUrl || '';
+
+  const { data, error } = await supabase
+    .from('ebs_screenshots')
+    .insert({
+      intake_id,
+      patient_code,
+      service_date,
+      screenshot_url,
+      storage_path: storagePath,
+      verification_status: 'pending',
+      is_correction: !!is_correction,
+      correction_of: correction_of || null
+    })
+    .select()
+    .single();
+
+  if (error) return dbError(res, error);
+  res.json({ ...data, screenshot_url });
+});
+
+// PATCH /api/ebs-screenshots/:id/verify
+app.patch('/api/ebs-screenshots/:id/verify', requireAuth, async (req, res) => {
+  const { verification_status, mismatch_notes } = req.body;
+
+  if (!['pass', 'fail', 'corrected'].includes(verification_status)) {
+    return res.status(400).json({ error: 'Invalid verification_status. Must be pass, fail, or corrected.' });
+  }
+
+  const update = {
+    verification_status,
+    verified_at: new Date().toISOString(),
+    verified_by: req.user.email
+  };
+  if (mismatch_notes !== undefined) update.mismatch_notes = mismatch_notes || null;
+
+  const { data, error } = await supabase
+    .from('ebs_screenshots')
+    .update(update)
+    .eq('id', req.params.id)
+    .select()
+    .single();
+
+  if (error) return dbError(res, error);
+  res.json(data);
+});
+
+// POST /api/ebs-screenshots/correction — upload correction screenshot linked to original
+app.post('/api/ebs-screenshots/correction', requireAuth, async (req, res) => {
+  const { base64, mimeType, intake_id, patient_code, service_date, correction_of, mismatch_notes } = req.body;
+
+  if (!base64 || !intake_id || !patient_code || !service_date || !correction_of) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const allowedTypes = ['image/jpeg', 'image/png'];
+  if (!allowedTypes.includes(mimeType)) {
+    return res.status(400).json({ error: 'Please convert to JPG or PNG before uploading.' });
+  }
+
+  let buffer;
+  try {
+    buffer = Buffer.from(base64, 'base64');
+  } catch {
+    return res.status(400).json({ error: 'Invalid base64 data' });
+  }
+
+  if (buffer.length > 10 * 1024 * 1024) {
+    return res.status(400).json({ error: 'File size exceeds 10MB limit' });
+  }
+
+  const ext = mimeType === 'image/png' ? 'png' : 'jpg';
+  const ts = Date.now();
+  const storagePath = `${service_date}/${intake_id}/correction_${ts}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('ebs-screenshots')
+    .upload(storagePath, buffer, { contentType: mimeType, upsert: false });
+
+  if (uploadError) {
+    console.error('Storage upload error:', uploadError);
+    return res.status(500).json({ error: 'Failed to upload correction screenshot: ' + uploadError.message });
+  }
+
+  const { data: signedData } = await supabase.storage
+    .from('ebs-screenshots')
+    .createSignedUrl(storagePath, 3600);
+
+  const screenshot_url = signedData?.signedUrl || '';
+
+  // Insert correction record and mark original as corrected
+  const [insertResult, updateResult] = await Promise.all([
+    supabase.from('ebs_screenshots').insert({
+      intake_id, patient_code, service_date,
+      screenshot_url, storage_path: storagePath,
+      verification_status: 'corrected',
+      is_correction: true, correction_of,
+      verified_at: new Date().toISOString(),
+      verified_by: req.user.email
+    }).select().single(),
+    supabase.from('ebs_screenshots').update({
+      verification_status: 'corrected',
+      mismatch_notes: mismatch_notes || null
+    }).eq('id', correction_of)
+  ]);
+
+  if (insertResult.error) return dbError(res, insertResult.error);
+  if (updateResult.error) return dbError(res, updateResult.error);
+
+  res.json({ ...insertResult.data, screenshot_url });
+});
+
+// GET /api/ebs-screenshots — list with optional filters
+app.get('/api/ebs-screenshots', requireAuth, async (req, res) => {
+  const { intake_id, service_date, verification_status } = req.query;
+
+  let q = supabase.from('ebs_screenshots').select('*').order('created_at', { ascending: false });
+  if (intake_id) q = q.eq('intake_id', intake_id);
+  if (service_date) q = q.eq('service_date', service_date);
+  if (verification_status) q = q.eq('verification_status', verification_status);
+
+  const { data, error } = await q.limit(200);
+  if (error) return dbError(res, error);
+
+  // Refresh signed URLs in parallel
+  const rows = await Promise.all((data || []).map(async row => {
+    const { data: signed } = await supabase.storage
+      .from('ebs-screenshots')
+      .createSignedUrl(row.storage_path, 3600);
+    return { ...row, screenshot_url: signed?.signedUrl || row.screenshot_url };
+  }));
+
+  res.json(rows);
+});
+
+// GET /api/ebs-screenshots/intake/:intake_id — screenshots for a specific intake record
+app.get('/api/ebs-screenshots/intake/:intake_id', requireAuth, async (req, res) => {
+  const { data, error } = await supabase
+    .from('ebs_screenshots')
+    .select('*')
+    .eq('intake_id', req.params.intake_id)
+    .order('created_at', { ascending: false });
+
+  if (error) return dbError(res, error);
+
+  const rows = await Promise.all((data || []).map(async row => {
+    const { data: signed } = await supabase.storage
+      .from('ebs-screenshots')
+      .createSignedUrl(row.storage_path, 3600);
+    return { ...row, screenshot_url: signed?.signedUrl || row.screenshot_url };
+  }));
+
+  res.json(rows);
 });
 
 // SPA fallback — serve index.html for non-API routes

@@ -277,6 +277,8 @@
     .btn-ghost:hover { color: var(--ink); background: var(--surface2); }
     .btn-danger { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(247,95,95,0.2); }
     .btn-danger:hover { background: var(--danger); color: white; }
+    .btn-success { background: rgba(67,160,71,0.12); color: var(--accent2); border: 1px solid rgba(67,160,71,0.25); }
+    .btn-success:hover { background: var(--accent2); color: white; }
     .btn-sm { padding: 4px 10px; font-size: 11.5px; border-radius: 6px; }
     .btn-xs { padding: 3px 8px; font-size: 11px; border-radius: 5px; }
 
@@ -1026,6 +1028,27 @@
     .ebs-flag-name { font-weight: 500; font-size: 14px; flex: 1; }
     .ebs-flag-note { background: rgba(230,126,34,0.1); border: 1px solid rgba(230,126,34,0.25); border-radius: 6px; padding: 9px 13px; font-size: 13px; color: var(--ink2); margin-bottom: 10px; white-space: pre-wrap; }
     .ebs-flag-actions { display: flex; gap: 8px; }
+
+    /* ---- EBS SCREENSHOT UPLOAD ---- */
+    .ebs-upload-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 28px 16px; text-align: center; cursor: pointer; transition: all 0.15s; background: var(--surface); color: var(--ink3); font-size: 13px; }
+    .ebs-upload-zone:hover, .ebs-upload-zone.drag-over { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+    .ebs-upload-zone .upload-icon { font-size: 28px; margin-bottom: 8px; }
+    .ebs-ss-thumb-wrap { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); background: #000; }
+    .ebs-ss-thumb-wrap img { width: 100%; max-height: 220px; object-fit: contain; display: block; }
+    .ebs-ss-thumb-wrap .ss-replace { position: absolute; bottom: 0; right: 0; padding: 4px 8px; font-size: 11px; background: rgba(0,0,0,0.55); color: #fff; cursor: pointer; border-radius: 6px 0 0 0; }
+    .ebs-verify-btns { display: flex; gap: 10px; margin-top: 12px; }
+    .ebs-verify-btns .btn { flex: 1; justify-content: center; font-size: 14px; padding: 10px; }
+    .ebs-ss-status { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+    .ebs-ss-status.pass     { background: rgba(67,160,71,0.12); color: var(--accent2); }
+    .ebs-ss-status.fail     { background: rgba(220,38,38,0.1); color: var(--danger); }
+    .ebs-ss-status.pending  { background: rgba(230,126,34,0.12); color: var(--warn); }
+    .ebs-ss-status.corrected{ background: rgba(21,101,192,0.1); color: #1565c0; }
+    .ebs-correction-zone { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px; }
+    .ebs-p2-cols { display: flex; gap: 16px; align-items: flex-start; }
+    .ebs-p2-left { flex: 1; min-width: 0; }
+    .ebs-p2-right { width: 320px; flex-shrink: 0; }
+    /* Screenshot log table */
+    .ss-log-thumb { width: 56px; height: 40px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 1px solid var(--border); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 </head>
@@ -1418,6 +1441,9 @@
           <button class="ebs-phase-tab" id="ebs-ptab-p3" onclick="showEBSPhase('p3')">
             Phase 3 — Flags <span class="ebs-badge" id="ebs-badge-p3"></span>
           </button>
+          <button class="ebs-phase-tab" id="ebs-ptab-p4" onclick="showEBSPhase('p4')">
+            Screenshots <span class="ebs-badge" id="ebs-badge-p4"></span>
+          </button>
         </div>
 
         <!-- Phase 1: Records table -->
@@ -1451,30 +1477,82 @@
             </div>
           </div>
           <div id="ebs-p2-active">
-            <div class="card" style="margin-bottom:16px">
-              <div class="card-head">
-                <span class="card-title">Entry Brief</span>
-                <div style="display:flex;gap:8px;align-items:center">
-                  <span style="font-size:12px;color:var(--ink3)" id="ebs-q-pos"></span>
-                  <button class="btn btn-xs btn-ghost" onclick="ebsNav(-1)">← Prev</button>
-                  <button class="btn btn-xs btn-ghost" onclick="ebsNav(1)">Next →</button>
+            <div class="ebs-p2-cols">
+              <!-- Left: Entry Brief + Queue -->
+              <div class="ebs-p2-left">
+                <div class="card" style="margin-bottom:16px">
+                  <div class="card-head">
+                    <span class="card-title">Entry Brief</span>
+                    <div style="display:flex;gap:8px;align-items:center">
+                      <span style="font-size:12px;color:var(--ink3)" id="ebs-q-pos"></span>
+                      <button class="btn btn-xs btn-ghost" onclick="ebsNav(-1)">← Prev</button>
+                      <button class="btn btn-xs btn-ghost" onclick="ebsNav(1)">Next →</button>
+                    </div>
+                  </div>
+                  <div class="card-body" id="ebs-brief">
+                    <div class="empty-state"><div class="icon">📋</div><p>Load records to begin EBS verification.</p></div>
+                  </div>
+                  <div class="ebs-p2-actions" id="ebs-p2-actions" style="display:none">
+                    <button class="btn btn-primary" onclick="ebsPass()">✓ Pass — Mark Entered EBS</button>
+                    <button class="btn btn-danger" onclick="ebsFlagCurrent()">⚑ Mismatch — Flag Issue</button>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-head">
+                    <span class="card-title">Queue</span>
+                    <span style="font-size:12px;color:var(--ink3)" id="ebs-q-count"></span>
+                  </div>
+                  <div class="ebs-queue-list" id="ebs-queue-list">
+                    <div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">No records in queue.</div>
+                  </div>
                 </div>
               </div>
-              <div class="card-body" id="ebs-brief">
-                <div class="empty-state"><div class="icon">📋</div><p>Load records to begin EBS verification.</p></div>
-              </div>
-              <div class="ebs-p2-actions" id="ebs-p2-actions" style="display:none">
-                <button class="btn btn-primary" onclick="ebsPass()">✓ Pass — Mark Entered EBS</button>
-                <button class="btn btn-danger" onclick="ebsFlagCurrent()">⚑ Mismatch — Flag Issue</button>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-head">
-                <span class="card-title">Queue</span>
-                <span style="font-size:12px;color:var(--ink3)" id="ebs-q-count"></span>
-              </div>
-              <div class="ebs-queue-list" id="ebs-queue-list">
-                <div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">No records in queue.</div>
+
+              <!-- Right: Screenshot Upload & Verify -->
+              <div class="ebs-p2-right">
+                <div class="card">
+                  <div class="card-head">
+                    <span class="card-title">EBS Screenshot</span>
+                    <span id="ebs-ss-status-badge"></span>
+                  </div>
+                  <div class="card-body" id="ebs-ss-panel">
+                    <p style="font-size:12px;color:var(--ink3);margin-bottom:12px">After entering the record in EBS, take a screenshot and upload it here to verify.</p>
+                    <!-- Upload zone (hidden once screenshot uploaded) -->
+                    <div id="ebs-ss-upload-zone" class="ebs-upload-zone" onclick="document.getElementById('ebs-ss-file-input').click()">
+                      <div class="upload-icon">📷</div>
+                      <div>Drop screenshot here or <strong>click to browse</strong></div>
+                      <div style="font-size:11px;margin-top:5px;color:var(--ink3)">JPG or PNG only · max 10MB</div>
+                    </div>
+                    <input type="file" id="ebs-ss-file-input" accept="image/jpeg,image/png" style="display:none" onchange="ebsHandleFileInput(this)">
+
+                    <!-- Preview (shown after upload) -->
+                    <div id="ebs-ss-preview" style="display:none">
+                      <div class="ebs-ss-thumb-wrap">
+                        <img id="ebs-ss-preview-img" src="" alt="EBS Screenshot">
+                        <span class="ss-replace" onclick="ebsResetScreenshot()">Replace</span>
+                      </div>
+                      <div class="ebs-verify-btns">
+                        <button class="btn btn-success" onclick="ebsVerifyPass()">✅ Pass</button>
+                        <button class="btn btn-danger" onclick="ebsVerifyFail()">🛑 Fail</button>
+                      </div>
+
+                      <!-- Fail flow: mismatch notes + correction upload -->
+                      <div id="ebs-ss-fail-zone" class="ebs-correction-zone" style="display:none">
+                        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;color:var(--ink2)">Mismatch Notes</label>
+                        <textarea id="ebs-ss-mismatch-notes" rows="3" placeholder="Describe what was wrong..." style="width:100%;font-size:13px;padding:8px;border:1px solid var(--border);border-radius:6px;resize:vertical;box-sizing:border-box"></textarea>
+                        <label style="font-size:12px;font-weight:600;display:block;margin:10px 0 6px;color:var(--ink2)">Correction Screenshot (optional)</label>
+                        <div id="ebs-ss-correction-zone" class="ebs-upload-zone" style="padding:16px" onclick="document.getElementById('ebs-ss-correction-input').click()">
+                          <div>Drop corrected screenshot or <strong>click to browse</strong></div>
+                        </div>
+                        <input type="file" id="ebs-ss-correction-input" accept="image/jpeg,image/png" style="display:none" onchange="ebsHandleCorrectionInput(this)">
+                        <div id="ebs-ss-correction-preview" style="display:none;margin-top:8px">
+                          <div class="ebs-ss-thumb-wrap"><img id="ebs-ss-correction-img" src="" alt="Correction"></div>
+                        </div>
+                        <button class="btn btn-primary" style="width:100%;margin-top:12px;justify-content:center" onclick="ebsSaveFail()">Save Fail Verification</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1489,6 +1567,44 @@
             </div>
             <div class="card-body" id="ebs-flags-list">
               <div class="empty-state"><p>No flagged records for this date.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 4: Screenshot Log -->
+        <div id="ebs-panel-p4" style="display:none">
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">Screenshot Log</span>
+              <div style="display:flex;gap:8px;align-items:center">
+                <select id="ebs-ss-log-filter-status" onchange="ebsLoadScreenshotLog()" style="font-size:12px;padding:4px 8px">
+                  <option value="">All Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="pass">Pass</option>
+                  <option value="fail">Fail</option>
+                  <option value="corrected">Corrected</option>
+                </select>
+                <button class="btn btn-xs btn-ghost" onclick="ebsLoadScreenshotLog()">↺ Refresh</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:70px">Preview</th>
+                    <th>Intake ID</th>
+                    <th>Patient</th>
+                    <th>Service Date</th>
+                    <th>Status</th>
+                    <th>Verified By</th>
+                    <th>Uploaded</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody id="ebs-ss-log-tbody">
+                  <tr><td colspan="8"><div class="empty-state"><div class="icon">📷</div><p>No screenshots yet.</p></div></td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -3329,10 +3445,11 @@ function ebsRenderQueue() {
 function ebsNav(dir) {
   if (!ebsQueue.length) return;
   ebsQIdx = Math.max(0, Math.min(ebsQueue.length - 1, ebsQIdx + dir));
+  ebsResetScreenshot();
   ebsRenderBrief(); ebsRenderQueue();
 }
 
-function ebsJump(i) { ebsQIdx = i; ebsRenderBrief(); ebsRenderQueue(); }
+function ebsJump(i) { ebsQIdx = i; ebsResetScreenshot(); ebsRenderBrief(); ebsRenderQueue(); }
 
 async function ebsPass() {
   if (!ebsQueue.length) return;
@@ -3381,10 +3498,254 @@ async function ebsClearFlag(id) {
 }
 
 function showEBSPhase(phase) {
-  ['p1','p2','p3'].forEach(p => {
+  ['p1','p2','p3','p4'].forEach(p => {
     document.getElementById('ebs-panel-' + p).style.display = p === phase ? '' : 'none';
     document.getElementById('ebs-ptab-' + p).classList.toggle('active', p === phase);
   });
+  if (phase === 'p4') ebsLoadScreenshotLog();
+}
+
+// ════════════════════════════════════
+// EBS SCREENSHOT UPLOAD & VERIFY
+// ════════════════════════════════════
+let ebsCurrentScreenshotId = null;   // id of the last uploaded screenshot for the current queue record
+let ebsCorrectionBase64    = null;   // pending correction file
+let ebsCorrectionMimeType  = null;
+
+// Drag-drop setup for Phase 2 upload zone — called once after DOM ready
+function ebsSetupP2UploadZone() {
+  const zone = document.getElementById('ebs-ss-upload-zone');
+  if (!zone) return;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const file = e.dataTransfer?.files?.[0];
+    if (file) ebsHandleFile(file);
+  });
+
+  const corrZone = document.getElementById('ebs-ss-correction-zone');
+  if (!corrZone) return;
+  corrZone.addEventListener('dragover', e => { e.preventDefault(); corrZone.classList.add('drag-over'); });
+  corrZone.addEventListener('dragleave', () => corrZone.classList.remove('drag-over'));
+  corrZone.addEventListener('drop', e => {
+    e.preventDefault();
+    corrZone.classList.remove('drag-over');
+    const file = e.dataTransfer?.files?.[0];
+    if (file) ebsHandleCorrectionFile(file);
+  });
+}
+
+function ebsHandleFileInput(input) {
+  const file = input.files?.[0];
+  if (file) ebsHandleFile(file);
+  input.value = '';
+}
+
+function ebsHandleCorrectionInput(input) {
+  const file = input.files?.[0];
+  if (file) ebsHandleCorrectionFile(file);
+  input.value = '';
+}
+
+function ebsGetCurrentRecord() {
+  return ebsQueue[ebsQIdx] || null;
+}
+
+async function ebsHandleFile(file) {
+  // Reject HEIC
+  if (file.type === 'image/heic' || file.type === 'image/heif' ||
+      file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
+    toast('Please convert to JPG or PNG before uploading.', 'error');
+    return;
+  }
+  if (!['image/jpeg', 'image/png'].includes(file.type)) {
+    toast('Only JPG and PNG files are allowed.', 'error');
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    toast('File size exceeds 10MB limit.', 'error');
+    return;
+  }
+
+  const rec = ebsGetCurrentRecord();
+  if (!rec) { toast('No record selected.', 'error'); return; }
+
+  try {
+    const base64 = await ebsFileToBase64(file);
+
+    // Show preview immediately
+    const img = document.getElementById('ebs-ss-preview-img');
+    img.src = 'data:' + file.type + ';base64,' + base64;
+    document.getElementById('ebs-ss-upload-zone').style.display = 'none';
+    document.getElementById('ebs-ss-preview').style.display = '';
+    document.getElementById('ebs-ss-fail-zone').style.display = 'none';
+    document.getElementById('ebs-ss-status-badge').innerHTML = '<span class="ebs-ss-status pending">⏳ Pending</span>';
+    ebsCurrentScreenshotId = null;
+
+    // Upload
+    toast('Uploading screenshot…', 'info');
+    const result = await api('POST', '/api/ebs-screenshots/upload', {
+      base64,
+      mimeType: file.type,
+      intake_id: rec.intake_id,
+      patient_code: rec.patient_code,
+      service_date: rec.service_date || rec.visit_date,
+      is_correction: false
+    });
+    ebsCurrentScreenshotId = result.id;
+    toast('Screenshot uploaded — verify Pass or Fail.', 'success');
+  } catch(e) {
+    toast('Upload failed: ' + e.message, 'error');
+  }
+}
+
+async function ebsHandleCorrectionFile(file) {
+  if (file.type === 'image/heic' || file.type === 'image/heif' ||
+      file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
+    toast('Please convert to JPG or PNG before uploading.', 'error');
+    return;
+  }
+  if (!['image/jpeg', 'image/png'].includes(file.type)) {
+    toast('Only JPG and PNG files are allowed.', 'error');
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    toast('File size exceeds 10MB limit.', 'error');
+    return;
+  }
+
+  ebsCorrectionBase64 = await ebsFileToBase64(file);
+  ebsCorrectionMimeType = file.type;
+
+  const corrImg = document.getElementById('ebs-ss-correction-img');
+  corrImg.src = 'data:' + file.type + ';base64,' + ebsCorrectionBase64;
+  document.getElementById('ebs-ss-correction-preview').style.display = '';
+}
+
+function ebsFileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function ebsVerifyPass() {
+  if (!ebsCurrentScreenshotId) { toast('Upload a screenshot first.', 'error'); return; }
+  try {
+    await api('PATCH', `/api/ebs-screenshots/${ebsCurrentScreenshotId}/verify`, { verification_status: 'pass' });
+    document.getElementById('ebs-ss-status-badge').innerHTML = '<span class="ebs-ss-status pass">✅ Pass</span>';
+    toast('Verified — Pass ✅', 'success');
+    // Also mark the record as entered_ebs
+    await ebsMark(ebsQueue[ebsQIdx].id);
+    ebsResetScreenshot();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+function ebsVerifyFail() {
+  if (!ebsCurrentScreenshotId) { toast('Upload a screenshot first.', 'error'); return; }
+  document.getElementById('ebs-ss-fail-zone').style.display = '';
+  document.getElementById('ebs-ss-status-badge').innerHTML = '<span class="ebs-ss-status fail">🛑 Fail</span>';
+  document.getElementById('ebs-ss-mismatch-notes').focus();
+}
+
+async function ebsSaveFail() {
+  if (!ebsCurrentScreenshotId) { toast('No screenshot uploaded.', 'error'); return; }
+  const rec = ebsGetCurrentRecord();
+  const notes = document.getElementById('ebs-ss-mismatch-notes').value.trim();
+
+  try {
+    if (ebsCorrectionBase64 && rec) {
+      // Upload correction screenshot via dedicated endpoint
+      toast('Uploading correction…', 'info');
+      await api('POST', '/api/ebs-screenshots/correction', {
+        base64: ebsCorrectionBase64,
+        mimeType: ebsCorrectionMimeType,
+        intake_id: rec.intake_id,
+        patient_code: rec.patient_code,
+        service_date: rec.service_date || rec.visit_date,
+        correction_of: ebsCurrentScreenshotId,
+        mismatch_notes: notes
+      });
+    } else {
+      // Just save the fail status with notes on original
+      await api('PATCH', `/api/ebs-screenshots/${ebsCurrentScreenshotId}/verify`, {
+        verification_status: 'fail',
+        mismatch_notes: notes
+      });
+    }
+    toast('Fail verification saved.', 'success');
+    ebsFlagCurrent();
+    ebsResetScreenshot();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+function ebsResetScreenshot() {
+  ebsCurrentScreenshotId = null;
+  ebsCorrectionBase64    = null;
+  ebsCorrectionMimeType  = null;
+  document.getElementById('ebs-ss-upload-zone').style.display = '';
+  document.getElementById('ebs-ss-preview').style.display = 'none';
+  document.getElementById('ebs-ss-fail-zone').style.display = 'none';
+  document.getElementById('ebs-ss-correction-preview').style.display = 'none';
+  document.getElementById('ebs-ss-preview-img').src = '';
+  document.getElementById('ebs-ss-correction-img').src = '';
+  document.getElementById('ebs-ss-mismatch-notes').value = '';
+  document.getElementById('ebs-ss-status-badge').innerHTML = '';
+  document.getElementById('ebs-ss-file-input').value = '';
+  document.getElementById('ebs-ss-correction-input').value = '';
+}
+
+// Phase 4: Screenshot Log
+async function ebsLoadScreenshotLog() {
+  const date   = document.getElementById('intake-date').value;
+  const status = document.getElementById('ebs-ss-log-filter-status')?.value || '';
+  const tbody  = document.getElementById('ebs-ss-log-tbody');
+  tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--ink3)">Loading…</td></tr>`;
+  try {
+    let url = '/api/ebs-screenshots?';
+    if (date)   url += `service_date=${encodeURIComponent(date)}&`;
+    if (status) url += `verification_status=${encodeURIComponent(status)}`;
+    const rows = await api('GET', url);
+    ebsRenderScreenshotLog(rows || []);
+    const badge = document.getElementById('ebs-badge-p4');
+    if (badge) { badge.textContent = (rows || []).length || ''; }
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><p>Failed to load: ${esc(e.message)}</p></div></td></tr>`;
+  }
+}
+
+function ebsRenderScreenshotLog(rows) {
+  const tbody = document.getElementById('ebs-ss-log-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="icon">📷</div><p>No screenshots for this date.</p><small>Upload screenshots in Phase 2.</small></div></td></tr>`;
+    return;
+  }
+  const statusHtml = s => {
+    const m = { pass:'pass', fail:'fail', pending:'pending', corrected:'corrected' };
+    const icons = { pass:'✅', fail:'🛑', pending:'⏳', corrected:'🔄' };
+    const cls = m[s] || 'pending';
+    return `<span class="ebs-ss-status ${cls}">${icons[s]||''} ${s||'pending'}</span>`;
+  };
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.screenshot_url ? `<img class="ss-log-thumb" src="${esc(r.screenshot_url)}" alt="screenshot" onclick="ebsViewScreenshot('${esc(r.screenshot_url)}','${esc(r.intake_id||'')}')">` : '<span class="muted">—</span>'}</td>
+      <td><code style="font-size:11px">${esc(r.intake_id||'—')}</code>${r.is_correction?'<span class="ep ep-bd" style="font-size:9px;margin-left:4px">CORR</span>':''}</td>
+      <td>${esc(r.patient_code||'—')}</td>
+      <td>${esc(r.service_date||'—')}</td>
+      <td>${statusHtml(r.verification_status)}</td>
+      <td style="font-size:12px;color:var(--ink3)">${esc(r.verified_by||'—')}</td>
+      <td style="font-size:12px;color:var(--ink3)">${r.created_at ? new Date(r.created_at).toLocaleString() : '—'}</td>
+      <td style="font-size:12px;color:var(--ink2);max-width:200px;white-space:pre-wrap">${esc(r.mismatch_notes||'')}</td>
+    </tr>`
+  ).join('');
+}
+
+function ebsViewScreenshot(url, intakeId) {
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function badge(val, type) {
@@ -6208,6 +6569,7 @@ function initVisitColResizers() {
 setupDragDrop();
 setupImageDragDrop();
 setupClipboardPaste();
+ebsSetupP2UploadZone();
 checkSession();
 
 // Restore sidebar state on load

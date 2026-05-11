@@ -1254,6 +1254,14 @@
               <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="therapeutic_exercises" onchange="toggleVisitCol(this)" checked> TE</label>
               <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="diagnosis_category" onchange="toggleVisitCol(this)" checked> Diagnosis</label>
               <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="workflow_status" onchange="toggleVisitCol(this)" checked> Status</label>
+              <hr style="margin:6px 0;border-color:var(--border)"/>
+              <div style="font-size:10px;color:var(--ink3);margin-bottom:4px">OPTIONAL</div>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="a2" onchange="toggleVisitCol(this)"> A2</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="re3" onchange="toggleVisitCol(this)"> RE3</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="no_fault" onchange="toggleVisitCol(this)"> No Fault</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="claim_number" onchange="toggleVisitCol(this)"> Claim #</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="amount_charged" onchange="toggleVisitCol(this)"> Amount</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px"><input type="checkbox" data-col="notes" onchange="toggleVisitCol(this)"> Notes</label>
             </div>
           </div>
           <div class="table-wrap">
@@ -1268,6 +1276,12 @@
                   <th data-col="therapeutic_exercises" style="position:relative;min-width:40px">TE <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
                   <th data-col="diagnosis_category" style="position:relative;min-width:120px">Diagnosis <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
                   <th data-col="workflow_status" style="position:relative;min-width:100px">Status <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th data-col="a2" style="position:relative;min-width:40px;display:none">A2 <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th data-col="re3" style="position:relative;min-width:40px;display:none">RE3 <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th data-col="no_fault" style="position:relative;min-width:60px;display:none">No Fault <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th data-col="claim_number" style="position:relative;min-width:80px;display:none">Claim # <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th data-col="amount_charged" style="position:relative;min-width:70px;display:none">Amount <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
+                  <th data-col="notes" style="position:relative;min-width:100px;display:none">Notes <span class="sort-icon">⇅</span><div class="col-resizer"></div></th>
                   <th style="position:relative;min-width:60px">Actions<div class="col-resizer"></div></th>
                 </tr>
                 <tr id="visits-filter-row">
@@ -1279,11 +1293,17 @@
                   <td><input class="col-filter" data-col="therapeutic_exercises" placeholder="#" oninput="applyVisitFilters()"/></td>
                   <td><input class="col-filter" data-col="diagnosis_category" placeholder="Filter…" oninput="applyVisitFilters()"/></td>
                   <td><input class="col-filter" data-col="workflow_status" placeholder="Filter…" oninput="applyVisitFilters()"/></td>
+                  <td data-col="a2" style="display:none"><input class="col-filter" data-col="a2" placeholder="Y/N" oninput="applyVisitFilters()"/></td>
+                  <td data-col="re3" style="display:none"><input class="col-filter" data-col="re3" placeholder="Y/N" oninput="applyVisitFilters()"/></td>
+                  <td data-col="no_fault" style="display:none"><input class="col-filter" data-col="no_fault" placeholder="Y/N" oninput="applyVisitFilters()"/></td>
+                  <td data-col="claim_number" style="display:none"><input class="col-filter" data-col="claim_number" placeholder="Filter…" oninput="applyVisitFilters()"/></td>
+                  <td data-col="amount_charged" style="display:none"><input class="col-filter" data-col="amount_charged" placeholder="$" oninput="applyVisitFilters()"/></td>
+                  <td data-col="notes" style="display:none"><input class="col-filter" data-col="notes" placeholder="Filter…" oninput="applyVisitFilters()"/></td>
                   <td></td>
                 </tr>
               </thead>
               <tbody id="visits-tbody">
-                <tr><td colspan="9"><div class="empty-state"><div class="icon">📅</div><p>No visits for this date.</p></div></td></tr>
+                <tr><td colspan="15"><div class="empty-state"><div class="icon">📅</div><p>No visits for this date.</p></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -3548,6 +3568,12 @@ function renderVisitRows(tbodyId, visits, compact) {
       <td>${v.therapeutic_exercises != null ? v.therapeutic_exercises : '<span class="muted">—</span>'}</td>
       <td style="max-width:180px">${dxCat}${dxCodes}</td>
       <td>${statusSelect}</td>
+      <td data-col="a2">${v.a2 ? '<span class="badge" style="font-size:10px;background:rgba(46,125,50,0.12);color:#2e7d32">A2</span>' : '<span class="muted">—</span>'}</td>
+      <td data-col="re3">${v.re3 ? '<span class="badge" style="font-size:10px;background:rgba(21,101,192,0.12);color:#1565c0">RE3</span>' : '<span class="muted">—</span>'}</td>
+      <td data-col="no_fault">${v.no_fault ? '<span class="badge" style="font-size:10px">NF</span>' : '<span class="muted">—</span>'}</td>
+      <td data-col="claim_number"><span class="muted" style="font-family:monospace;font-size:11px">${esc(v.claim_number || '—')}</span></td>
+      <td data-col="amount_charged">${v.amount_charged != null ? `<strong>$${v.amount_charged}</strong>` : '<span class="muted">—</span>'}</td>
+      <td data-col="notes" style="max-width:140px;font-size:11px;color:var(--ink2)">${esc(v.notes || '—')}</td>
       ${compact ? '' : `<td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openVisitModal(${JSON.stringify(v)})'>Edit</button></div></td>`}
     </tr>`;
   }).join('');
@@ -6032,7 +6058,7 @@ function toggleSidebar() {
 // ════════════════════════════════════
 // VISITS TABLE: COLUMN VISIBILITY
 // ════════════════════════════════════
-let visitHiddenCols = new Set();
+let visitHiddenCols = new Set(['a2','re3','no_fault','claim_number','amount_charged','notes']);
 
 function toggleColPicker() {
   const picker = document.getElementById('col-picker');
@@ -6054,10 +6080,8 @@ function toggleVisitCol(checkbox) {
 }
 function applyColVisibility() {
   // Hide/show header th and filter td by data-col
-  document.querySelectorAll('#visits-sort-row th[data-col], #visits-filter-row td').forEach((el, i) => {
-    const col = el.dataset?.col;
-    if (!col) return;
-    el.style.display = visitHiddenCols.has(col) ? 'none' : '';
+  document.querySelectorAll('#visits-sort-row th[data-col], #visits-filter-row td[data-col]').forEach(el => {
+    el.style.display = visitHiddenCols.has(el.dataset.col) ? 'none' : '';
   });
   // Hide/show body cells by column index
   const ths = [...document.querySelectorAll('#visits-sort-row th')];
@@ -6118,6 +6142,12 @@ function visitCellText(v, col) {
     case 'therapeutic_exercises': return String(v.therapeutic_exercises ?? '');
     case 'diagnosis_category': return v.diagnosis_category || '';
     case 'workflow_status': return v.workflow_status || '';
+    case 'a2': return v.a2 ? 'yes' : 'no';
+    case 're3': return v.re3 ? 'yes' : 'no';
+    case 'no_fault': return v.no_fault ? 'yes' : 'no';
+    case 'claim_number': return v.claim_number || '';
+    case 'amount_charged': return String(v.amount_charged ?? '');
+    case 'notes': return v.notes || '';
     default: return '';
   }
 }

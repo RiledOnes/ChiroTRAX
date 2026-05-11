@@ -1948,7 +1948,7 @@
 
 <!-- VISIT MODAL -->
 <div class="modal-overlay" id="visit-modal">
-  <div class="modal" style="max-width:560px">
+  <div class="modal" style="max-width:820px;width:95vw">
     <div class="modal-header">
       <h3 id="visit-modal-title">Log Visit</h3>
       <button class="modal-close" onclick="closeModal('visit-modal')">✕</button>
@@ -1956,74 +1956,105 @@
     <input type="hidden" id="visit-edit-id"/>
     <div class="search-select" id="ss-visit-patient" style="margin-bottom:14px">
       <input type="text" id="visit-patient-search" placeholder="Search patient by name or code..." autocomplete="off" oninput="filterSearchSelect('ss-visit-patient')" onfocus="openSearchSelect('ss-visit-patient')" style="width:100%"/>
-      <input type="hidden" id="visit-patient-id"/>
+      <input type="hidden" id="visit-patient-id" onchange="visitPatientChanged()"/>
       <div class="ss-list"></div>
     </div>
-    <table style="width:100%;border-collapse:collapse;font-size:13px">
-      <colgroup><col style="width:40%"/><col style="width:60%"/></colgroup>
-      <tbody>
-        <tr>
-          <td style="padding:7px 0;color:var(--ink2);font-weight:500">Intake Date *</td>
-          <td style="padding:7px 0"><input type="date" id="visit-date" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/></td>
-        </tr>
-        <tr>
-          <td style="padding:7px 0;color:var(--ink2);font-weight:500">Service Date <span style="font-weight:400;color:var(--ink3)">(if backdated)</span></td>
-          <td style="padding:7px 0"><input type="date" id="visit-service-date" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/></td>
-        </tr>
-        <tr>
-          <td style="padding:7px 0;color:var(--ink2);font-weight:500">Patient Status</td>
-          <td style="padding:7px 0">
-            <select id="visit-status" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
-              <option value="">— None —</option>
-              <option value="new">New Patient</option>
-              <option value="existing">Existing Patient</option>
-            </select>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:7px 0;color:var(--ink2);font-weight:500">Manipulation</td>
-          <td style="padding:7px 0">
-            <select id="visit-manip" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
-              <option value="">— None —</option>
-              <option value="E1">E1 — Spinal (98940)</option>
-              <option value="E2">E2 — Complex (98941)</option>
-            </select>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:7px 0;color:var(--ink2);font-weight:500">Therap. Exercises</td>
-          <td style="padding:7px 0"><input type="number" id="visit-exercises" min="0" max="10" placeholder="0" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/></td>
-        </tr>
-        <tr>
-          <td style="padding:7px 0;color:var(--ink2);font-weight:500">A2 <span style="font-weight:400;color:var(--ink3)">(New pt office visit 99204)</span></td>
-          <td style="padding:7px 0"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="visit-a2" style="width:16px;height:16px;accent-color:var(--accent)"/> <span style="color:var(--ink3);font-size:12px">Include A2 code</span></label></td>
-        </tr>
-        <tr>
-          <td style="padding:7px 0;color:var(--ink2);font-weight:500">RE3 <span style="font-weight:400;color:var(--ink3)">(Returning pt office visit 99213)</span></td>
-          <td style="padding:7px 0"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="visit-re3" style="width:16px;height:16px;accent-color:var(--accent)"/> <span style="color:var(--ink3);font-size:12px">Include RE3 code</span></label></td>
-        </tr>
-        <tr>
-          <td style="padding:7px 0;color:var(--ink2);font-weight:500">No Fault</td>
-          <td style="padding:7px 0"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="visit-no-fault" style="width:16px;height:16px;accent-color:var(--accent)"/> <span style="color:var(--ink3);font-size:12px">No-fault / MVA claim</span></label></td>
-        </tr>
-        <tr>
-          <td style="padding:7px 0;color:var(--ink2);font-weight:500">Workflow Status</td>
-          <td style="padding:7px 0">
-            <select id="visit-wf-status" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
-              <option value="logged">Logged</option>
-              <option value="entered_ebs">Entered in EBS</option>
-              <option value="claim_created">Claim Created</option>
-              <option value="pending">Pending</option>
-              <option value="prev_billed">Previously Billed</option>
-            </select>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:7px 0;color:var(--ink2);font-weight:500;vertical-align:top;padding-top:12px">Notes</td>
-          <td style="padding:7px 0"><textarea id="visit-notes" placeholder="Additional notes..." style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px;resize:vertical;min-height:60px"></textarea></td>
-        </tr>
-      </tbody>
-    </table>
+    <div style="display:flex;gap:16px;align-items:flex-start">
+      <!-- LEFT PANEL: intake form (~55%) -->
+      <div style="flex:55;min-width:0">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <colgroup><col style="width:42%"/><col style="width:58%"/></colgroup>
+          <tbody>
+            <tr>
+              <td style="padding:7px 0;color:var(--ink2);font-weight:500">Intake Date *</td>
+              <td style="padding:7px 0"><input type="date" id="visit-date" oninput="updateVisitLiveTotal()" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/></td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--ink2);font-weight:500">Service Date <span style="font-weight:400;color:var(--ink3)">(if backdated)</span></td>
+              <td style="padding:7px 0"><input type="date" id="visit-service-date" oninput="updateVisitLiveTotal()" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/></td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--ink2);font-weight:500">Patient Status</td>
+              <td style="padding:7px 0">
+                <select id="visit-status" oninput="updateVisitLiveTotal()" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
+                  <option value="">— None —</option>
+                  <option value="new">New Patient</option>
+                  <option value="existing">Existing Patient</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--ink2);font-weight:500">Manipulation</td>
+              <td style="padding:7px 0">
+                <select id="visit-manip" oninput="updateVisitLiveTotal()" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
+                  <option value="">— None —</option>
+                  <option value="E1">E1 — Spinal (98940) / $75</option>
+                  <option value="E2">E2 — Complex (98941) / $100</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--ink2);font-weight:500">Therap. Exercises</td>
+              <td style="padding:7px 0"><input type="number" id="visit-exercises" min="0" max="10" placeholder="0" oninput="updateVisitLiveTotal()" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px"/></td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--ink2);font-weight:500">Diagnosis Category</td>
+              <td style="padding:7px 0">
+                <select id="visit-dx-cat" onchange="visitDxCatChanged()" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
+                  <option value="ALL">ALL</option>
+                  <option value="LB">LB</option>
+                  <option value="NECK">NECK</option>
+                  <option value="MC-LB">MC-LB</option>
+                  <option value="CUSTOM">CUSTOM</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--ink2);font-weight:500;vertical-align:top;padding-top:10px">Diagnosis Codes</td>
+              <td style="padding:7px 0"><textarea id="visit-dx-codes" rows="2" placeholder="e.g. M54.50, M54.6" oninput="updateVisitLiveTotal()" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px;resize:vertical"></textarea></td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--ink2);font-weight:500">A2 <span style="font-weight:400;color:var(--ink3)">(99204 / $225)</span></td>
+              <td style="padding:7px 0"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="visit-a2" onchange="updateVisitLiveTotal()" style="width:16px;height:16px;accent-color:var(--accent)"/> <span style="color:var(--ink3);font-size:12px">New pt office visit</span></label></td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--ink2);font-weight:500">RE3 <span style="font-weight:400;color:var(--ink3)">(99213 / $175)</span></td>
+              <td style="padding:7px 0"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="visit-re3" onchange="updateVisitLiveTotal()" style="width:16px;height:16px;accent-color:var(--accent)"/> <span style="color:var(--ink3);font-size:12px">Returning pt office visit</span></label></td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--ink2);font-weight:500">No Fault</td>
+              <td style="padding:7px 0"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="visit-no-fault" onchange="updateVisitLiveTotal()" style="width:16px;height:16px;accent-color:var(--accent)"/> <span style="color:var(--ink3);font-size:12px">No-fault / MVA claim</span></label></td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--ink2);font-weight:500">Workflow Status</td>
+              <td style="padding:7px 0">
+                <select id="visit-wf-status" style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px">
+                  <option value="logged">Logged</option>
+                  <option value="entered_ebs">Entered in EBS</option>
+                  <option value="claim_created">Claim Created</option>
+                  <option value="pending">Pending</option>
+                  <option value="prev_billed">Previously Billed</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--ink2);font-weight:500;vertical-align:top;padding-top:12px">Notes</td>
+              <td style="padding:7px 0"><textarea id="visit-notes" placeholder="Additional notes..." style="width:100%;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-size:13px;resize:vertical;min-height:60px"></textarea></td>
+            </tr>
+            <tr>
+              <td style="padding:10px 0 4px;color:var(--ink2);font-weight:500">Total</td>
+              <td style="padding:10px 0 4px"><span id="visit-live-total" style="font-size:18px;font-weight:700;color:var(--accent2)">$0</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- RIGHT PANEL: last intake + entry brief (~45%) -->
+      <div style="flex:45;min-width:0;background:var(--surface2);border-radius:var(--radius);padding:14px">
+        <div id="visit-prior-panel" style="font-size:13px;color:var(--ink2)">
+          <em>Select a patient to see prior intake</em>
+        </div>
+      </div>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('visit-modal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveVisit()">Save Visit</button>
@@ -2586,6 +2617,17 @@ async function checkSession() {
 }
 
 // ════════════════════════════════════
+// VISIT CONSTANTS
+// ════════════════════════════════════
+const DX_TEMPLATES = {
+  ALL:    ['M54.50','M54.6','M54.2','M62.838','M99.03','M99.02','M99.01'],
+  LB:     ['M54.50','M54.6','M46.1','M62.838','M99.03','M99.05','M99.02'],
+  'MC-LB':['M99.03','M54.50','M99.05','M46.1'],
+  NECK:   ['M54.2','M54.6','M62.838','M99.01','M99.02'],
+};
+const CPT_FEES = { '98940':75, '98941':100, '97110':75, '99204':225, '99213':175 };
+
+// ════════════════════════════════════
 // STATE
 // ════════════════════════════════════
 let allPatients = [];
@@ -2627,6 +2669,126 @@ function closeModal(id) {
   document.getElementById(id).classList.remove('open');
 }
 
+function updateVisitLiveTotal() {
+  const manip = document.getElementById('visit-manip').value;
+  const te = parseInt(document.getElementById('visit-exercises').value) || 0;
+  const a2 = document.getElementById('visit-a2').checked;
+  const re3 = document.getElementById('visit-re3').checked;
+  let total = 0;
+  if (manip === 'E1') total += CPT_FEES['98940'];
+  else if (manip === 'E2') total += CPT_FEES['98941'];
+  total += te * CPT_FEES['97110'];
+  if (a2) total += CPT_FEES['99204'];
+  if (re3) total += CPT_FEES['99213'];
+  document.getElementById('visit-live-total').textContent = '$' + total;
+  updateVisitEntryBrief();
+}
+
+function visitDxCatChanged() {
+  const cat = document.getElementById('visit-dx-cat').value;
+  if (cat !== 'CUSTOM' && DX_TEMPLATES[cat] !== undefined) {
+    document.getElementById('visit-dx-codes').value = DX_TEMPLATES[cat].join(', ');
+  }
+  updateVisitLiveTotal();
+}
+
+function updateVisitEntryBrief() {
+  const briefEl = document.getElementById('visit-entry-brief');
+  if (!briefEl) return;
+  const manip = document.getElementById('visit-manip').value;
+  const te = parseInt(document.getElementById('visit-exercises').value) || 0;
+  const a2 = document.getElementById('visit-a2').checked;
+  const re3 = document.getElementById('visit-re3').checked;
+  const dxCodes = document.getElementById('visit-dx-codes').value.trim();
+  const serviceDate = document.getElementById('visit-service-date').value || document.getElementById('visit-date').value || '';
+  const lines = [];
+  if (manip === 'E1') lines.push(`98940 — Spinal Manip: $${CPT_FEES['98940']}`);
+  else if (manip === 'E2') lines.push(`98941 — Complex Manip: $${CPT_FEES['98941']}`);
+  if (te > 0) lines.push(`97110 × ${te} units — Therap. Ex: $${te * CPT_FEES['97110']}`);
+  if (a2) lines.push(`99204 — New Pt Office Visit: $${CPT_FEES['99204']}`);
+  if (re3) lines.push(`99213 — Return Pt Office Visit: $${CPT_FEES['99213']}`);
+  const total = parseInt(document.getElementById('visit-live-total').textContent.replace('$','')) || 0;
+  briefEl.innerHTML = lines.length
+    ? `<div style="margin-bottom:6px;font-size:11px;color:var(--ink3)">DOS: ${serviceDate || '—'}</div>`
+      + lines.map(l => `<div style="font-family:monospace;font-size:11px;white-space:nowrap">${l}</div>`).join('')
+      + (dxCodes ? `<div style="margin-top:6px;font-size:11px;color:var(--ink3)">Dx: ${dxCodes}</div>` : '')
+      + `<div style="margin-top:6px;font-size:13px;font-weight:700;color:var(--accent2)">Total: $${total}</div>`
+    : '<em style="font-size:12px;color:var(--ink3)">No charges entered yet</em>';
+}
+
+async function visitPatientChanged() {
+  const patientId = document.getElementById('visit-patient-id').value;
+  const panel = document.getElementById('visit-prior-panel');
+  if (!patientId) {
+    panel.innerHTML = '<em>Select a patient to see prior intake</em>';
+    return;
+  }
+  panel.innerHTML = '<em style="color:var(--ink3)">Loading...</em>';
+  try {
+    const visits = await api('GET', `/api/visits?patient_id=${patientId}`);
+    const prior = visits && visits.length ? visits[0] : null;
+    if (!prior) {
+      panel.innerHTML = '<div style="color:var(--ink3);font-size:13px">No prior intake found for this patient.</div>'
+        + '<hr style="margin:10px 0;border-color:var(--border)"/>'
+        + '<div style="font-weight:600;margin-bottom:6px">Entry Brief</div>'
+        + '<div id="visit-entry-brief"></div>';
+      updateVisitEntryBrief();
+      return;
+    }
+    const priorDate = prior.visit_date || prior.sheet_date || '—';
+    const priorManip = prior.manipulation_type || '—';
+    const priorTE = prior.therapeutic_exercises != null ? prior.therapeutic_exercises : '—';
+    const priorDxCat = prior.diagnosis_category || '—';
+    const priorDxCodes = Array.isArray(prior.diagnosis_codes)
+      ? prior.diagnosis_codes.join(', ')
+      : (prior.diagnosis_codes || '—');
+    const priorAmount = prior.amount_charged != null ? '$' + prior.amount_charged : '—';
+    panel.innerHTML = `
+      <div style="font-weight:600;margin-bottom:8px">Last Intake <span style="font-weight:400;color:var(--ink3);font-size:12px">${priorDate}</span></div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px">
+        <tbody>
+          <tr><td style="color:var(--ink3);padding:3px 0;width:45%">Date of Service</td><td style="padding:3px 0">${priorDate}</td></tr>
+          <tr><td style="color:var(--ink3);padding:3px 0">Manipulation</td><td style="padding:3px 0">${priorManip}</td></tr>
+          <tr><td style="color:var(--ink3);padding:3px 0">TE</td><td style="padding:3px 0">${priorTE}</td></tr>
+          <tr><td style="color:var(--ink3);padding:3px 0">Dx Category</td><td style="padding:3px 0">${priorDxCat}</td></tr>
+          <tr><td style="color:var(--ink3);padding:3px 0">Dx Codes</td><td style="padding:3px 0;word-break:break-all">${priorDxCodes}</td></tr>
+          <tr><td style="color:var(--ink3);padding:3px 0">A2</td><td style="padding:3px 0">${prior.a2 ? 'Yes' : 'No'}</td></tr>
+          <tr><td style="color:var(--ink3);padding:3px 0">RE3</td><td style="padding:3px 0">${prior.re3 ? 'Yes' : 'No'}</td></tr>
+          <tr><td style="color:var(--ink3);padding:3px 0">Amount</td><td style="padding:3px 0;font-weight:600">${priorAmount}</td></tr>
+        </tbody>
+      </table>
+      <button class="btn btn-sm btn-secondary" onclick="visitCopyFromPrior()" style="margin-bottom:14px;width:100%">Same as prior</button>
+      <hr style="margin:10px 0;border-color:var(--border)"/>
+      <div style="font-weight:600;margin-bottom:6px">Entry Brief</div>
+      <div id="visit-entry-brief"></div>`;
+    panel.dataset.prior = JSON.stringify(prior);
+    updateVisitEntryBrief();
+  } catch(e) {
+    panel.innerHTML = `<em style="color:var(--ink3)">Could not load prior intake.</em>
+      <hr style="margin:10px 0;border-color:var(--border)"/>
+      <div style="font-weight:600;margin-bottom:6px">Entry Brief</div>
+      <div id="visit-entry-brief"></div>`;
+    updateVisitEntryBrief();
+  }
+}
+
+function visitCopyFromPrior() {
+  const panel = document.getElementById('visit-prior-panel');
+  if (!panel.dataset.prior) return;
+  const prior = JSON.parse(panel.dataset.prior);
+  if (prior.manipulation_type) document.getElementById('visit-manip').value = prior.manipulation_type;
+  document.getElementById('visit-exercises').value = prior.therapeutic_exercises ?? '';
+  const dxCat = prior.diagnosis_category || 'CUSTOM';
+  document.getElementById('visit-dx-cat').value = dxCat;
+  const dxCodes = Array.isArray(prior.diagnosis_codes)
+    ? prior.diagnosis_codes.join(', ')
+    : (prior.diagnosis_codes || '');
+  document.getElementById('visit-dx-codes').value = dxCodes;
+  document.getElementById('visit-a2').checked = !!prior.a2;
+  document.getElementById('visit-re3').checked = !!prior.re3;
+  updateVisitLiveTotal();
+}
+
 function openVisitModal(visit = null) {
   populatePatientSelects();
   clearForm(['visit-edit-id','visit-status','visit-manip','visit-notes']);
@@ -2636,10 +2798,14 @@ function openVisitModal(visit = null) {
   document.getElementById('visit-re3').checked = false;
   document.getElementById('visit-no-fault').checked = false;
   document.getElementById('visit-wf-status').value = 'logged';
+  document.getElementById('visit-dx-cat').value = 'ALL';
+  document.getElementById('visit-dx-codes').value = DX_TEMPLATES['ALL'].join(', ');
   const intakeDate = document.getElementById('intake-date')?.value || today();
   document.getElementById('visit-date').value = intakeDate;
   document.getElementById('visit-service-date').value = '';
+  document.getElementById('visit-prior-panel').innerHTML = '<em>Select a patient to see prior intake</em>';
   document.getElementById('visit-modal-title').textContent = visit ? 'Edit Visit' : 'Log Visit';
+  updateVisitLiveTotal();
   if (visit) {
     document.getElementById('visit-edit-id').value = visit.id;
     const patLabel = visit.patients ? `${visit.patients.patient_code} — ${visit.patients.last_name}, ${visit.patients.first_name}` : (visit.patient_name || '');
@@ -2649,11 +2815,21 @@ function openVisitModal(visit = null) {
     document.getElementById('visit-status').value = visit.patient_status || '';
     document.getElementById('visit-manip').value = visit.manipulation_type || '';
     document.getElementById('visit-exercises').value = visit.therapeutic_exercises ?? '';
+    const dxCat = visit.diagnosis_category || 'ALL';
+    document.getElementById('visit-dx-cat').value = dxCat;
+    const dxCodes = Array.isArray(visit.diagnosis_codes)
+      ? visit.diagnosis_codes.join(', ')
+      : (visit.diagnosis_codes || (DX_TEMPLATES[dxCat] || []).join(', '));
+    document.getElementById('visit-dx-codes').value = dxCodes;
     document.getElementById('visit-notes').value = visit.notes || '';
     document.getElementById('visit-wf-status').value = visit.workflow_status || 'logged';
     document.getElementById('visit-a2').checked = !!visit.a2;
     document.getElementById('visit-re3').checked = !!visit.re3;
     document.getElementById('visit-no-fault').checked = !!visit.no_fault;
+    updateVisitLiveTotal();
+    if (visit.patient_id) {
+      visitPatientChanged();
+    }
   }
   document.getElementById('visit-modal').classList.add('open');
 }
@@ -3293,6 +3469,9 @@ async function saveVisit() {
     a2: document.getElementById('visit-a2').checked,
     re3: document.getElementById('visit-re3').checked,
     no_fault: document.getElementById('visit-no-fault').checked,
+    diagnosis_category: document.getElementById('visit-dx-cat').value || null,
+    diagnosis_codes: document.getElementById('visit-dx-codes').value.split(',').map(s => s.trim()).filter(Boolean).join(',') || null,
+    amount_charged: parseInt(document.getElementById('visit-live-total').textContent.replace('$','')) || 0,
     notes: document.getElementById('visit-notes').value || null,
     workflow_status: document.getElementById('visit-wf-status').value || 'logged'
   };

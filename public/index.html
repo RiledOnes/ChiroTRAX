@@ -2778,6 +2778,15 @@ async function visitPatientChanged() {
       <div style="font-weight:600;margin-bottom:6px">Entry Brief</div>
       <div id="visit-entry-brief"></div>`;
     panel.dataset.prior = JSON.stringify(prior);
+    // Pre-populate form with prior dx so flag only fires on user-driven changes
+    if (prior.diagnosis_category) {
+      document.getElementById('visit-dx-cat').value = prior.diagnosis_category;
+      const dxCodes = Array.isArray(prior.diagnosis_codes)
+        ? prior.diagnosis_codes.join(', ')
+        : (prior.diagnosis_codes || '');
+      document.getElementById('visit-dx-codes').value = dxCodes || (DX_TEMPLATES[prior.diagnosis_category] || []).join(', ');
+    }
+    updateVisitLiveTotal();
     updateVisitEntryBrief();
     visitCheckDxDiff();
   } catch(e) {

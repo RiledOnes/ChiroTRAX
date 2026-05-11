@@ -1223,13 +1223,13 @@
                   <th>Svc Date</th>
                   <th>Manipulation</th>
                   <th>Exercises</th>
-                  <th>Workflow</th>
-                  <th>Notes</th>
+                  <th>Diagnosis</th>
+                  <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="visits-tbody">
-                <tr><td colspan="7"><div class="empty-state"><div class="icon">📅</div><p>No visits for this date.</p></div></td></tr>
+                <tr><td colspan="9"><div class="empty-state"><div class="icon">📅</div><p>No visits for this date.</p></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -2690,6 +2690,17 @@ function visitDxCatChanged() {
     document.getElementById('visit-dx-codes').value = DX_TEMPLATES[cat].join(', ');
   }
   updateVisitLiveTotal();
+  visitCheckDxDiff();
+}
+
+function visitCheckDxDiff() {
+  const flag = document.getElementById('visit-dx-diff-flag');
+  if (!flag) return;
+  const panel = document.getElementById('visit-prior-panel');
+  if (!panel?.dataset?.prior) { flag.style.display = 'none'; return; }
+  const prior = JSON.parse(panel.dataset.prior);
+  const currentCat = document.getElementById('visit-dx-cat').value;
+  flag.style.display = (prior.diagnosis_category && currentCat && currentCat !== prior.diagnosis_category) ? 'inline' : 'none';
 }
 
 function updateVisitEntryBrief() {
@@ -2726,7 +2737,12 @@ async function visitPatientChanged() {
   panel.innerHTML = '<em style="color:var(--ink3)">Loading...</em>';
   try {
     const visits = await api('GET', `/api/visits?patient_id=${patientId}`);
-    const prior = visits && visits.length ? visits[0] : null;
+    const currentIntakeDate = document.getElementById('intake-date')?.value;
+    const editingId = document.getElementById('visit-edit-id').value;
+    // Skip today's intake date and the record currently being edited
+    const prior = (visits || []).find(v =>
+      (!editingId || v.id !== editingId) && v.sheet_date !== currentIntakeDate
+    ) || null;
     if (!prior) {
       panel.innerHTML = '<div style="color:var(--ink3);font-size:13px">No prior intake found for this patient.</div>'
         + '<hr style="margin:10px 0;border-color:var(--border)"/>'
@@ -2750,7 +2766,7 @@ async function visitPatientChanged() {
           <tr><td style="color:var(--ink3);padding:3px 0;width:45%">Date of Service</td><td style="padding:3px 0">${priorDate}</td></tr>
           <tr><td style="color:var(--ink3);padding:3px 0">Manipulation</td><td style="padding:3px 0">${priorManip}</td></tr>
           <tr><td style="color:var(--ink3);padding:3px 0">TE</td><td style="padding:3px 0">${priorTE}</td></tr>
-          <tr><td style="color:var(--ink3);padding:3px 0">Dx Category</td><td style="padding:3px 0">${priorDxCat}</td></tr>
+          <tr><td style="color:var(--ink3);padding:3px 0">Dx Category</td><td style="padding:3px 0">${priorDxCat} <span id="visit-dx-diff-flag" style="display:none;background:rgba(220,38,38,0.12);color:#dc2626;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:4px">CHANGED</span></td></tr>
           <tr><td style="color:var(--ink3);padding:3px 0">Dx Codes</td><td style="padding:3px 0;word-break:break-all">${priorDxCodes}</td></tr>
           <tr><td style="color:var(--ink3);padding:3px 0">A2</td><td style="padding:3px 0">${prior.a2 ? 'Yes' : 'No'}</td></tr>
           <tr><td style="color:var(--ink3);padding:3px 0">RE3</td><td style="padding:3px 0">${prior.re3 ? 'Yes' : 'No'}</td></tr>
@@ -2763,6 +2779,7 @@ async function visitPatientChanged() {
       <div id="visit-entry-brief"></div>`;
     panel.dataset.prior = JSON.stringify(prior);
     updateVisitEntryBrief();
+    visitCheckDxDiff();
   } catch(e) {
     panel.innerHTML = `<em style="color:var(--ink3)">Could not load prior intake.</em>
       <hr style="margin:10px 0;border-color:var(--border)"/>
@@ -3437,21 +3454,44 @@ function renderVisitRows(tbodyId, visits, compact) {
     tbody.innerHTML = `<tr><td colspan="${cols}"><div class="empty-state"><div class="icon">📋</div><p>No visits found for this date.</p></div></td></tr>`;
     return;
   }
+  const statusOpts = [
+    ['logged','Logged'],['entered_ebs','Entered EBS'],['claim_created','Claim Created'],
+    ['pending','Pending'],['prev_billed','Prev Billed']
+  ].map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
   tbody.innerHTML = visits.map(v => {
     const svcDate = v.is_backdated ? `<span style="color:#d97706;font-weight:600" title="Backdated">${v.visit_date}</span>` : `<span class="muted">${v.visit_date || '—'}</span>`;
-    const wfLabel = formatStage(v.workflow_status || 'intake');
+    const dxCat = v.diagnosis_category ? `<span class="badge" style="font-size:10px">${esc(v.diagnosis_category)}</span> ` : '';
+    const dxCodes = v.diagnosis_codes ? `<span style="font-size:11px;color:var(--ink2)">${esc(typeof v.diagnosis_codes === 'string' ? v.diagnosis_codes : v.diagnosis_codes.join(', '))}</span>` : '<span class="muted">—</span>';
+    const wfStatus = v.workflow_status || 'logged';
+    const statusSelect = `<select class="badge badge-${wfStatus}" style="border:none;background:transparent;cursor:pointer;font-size:11px;font-weight:600;padding:2px 4px" onchange="updateVisitStatus('${v.id}', this)">
+      ${['logged','entered_ebs','claim_created','pending','prev_billed'].map(s => `<option value="${s}"${s===wfStatus?' selected':''}>${formatStage(s)}</option>`).join('')}
+    </select>`;
     return `<tr>
       <td><span class="muted" style="font-family:monospace;font-size:11px">${esc(v.intake_id || '—')}</span></td>
-      <td><strong>${v.patients?.patient_code || '—'}</strong></td>
-      <td>${v.patients?.last_name || ''}, ${v.patients?.first_name || ''}</td>
+      <td><strong>${esc(v.patients?.patient_code || '—')}</strong></td>
+      <td>${esc(v.patients?.last_name || '')}, ${esc(v.patients?.first_name || '')}</td>
       <td>${svcDate}</td>
       <td>${badge(v.manipulation_type)}</td>
       <td>${v.therapeutic_exercises != null ? v.therapeutic_exercises : '<span class="muted">—</span>'}</td>
-      <td><span class="badge badge-${v.workflow_status || 'intake'}">${wfLabel}</span></td>
-      <td class="muted">${v.notes || '—'}</td>
+      <td style="max-width:180px">${dxCat}${dxCodes}</td>
+      <td>${statusSelect}</td>
       ${compact ? '' : `<td><div class="actions"><button class="btn btn-secondary btn-xs" onclick='openVisitModal(${JSON.stringify(v)})'>Edit</button></div></td>`}
     </tr>`;
   }).join('');
+}
+
+async function updateVisitStatus(id, selectEl) {
+  const newStatus = selectEl.value;
+  const prevStatus = selectEl.className.match(/badge-(\S+)/)?.[1] || 'logged';
+  try {
+    await api('PUT', `/api/visits/${id}`, { workflow_status: newStatus });
+    selectEl.className = `badge badge-${newStatus}`;
+    if (document.getElementById('tab-workflow').classList.contains('active')) loadEBSWorkflow();
+    toast('Status updated', 'success');
+  } catch(e) {
+    selectEl.value = prevStatus;
+    toast('Error: ' + e.message, 'error');
+  }
 }
 
 async function saveVisit() {

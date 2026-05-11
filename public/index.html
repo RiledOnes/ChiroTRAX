@@ -1956,7 +1956,7 @@
     <input type="hidden" id="visit-edit-id"/>
     <div class="search-select" id="ss-visit-patient" style="margin-bottom:14px">
       <input type="text" id="visit-patient-search" placeholder="Search patient by name or code..." autocomplete="off" oninput="filterSearchSelect('ss-visit-patient')" onfocus="openSearchSelect('ss-visit-patient')" style="width:100%"/>
-      <input type="hidden" id="visit-patient-id" onchange="visitPatientChanged()"/>
+      <input type="hidden" id="visit-patient-id"/>
       <div class="ss-list"></div>
     </div>
     <div style="display:flex;gap:16px;align-items:flex-start">
@@ -2793,6 +2793,7 @@ function openVisitModal(visit = null) {
   populatePatientSelects();
   clearForm(['visit-edit-id','visit-status','visit-manip','visit-notes']);
   setSearchSelectValue('ss-visit-patient', '', '');
+  document.getElementById('ss-visit-patient')._onSelect = visitPatientChanged;
   document.getElementById('visit-exercises').value = '';
   document.getElementById('visit-a2').checked = false;
   document.getElementById('visit-re3').checked = false;

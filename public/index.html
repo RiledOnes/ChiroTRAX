@@ -3457,6 +3457,18 @@ async function ebsRunOCR(base64, mimeType, rec) {
 
     const checks = [];
 
+    // Patient name — title bar shows LASTNAME,FIRSTNAME
+    if (rec.patient_name) {
+      // Handle "First Last" or "Last, First" → extract last name
+      const nameParts = rec.patient_name.includes(',')
+        ? rec.patient_name.split(',')[0].trim()          // "D'Orazio, Anthony" → "D'Orazio"
+        : rec.patient_name.trim().split(/\s+/).pop();    // "Anthony D'Orazio" → "D'Orazio"
+      const lastName = nameParts.toUpperCase().replace(/[^A-Z0-9']/g, '');
+      if (lastName.length > 1) {
+        checks.push({ label: `Name: ${nameParts}`, found: extracted.replace(/[^A-Z0-9']/g, '').includes(lastName) });
+      }
+    }
+
     // Service date — EBS shows MM/DD/YYYY (e.g. 05/07/2026)
     if (rec.service_date) {
       const [y, m, d] = rec.service_date.split('-');

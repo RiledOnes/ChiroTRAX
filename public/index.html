@@ -3455,20 +3455,21 @@ async function ebsRunOCR(base64, mimeType, rec) {
     const { data: { text } } = await _tesseractWorker.recognize(`data:${mimeType};base64,${base64}`);
     const extracted = text.toUpperCase().replace(/\s+/g, ' ');
 
-    // Fields to check
-    const cpts = [rec.manipulation_type === 'E1' ? '98940' : '98941'];
-    if (rec.therapeutic_exercises > 0) cpts.push('97110');
-    if (rec.a2) cpts.push('99204');
-    else if (rec.re3) cpts.push('99213');
-
     const checks = [];
 
-    // Patient code
-    if (rec.patient_code && rec.patient_code !== 'XXX-XX') {
-      checks.push({ label: rec.patient_code, found: extracted.includes(rec.patient_code.toUpperCase()) });
+    // Patient name — title bar shows LASTNAME,FIRSTNAME
+    if (rec.patient_name) {
+      // Handle "First Last" or "Last, First" → extract last name
+      const nameParts = rec.patient_name.includes(',')
+        ? rec.patient_name.split(',')[0].trim()          // "D'Orazio, Anthony" → "D'Orazio"
+        : rec.patient_name.trim().split(/\s+/).pop();    // "Anthony D'Orazio" → "D'Orazio"
+      const lastName = nameParts.toUpperCase().replace(/[^A-Z0-9']/g, '');
+      if (lastName.length > 1) {
+        checks.push({ label: `Name: ${nameParts}`, found: extracted.replace(/[^A-Z0-9']/g, '').includes(lastName) });
+      }
     }
 
-    // Service date — try MM/DD/YYYY, M/D/YYYY, MM/DD/YY
+    // Service date — EBS shows MM/DD/YYYY (e.g. 05/07/2026)
     if (rec.service_date) {
       const [y, m, d] = rec.service_date.split('-');
       const fmts = [`${m}/${d}/${y}`, `${parseInt(m)}/${parseInt(d)}/${y}`,
@@ -3476,9 +3477,22 @@ async function ebsRunOCR(base64, mimeType, rec) {
       checks.push({ label: `Date ${rec.service_date}`, found: fmts.some(f => extracted.includes(f)) });
     }
 
-    // CPT codes
+    // CPT codes — visible in the right-side CPT table
+    const cpts = [rec.manipulation_type === 'E1' ? '98940' : '98941'];
+    if (rec.therapeutic_exercises > 0) cpts.push('97110');
+    if (rec.a2) cpts.push('99204');
+    else if (rec.re3) cpts.push('99213');
     for (const cpt of cpts) {
       checks.push({ label: `CPT ${cpt}`, found: extracted.includes(cpt) });
+    }
+
+    // Diagnosis codes — visible in the ICD9 column of the Diag table
+    const dxCodes = Array.isArray(rec.diagnosis_codes) ? rec.diagnosis_codes : [];
+    for (const code of dxCodes) {
+      // Normalise: remove trailing zeros on decimal (M54.50 → M54.5 also valid in OCR)
+      const codeUpper = code.toUpperCase();
+      const codeAlt   = codeUpper.replace(/\.?0+$/, ''); // M54.50 → M54.5
+      checks.push({ label: code, found: extracted.includes(codeUpper) || extracted.includes(codeAlt) });
     }
 
     const allPass = checks.every(c => c.found);

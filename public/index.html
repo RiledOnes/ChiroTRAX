@@ -1521,7 +1521,7 @@
                     <div id="ebs-ss-upload-zone" class="ebs-upload-zone" onclick="document.getElementById('ebs-ss-file-input').click()">
                       <div class="upload-icon">📷</div>
                       <div>Drop screenshot here or <strong>click to browse</strong></div>
-                      <div style="font-size:11px;margin-top:5px;color:var(--ink3)">JPG or PNG only · max 10MB</div>
+                      <div style="font-size:11px;margin-top:5px;color:var(--ink3)">JPG or PNG only · max 10MB · or paste Ctrl+V</div>
                     </div>
                     <input type="file" id="ebs-ss-file-input" accept="image/jpeg,image/png" style="display:none" onchange="ebsHandleFileInput(this)">
 
@@ -4913,14 +4913,23 @@ async function fileToPreviewableDataURL(file) {
 // Clipboard paste handler for images
 function setupClipboardPaste() {
   document.addEventListener('paste', async (e) => {
-    // Only handle paste when images tab is active and daily intake page is shown
-    if (!document.getElementById('tab-images')?.classList.contains('active')) return;
     if (!document.getElementById('page-daily')?.classList.contains('active')) return;
 
     const items = Array.from(e.clipboardData?.items || []);
     const imageItems = items.filter(item => item.type.startsWith('image/'));
     if (!imageItems.length) return;
 
+    // EBS Workflow Phase 2 screenshot paste
+    if (document.getElementById('tab-workflow')?.classList.contains('active') &&
+        document.getElementById('ebs-panel-p2')?.style.display !== 'none') {
+      e.preventDefault();
+      const file = imageItems[0].getAsFile();
+      if (file) ebsHandleFile(file);
+      return;
+    }
+
+    // Images tab paste
+    if (!document.getElementById('tab-images')?.classList.contains('active')) return;
     e.preventDefault();
     const files = imageItems.map(item => item.getAsFile()).filter(Boolean);
     if (files.length) await uploadImageFiles(files);

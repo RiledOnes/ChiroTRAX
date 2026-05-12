@@ -1521,7 +1521,7 @@
                     <div id="ebs-ss-upload-zone" class="ebs-upload-zone" onclick="document.getElementById('ebs-ss-file-input').click()">
                       <div class="upload-icon">📷</div>
                       <div>Drop screenshot here or <strong>click to browse</strong></div>
-                      <div style="font-size:11px;margin-top:5px;color:var(--ink3)">JPG or PNG only · max 10MB</div>
+                      <div style="font-size:11px;margin-top:5px;color:var(--ink3)">JPG or PNG only · max 10MB · or paste Ctrl+V</div>
                     </div>
                     <input type="file" id="ebs-ss-file-input" accept="image/jpeg,image/png" style="display:none" onchange="ebsHandleFileInput(this)">
 
@@ -3198,10 +3198,11 @@ async function loadIntakeRecordsForDate() {
 // ════════════════════════════════════
 // EBS WORKFLOW
 // ════════════════════════════════════
-let ebsRecords = [];
-let ebsQueue   = [];
-let ebsQIdx    = 0;
-let ebsFlagId  = null;
+let ebsRecords  = [];
+let ebsQueue    = [];
+let ebsQIdx     = 0;
+let ebsFlagId   = null;
+let ebsPriorMap = {};  // patient_id → prior visit record from a different date
 
 async function loadWorkflowTab() { await loadEBSWorkflow(); }
 
@@ -3217,6 +3218,16 @@ async function loadEBSWorkflow() {
         : (Array.isArray(r.diagnosis_codes) ? r.diagnosis_codes : [])
     }));
     ebsRecords.sort((a, b) => (a.intake_id || '') > (b.intake_id || '') ? 1 : -1);
+
+    // Fetch prior visit history for each patient (from other dates)
+    const patientIds = [...new Set(ebsRecords.filter(r => r.patient_id).map(r => r.patient_id))];
+    ebsPriorMap = {};
+    await Promise.all(patientIds.map(async pid => {
+      const history = await api('GET', `/api/visits?patient_id=${pid}`);
+      const prior = (history || []).find(v => v.sheet_date !== date && v.sheet_date);
+      if (prior) ebsPriorMap[pid] = prior;
+    }));
+
     ebsBuildQueue();
     ebsUpdateMetrics();
     ebsRenderP1();
@@ -3392,13 +3403,23 @@ function ebsRenderBrief() {
     cpts += `<div class="ebs-cpt-row"><span class="ebs-cpt-code">99213</span><span class="ebs-cpt-desc">Established patient office visit</span></div>`;
   const dosClass = rec.is_backdated ? ' bd' : '';
   const dosBd    = rec.is_backdated ? ' <span class="ep ep-bd">BACKDATED</span>' : '';
-  const lastVisit = ebsRecords
-    .filter(r => r.patient_code === rec.patient_code && r.id !== rec.id &&
-      (r.workflow_status === 'entered_ebs' || r.workflow_status === 'claim_created'))
-    .sort((a, b) => (a.service_date||'') > (b.service_date||'') ? -1 : 1)[0];
-  const lastHtml = lastVisit
-    ? `${esc(lastVisit.service_date)} — ${ebsStatusPill(lastVisit.workflow_status)}`
-    : '<span class="muted">No prior records this date</span>';
+  const prior = rec.patient_id ? ebsPriorMap[rec.patient_id] : null;
+  const priorCodes = prior?.diagnosis_codes
+    ? (typeof prior.diagnosis_codes === 'string'
+        ? prior.diagnosis_codes.split(',').map(s => s.trim()).filter(Boolean)
+        : prior.diagnosis_codes)
+    : [];
+  const priorDxHtml = priorCodes.length
+    ? priorCodes.map(c => `<span class="ebs-dx-code">${esc(c)}</span>`).join('')
+    : '<span class="muted">—</span>';
+  const priorManip = prior?.manipulation_type || null;
+  const priorTE    = prior?.therapeutic_exercises > 0 ? ` · TE×${prior.therapeutic_exercises}` : '';
+  const priorDxCat = prior?.diagnosis_category || null;
+  const lastHtml = prior
+    ? `<div style="font-size:13px">${esc(prior.sheet_date||prior.service_date||'—')} — ${ebsStatusPill(prior.workflow_status)}</div>
+       <div style="font-size:12px;color:var(--ink3);margin-top:3px">${priorManip ? esc(priorManip) + priorTE : ''}${priorDxCat ? ` · <em>${esc(priorDxCat)}</em>` : ''}</div>
+       <div style="margin-top:4px">${priorDxHtml}</div>`
+    : '<span class="muted">No prior records found</span>';
   const codes  = Array.isArray(rec.diagnosis_codes) ? rec.diagnosis_codes : [];
   const dxHtml = codes.length
     ? codes.map(c => `<span class="ebs-dx-code">${esc(c)}</span>`).join('')
@@ -3417,7 +3438,7 @@ function ebsRenderBrief() {
       <div>
         <div class="ebs-brief-label">Date of Service</div>
         <div class="ebs-dos${dosClass}">${esc(rec.service_date||'—')}${dosBd}</div>
-        <div class="ebs-brief-label" style="margin-top:10px">Last Visit (this date)</div>
+        <div class="ebs-brief-label" style="margin-top:10px">Prior Visit</div>
         <div class="ebs-info">${lastHtml}</div>
       </div>
     </div>
@@ -4892,14 +4913,23 @@ async function fileToPreviewableDataURL(file) {
 // Clipboard paste handler for images
 function setupClipboardPaste() {
   document.addEventListener('paste', async (e) => {
-    // Only handle paste when images tab is active and daily intake page is shown
-    if (!document.getElementById('tab-images')?.classList.contains('active')) return;
     if (!document.getElementById('page-daily')?.classList.contains('active')) return;
 
     const items = Array.from(e.clipboardData?.items || []);
     const imageItems = items.filter(item => item.type.startsWith('image/'));
     if (!imageItems.length) return;
 
+    // EBS Workflow Phase 2 screenshot paste
+    if (document.getElementById('tab-workflow')?.classList.contains('active') &&
+        document.getElementById('ebs-panel-p2')?.style.display !== 'none') {
+      e.preventDefault();
+      const file = imageItems[0].getAsFile();
+      if (file) ebsHandleFile(file);
+      return;
+    }
+
+    // Images tab paste
+    if (!document.getElementById('tab-images')?.classList.contains('active')) return;
     e.preventDefault();
     const files = imageItems.map(item => item.getAsFile()).filter(Boolean);
     if (files.length) await uploadImageFiles(files);

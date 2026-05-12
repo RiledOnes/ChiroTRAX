@@ -1530,8 +1530,9 @@ app.get('/api/intake/:id/status-history', async (req, res) => {
 app.post('/api/ebs-screenshots/upload', requireAuth, async (req, res) => {
   const { base64, mimeType, intake_id, patient_code, service_date, is_correction, correction_of } = req.body;
 
-  if (!base64 || !intake_id || !patient_code || !service_date) {
-    return res.status(400).json({ error: 'Missing required fields: base64, intake_id, patient_code, service_date' });
+  const missing = ['base64','intake_id','patient_code','service_date'].filter(f => !req.body[f]);
+  if (missing.length) {
+    return res.status(400).json({ error: `Missing: ${missing.join(', ')}` });
   }
 
   const allowedTypes = ['image/jpeg', 'image/png'];

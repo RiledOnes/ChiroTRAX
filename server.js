@@ -23,7 +23,9 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https://*.supabase.co"],
-      connectSrc: ["'self'", "https://*.supabase.co"],
+      connectSrc: ["'self'", "https://*.supabase.co", "https://cdn.jsdelivr.net"],
+      workerSrc: ["'self'", "blob:"],
+      childSrc: ["'self'", "blob:"],
       scriptSrcAttr: null  // allow inline event handlers (onclick, onsubmit, etc.)
     }
   }

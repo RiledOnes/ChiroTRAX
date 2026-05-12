@@ -2784,7 +2784,15 @@ function showApp() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app-shell').style.display = 'flex';
   document.getElementById('user-email').textContent = authEmail;
-  loadDashboard();
+
+  const savedPage = localStorage.getItem('ct_page') || 'dashboard';
+  showPage(savedPage, null);
+
+  // Restore daily tab and date if on daily page
+  if (savedPage === 'daily') {
+    const savedTab = localStorage.getItem('ct_daily_tab') || 'visits';
+    switchDailyTab(savedTab, null);
+  }
 }
 
 // Check existing session on page load
@@ -2837,6 +2845,11 @@ function showPage(page, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
   if (el) el.classList.add('active');
+  else {
+    const navEl = document.querySelector(`.nav-item[data-page="${page}"]`);
+    if (navEl) navEl.classList.add('active');
+  }
+  localStorage.setItem('ct_page', page);
 
   if (page === 'dashboard') loadDashboard();
   if (page === 'daily') { setTodayDate(); loadDailyPage(); }
@@ -3117,7 +3130,7 @@ function today() {
 
 function setTodayDate() {
   const d = document.getElementById('intake-date');
-  if (!d.value) d.value = today();
+  if (!d.value) d.value = localStorage.getItem('ct_intake_date') || today();
 }
 
 function dailyDateNav(offset) {
@@ -3131,9 +3144,15 @@ function dailyDateNav(offset) {
 function switchDailyTab(tab, el) {
   document.querySelectorAll('.intake-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
+  if (el) el.classList.add('active');
+  else {
+    // find the button by its onclick text when called programmatically
+    document.querySelectorAll('.intake-tab').forEach(t => {
+      if (t.getAttribute('onclick')?.includes(`'${tab}'`)) t.classList.add('active');
+    });
+  }
   document.getElementById('tab-' + tab).classList.add('active');
-  // Load tab-specific data
+  localStorage.setItem('ct_daily_tab', tab);
   if (tab === 'images') loadIntakeImages();
   if (tab === 'bulk') loadIntakeRecordsForDate();
   if (tab === 'workflow') loadEBSWorkflow();
@@ -3142,6 +3161,7 @@ function switchDailyTab(tab, el) {
 async function loadDailyPage() {
   const date = document.getElementById('intake-date').value;
   if (!date) return;
+  localStorage.setItem('ct_intake_date', date);
   // Load visits (always)
   loadVisits();
   // Update image and bulk counts for tab badges
@@ -3236,6 +3256,9 @@ async function loadEBSWorkflow() {
     ebsRenderP2();
     ebsRenderP3();
     document.getElementById('ebs-date-label').textContent = date;
+    // Restore last EBS phase
+    const savedPhase = localStorage.getItem('ct_ebs_phase');
+    if (savedPhase && ['p1','p2','p3','p4'].includes(savedPhase)) showEBSPhase(savedPhase);
   } catch(e) {
     toast('EBS load failed: ' + e.message, 'error');
   }
@@ -3590,6 +3613,7 @@ function showEBSPhase(phase) {
     document.getElementById('ebs-panel-' + p).style.display = p === phase ? '' : 'none';
     document.getElementById('ebs-ptab-' + p).classList.toggle('active', p === phase);
   });
+  localStorage.setItem('ct_ebs_phase', phase);
   if (phase === 'p4') ebsLoadScreenshotLog();
 }
 

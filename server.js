@@ -1530,7 +1530,7 @@ app.get('/api/intake/:id/status-history', async (req, res) => {
 app.post('/api/ebs-screenshots/upload', requireAuth, async (req, res) => {
   const { base64, mimeType, intake_id, patient_code, service_date, is_correction, correction_of } = req.body;
 
-  const missing = ['base64','intake_id','patient_code','service_date'].filter(f => !req.body[f]);
+  const missing = ['base64','intake_id','service_date'].filter(f => !req.body[f]);
   if (missing.length) {
     return res.status(400).json({ error: `Missing: ${missing.join(', ')}` });
   }

@@ -418,7 +418,7 @@
     }
     .toast.show { opacity: 1; transform: translateY(0); }
     .toast.success { border-color: var(--accent2); color: var(--accent2); }
-    .toast.error { border-color: var(--danger); color: var(--danger); }
+    .toast.error { border-color: var(--danger); color: var(--danger); pointer-events: auto; cursor: pointer; }
 
     /* ---- PATIENT CARD IN DETAIL ---- */
     .patient-meta {
@@ -2864,11 +2864,19 @@ function showPage(page, el) {
 // ════════════════════════════════════
 // TOAST
 // ════════════════════════════════════
+let _toastTimer = null;
 function toast(msg, type = '') {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast show ' + type;
-  setTimeout(() => t.className = 'toast', 3000);
+  if (_toastTimer) clearTimeout(_toastTimer);
+  if (type === 'error') {
+    // errors persist until clicked
+    t.onclick = () => { t.className = 'toast'; t.onclick = null; };
+  } else {
+    t.onclick = null;
+    _toastTimer = setTimeout(() => t.className = 'toast', 3000);
+  }
 }
 
 // ════════════════════════════════════

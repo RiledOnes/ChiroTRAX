@@ -3697,13 +3697,22 @@ async function ebsHandleFile(file) {
     ebsCurrentScreenshotId = null;
 
     // Upload
+    const serviceDate = rec.service_date || rec.visit_date || rec.sheet_date;
+    const intakeId    = rec.intake_id || rec.id;
+    const patientCode = rec.patient_code;
+
+    if (!base64 || !intakeId || !patientCode || !serviceDate) {
+      toast(`Record missing data — intake_id:${intakeId} code:${patientCode} date:${serviceDate}`, 'error');
+      return;
+    }
+
     toast('Uploading screenshot…', 'info');
     const result = await api('POST', '/api/ebs-screenshots/upload', {
       base64,
       mimeType: file.type,
-      intake_id: rec.intake_id,
-      patient_code: rec.patient_code,
-      service_date: rec.service_date || rec.visit_date,
+      intake_id: intakeId,
+      patient_code: patientCode,
+      service_date: serviceDate,
       is_correction: false
     });
     ebsCurrentScreenshotId = result.id;

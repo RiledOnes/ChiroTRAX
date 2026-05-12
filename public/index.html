@@ -1051,6 +1051,7 @@
     .ss-log-thumb { width: 56px; height: 40px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 1px solid var(--border); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
@@ -1531,6 +1532,7 @@
                         <img id="ebs-ss-preview-img" src="" alt="EBS Screenshot">
                         <span class="ss-replace" onclick="ebsResetScreenshot()">Replace</span>
                       </div>
+                      <div id="ebs-ss-ocr-panel" style="display:none;margin-top:10px;padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)"></div>
                       <div class="ebs-verify-btns">
                         <button class="btn btn-success" onclick="ebsVerifyPass()">✅ Pass</button>
                         <button class="btn btn-danger" onclick="ebsVerifyFail()">🛑 Fail</button>
@@ -3392,58 +3394,109 @@ function ebsRenderBrief() {
   const rec = ebsQueue[ebsQIdx];
   if (!rec) return;
   document.getElementById('ebs-q-pos').textContent = `${ebsQIdx + 1} of ${ebsQueue.length}`;
-  const cpt1 = rec.manipulation_type === 'E1' ? '98940' : '98941';
-  const cpt1d = rec.manipulation_type === 'E1' ? 'Manipulation — 1–2 regions' : 'Manipulation — 3–4 regions';
-  let cpts = `<div class="ebs-cpt-row"><span class="ebs-cpt-code">${cpt1}</span><span class="ebs-cpt-desc">${cpt1d}</span></div>`;
-  if (rec.therapeutic_exercises > 0)
-    cpts += `<div class="ebs-cpt-row"><span class="ebs-cpt-code">97110</span><span class="ebs-cpt-desc">Therapeutic exercises &times; ${rec.therapeutic_exercises} units</span></div>`;
-  if (rec.a2)
-    cpts += `<div class="ebs-cpt-row"><span class="ebs-cpt-code">99204</span><span class="ebs-cpt-desc">New patient office visit</span></div>`;
-  else if (rec.re3)
-    cpts += `<div class="ebs-cpt-row"><span class="ebs-cpt-code">99213</span><span class="ebs-cpt-desc">Established patient office visit</span></div>`;
-  const dosClass = rec.is_backdated ? ' bd' : '';
-  const dosBd    = rec.is_backdated ? ' <span class="ep ep-bd">BACKDATED</span>' : '';
+
+  // CPT codes list (compact)
+  const cpts = [rec.manipulation_type === 'E1' ? '98940' : '98941'];
+  if (rec.therapeutic_exercises > 0) cpts.push(`97110×${rec.therapeutic_exercises}`);
+  if (rec.a2)       cpts.push('99204');
+  else if (rec.re3) cpts.push('99213');
+
+  // Diagnosis
+  const codes = Array.isArray(rec.diagnosis_codes) ? rec.diagnosis_codes : [];
+  const dxCat = rec.diagnosis_category || '';
+
+  // Prior visit
   const prior = rec.patient_id ? ebsPriorMap[rec.patient_id] : null;
   const priorCodes = prior?.diagnosis_codes
     ? (typeof prior.diagnosis_codes === 'string'
         ? prior.diagnosis_codes.split(',').map(s => s.trim()).filter(Boolean)
         : prior.diagnosis_codes)
     : [];
-  const priorDxHtml = priorCodes.length
-    ? priorCodes.map(c => `<span class="ebs-dx-code">${esc(c)}</span>`).join('')
-    : '<span class="muted">—</span>';
-  const priorManip = prior?.manipulation_type || null;
-  const priorTE    = prior?.therapeutic_exercises > 0 ? ` · TE×${prior.therapeutic_exercises}` : '';
-  const priorDxCat = prior?.diagnosis_category || null;
-  const lastHtml = prior
-    ? `<div style="font-size:13px">${esc(prior.sheet_date||prior.service_date||'—')} — ${ebsStatusPill(prior.workflow_status)}</div>
-       <div style="font-size:12px;color:var(--ink3);margin-top:3px">${priorManip ? esc(priorManip) + priorTE : ''}${priorDxCat ? ` · <em>${esc(priorDxCat)}</em>` : ''}</div>
-       <div style="margin-top:4px">${priorDxHtml}</div>`
-    : '<span class="muted">No prior records found</span>';
-  const codes  = Array.isArray(rec.diagnosis_codes) ? rec.diagnosis_codes : [];
-  const dxHtml = codes.length
-    ? codes.map(c => `<span class="ebs-dx-code">${esc(c)}</span>`).join('')
-    : '<span class="muted">No diagnosis codes on file</span>';
-  const catLabel = rec.diagnosis_category
-    ? ` <span style="font-size:10px;color:var(--ink3)">(${esc(rec.diagnosis_category)})</span>` : '';
+
+  const row = (label, val) =>
+    `<tr><td style="color:var(--ink3);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:5px 10px 5px 0;white-space:nowrap;vertical-align:top">${label}</td><td style="padding:5px 0;font-size:13px">${val}</td></tr>`;
+
+  const priorRow = prior
+    ? `${esc(prior.sheet_date||prior.service_date||'—')}  ${prior.manipulation_type||''}${prior.therapeutic_exercises>0?` TE×${prior.therapeutic_exercises}`:''}${prior.diagnosis_category?` · ${esc(prior.diagnosis_category)}`:''}
+       <div style="margin-top:3px">${priorCodes.map(c=>`<span class="ebs-dx-code">${esc(c)}</span>`).join('')||'<span class="muted">—</span>'}</div>`
+    : '<span class="muted">No prior on record</span>';
+
   document.getElementById('ebs-brief').innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <strong style="font-size:15px">${esc(rec.patient_name||'—')}</strong>
-      <span class="muted" style="font-size:13px">${esc(rec.patient_code||'')}</span>
+      <code style="font-size:12px;background:var(--surface2);padding:2px 7px;border-radius:4px">${esc(rec.patient_code||'')}</code>
       <code style="font-size:11px;color:var(--ink3)">${esc(rec.intake_id||'')}</code>
       ${rec.is_backdated?'<span class="ep ep-bd">BD</span>':''}${rec.a2?'<span class="ep ep-a2">A2</span>':''}${rec.re3?'<span class="ep ep-re3">RE3</span>':''}
     </div>
-    <div class="ebs-brief-grid">
-      <div><div class="ebs-brief-label">CPT Codes</div>${cpts}</div>
-      <div>
-        <div class="ebs-brief-label">Date of Service</div>
-        <div class="ebs-dos${dosClass}">${esc(rec.service_date||'—')}${dosBd}</div>
-        <div class="ebs-brief-label" style="margin-top:10px">Prior Visit</div>
-        <div class="ebs-info">${lastHtml}</div>
-      </div>
-    </div>
-    <div><div class="ebs-brief-label">Diagnosis Codes${catLabel}</div><div class="ebs-dx-codes">${dxHtml}</div></div>`;
+    <table style="border-collapse:collapse;width:100%">
+      ${row('Date', `<strong>${esc(rec.service_date||'—')}</strong>${rec.is_backdated?' <span class="ep ep-bd">BACKDATED</span>':''}`)}
+      ${row('CPT', cpts.map(c=>`<span class="ebs-dx-code">${esc(c)}</span>`).join(' '))}
+      ${row('Dx', `${dxCat?`<span style="font-size:11px;color:var(--ink3);margin-right:6px">${esc(dxCat)}</span>`:''}${codes.map(c=>`<span class="ebs-dx-code">${esc(c)}</span>`).join('')||'<span class="muted">—</span>'}`)}
+      ${row('Prior', priorRow)}
+    </table>`;
   document.getElementById('ebs-p2-actions').style.display = 'flex';
+}
+
+// OCR validation after screenshot upload
+let _tesseractWorker = null;
+async function ebsRunOCR(base64, mimeType, rec) {
+  const panel = document.getElementById('ebs-ss-ocr-panel');
+  if (!panel) return;
+  panel.style.display = '';
+  panel.innerHTML = '<div style="font-size:12px;color:var(--ink3)">🔍 Scanning screenshot…</div>';
+
+  try {
+    if (typeof Tesseract === 'undefined') throw new Error('OCR library not loaded');
+
+    if (!_tesseractWorker) {
+      _tesseractWorker = await Tesseract.createWorker('eng', 1, { logger: () => {} });
+    }
+
+    const { data: { text } } = await _tesseractWorker.recognize(`data:${mimeType};base64,${base64}`);
+    const extracted = text.toUpperCase().replace(/\s+/g, ' ');
+
+    // Fields to check
+    const cpts = [rec.manipulation_type === 'E1' ? '98940' : '98941'];
+    if (rec.therapeutic_exercises > 0) cpts.push('97110');
+    if (rec.a2) cpts.push('99204');
+    else if (rec.re3) cpts.push('99213');
+
+    const checks = [];
+
+    // Patient code
+    if (rec.patient_code && rec.patient_code !== 'XXX-XX') {
+      checks.push({ label: rec.patient_code, found: extracted.includes(rec.patient_code.toUpperCase()) });
+    }
+
+    // Service date — try MM/DD/YYYY, M/D/YYYY, MM/DD/YY
+    if (rec.service_date) {
+      const [y, m, d] = rec.service_date.split('-');
+      const fmts = [`${m}/${d}/${y}`, `${parseInt(m)}/${parseInt(d)}/${y}`,
+                    `${m}/${d}/${y.slice(2)}`, `${parseInt(m)}/${parseInt(d)}/${y.slice(2)}`];
+      checks.push({ label: `Date ${rec.service_date}`, found: fmts.some(f => extracted.includes(f)) });
+    }
+
+    // CPT codes
+    for (const cpt of cpts) {
+      checks.push({ label: `CPT ${cpt}`, found: extracted.includes(cpt) });
+    }
+
+    const allPass = checks.every(c => c.found);
+    const checkHtml = checks.map(c =>
+      `<span style="margin-right:10px;font-size:12px;color:${c.found?'var(--accent2)':'var(--danger)'}">${c.found?'✅':'❌'} ${esc(c.label)}</span>`
+    ).join('');
+
+    panel.innerHTML = `
+      <div style="font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">OCR Check</div>
+      <div style="display:flex;flex-wrap:wrap;gap:2px">${checkHtml}</div>
+      ${allPass ? '<div style="margin-top:6px;font-size:12px;color:var(--accent2);font-weight:600">All matched — auto-passing ✅</div>' : '<div style="margin-top:6px;font-size:11px;color:var(--ink3)">Review manually or OCR may have missed text.</div>'}`;
+
+    if (allPass && ebsCurrentScreenshotId) {
+      setTimeout(() => ebsVerifyPass(), 1000);
+    }
+  } catch(e) {
+    panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR unavailable — verify manually.</div>`;
+  }
 }
 
 function ebsRenderQueue() {
@@ -3616,7 +3669,8 @@ async function ebsHandleFile(file) {
       is_correction: false
     });
     ebsCurrentScreenshotId = result.id;
-    toast('Screenshot uploaded — verify Pass or Fail.', 'success');
+    toast('Screenshot uploaded — scanning…', 'success');
+    ebsRunOCR(base64, file.type, rec);
   } catch(e) {
     toast('Upload failed: ' + e.message, 'error');
   }
@@ -3718,6 +3772,8 @@ function ebsResetScreenshot() {
   document.getElementById('ebs-ss-status-badge').innerHTML = '';
   document.getElementById('ebs-ss-file-input').value = '';
   document.getElementById('ebs-ss-correction-input').value = '';
+  const ocrPanel = document.getElementById('ebs-ss-ocr-panel');
+  if (ocrPanel) { ocrPanel.style.display = 'none'; ocrPanel.innerHTML = ''; }
 }
 
 // Phase 4: Screenshot Log

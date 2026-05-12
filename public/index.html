@@ -3474,16 +3474,26 @@ async function ebsRunOCR(base64, mimeType, rec) {
   const panel = document.getElementById('ebs-ss-ocr-panel');
   if (!panel) return;
   panel.style.display = '';
-  panel.innerHTML = '<div style="font-size:12px;color:var(--ink3)">🔍 Scanning screenshot…</div>';
+  panel.innerHTML = '<div style="font-size:12px;color:var(--ink3)">🔍 Scanning… <span style="color:var(--ink3);font-size:11px">(or just click ✅ Pass / 🛑 Fail above)</span></div>';
+
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('timeout')), 20000)
+  );
 
   try {
-    if (typeof Tesseract === 'undefined') throw new Error('OCR library not loaded');
+    if (typeof Tesseract === 'undefined') throw new Error('not loaded');
 
     if (!_tesseractWorker) {
-      _tesseractWorker = await Tesseract.createWorker('eng', 1, { logger: () => {} });
+      _tesseractWorker = await Promise.race([
+        Tesseract.createWorker('eng', 1, { logger: () => {} }),
+        timeout
+      ]);
     }
 
-    const { data: { text } } = await _tesseractWorker.recognize(`data:${mimeType};base64,${base64}`);
+    const { data: { text } } = await Promise.race([
+      _tesseractWorker.recognize(`data:${mimeType};base64,${base64}`),
+      timeout
+    ]);
     const extracted = text.toUpperCase().replace(/\s+/g, ' ');
 
     const checks = [];
@@ -3541,7 +3551,14 @@ async function ebsRunOCR(base64, mimeType, rec) {
     }
   } catch(e) {
     console.error('OCR error:', e);
-    panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR unavailable — verify manually. (${e.message})</div>`;
+    // Kill hung worker so it doesn't block future attempts
+    if (e.message === 'timeout' || e.message?.includes('timeout')) {
+      try { _tesseractWorker?.terminate(); } catch {}
+      _tesseractWorker = null;
+      panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR timed out — verify manually using ✅ Pass / 🛑 Fail.</div>`;
+    } else {
+      panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR unavailable — verify manually. (${e.message})</div>`;
+    }
   }
 }
 

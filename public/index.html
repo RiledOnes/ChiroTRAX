@@ -3928,29 +3928,90 @@ async function populatePatientSelects() {
   });
 }
 
-function openSearchSelect(ssId) {
+// ════════════════════════════════════
+// SEARCH-SELECT (portal pattern)
+// — dropdown rendered in <body> to escape ancestor overflow:hidden
+// ════════════════════════════════════
+let _ssPortal = null;
+let _ssActiveId = null;
+let _ssCloseListeners = [];
+
+function _ssGetPortal() {
+  if (!_ssPortal) {
+    _ssPortal = document.createElement('div');
+    _ssPortal.id = 'ss-portal';
+    _ssPortal.style.cssText = [
+      'display:none', 'position:fixed', 'z-index:9999',
+      'background:var(--surface)', 'border:1px solid var(--border)',
+      'border-radius:0 0 8px 8px', 'box-shadow:0 4px 12px rgba(0,0,0,0.18)',
+      'max-height:220px', 'overflow-y:auto', 'min-width:200px'
+    ].join(';');
+    document.body.appendChild(_ssPortal);
+  }
+  return _ssPortal;
+}
+
+function _ssPosition(ssId) {
   const wrap = document.getElementById(ssId);
   if (!wrap) return;
-  wrap.classList.add('open');
-  filterSearchSelect(ssId);
-  // Close on outside click
+  const input = wrap.querySelector('input[type="text"]');
+  const rect = input.getBoundingClientRect();
+  const portal = _ssGetPortal();
+  portal.style.top    = (rect.bottom + 1) + 'px';
+  portal.style.left   = rect.left + 'px';
+  portal.style.width  = rect.width + 'px';
+}
+
+function _ssClose() {
+  const portal = _ssGetPortal();
+  portal.style.display = 'none';
+  _ssActiveId = null;
+  _ssCloseListeners.forEach(fn => {
+    document.removeEventListener('mousedown', fn);
+    document.removeEventListener('scroll', fn, true);
+    window.removeEventListener('resize', fn);
+  });
+  _ssCloseListeners = [];
+}
+
+function openSearchSelect(ssId) {
+  if (_ssActiveId && _ssActiveId !== ssId) _ssClose();
+  _ssActiveId = ssId;
+  const portal = _ssGetPortal();
+  portal.style.display = 'block';
+  _ssPosition(ssId);
+  _ssRenderItems(ssId);
+
   setTimeout(() => {
-    const close = (e) => { if (!wrap.contains(e.target)) { wrap.classList.remove('open'); document.removeEventListener('mousedown', close); } };
+    const close = (e) => {
+      const wrap = document.getElementById(ssId);
+      if (wrap?.contains(e.target) || portal.contains(e.target)) return;
+      _ssClose();
+    };
+    const reposition = () => {
+      if (_ssActiveId === ssId) _ssPosition(ssId);
+    };
     document.addEventListener('mousedown', close);
+    document.addEventListener('scroll', _ssClose, true);
+    window.addEventListener('resize', reposition);
+    _ssCloseListeners = [close, reposition];
   }, 0);
 }
 
 function filterSearchSelect(ssId) {
+  if (_ssActiveId === ssId) _ssRenderItems(ssId);
+}
+
+function _ssRenderItems(ssId) {
   const wrap = document.getElementById(ssId);
   if (!wrap) return;
   const input = wrap.querySelector('input[type="text"]');
-  const list = wrap.querySelector('.ss-list');
-  const q = (input.value || '').toLowerCase();
+  const q = (input?.value || '').toLowerCase();
   const patients = wrap._patients || allPatients;
 
   let html = '';
   if (wrap._allowEmpty) {
-    html += `<div class="ss-item" onclick="selectSearchItem('${ssId}','','${wrap._emptyLabel || 'All Patients'}')">${wrap._emptyLabel || 'All Patients'}</div>`;
+    html += `<div class="ss-item" onmousedown="selectSearchItem('${ssId}','','${wrap._emptyLabel || 'All Patients'}')">${wrap._emptyLabel || 'All Patients'}</div>`;
   }
   const filtered = patients.filter(p =>
     p.first_name.toLowerCase().includes(q) ||
@@ -3960,33 +4021,31 @@ function filterSearchSelect(ssId) {
   if (filtered.length) {
     filtered.slice(0, 50).forEach(p => {
       const label = `${p.patient_code} — ${p.last_name}, ${p.first_name}`;
-      html += `<div class="ss-item" onclick="selectSearchItem('${ssId}','${p.id}',\`${label.replace(/`/g, '')}\`)">${esc(label)}</div>`;
+      html += `<div class="ss-item" onmousedown="selectSearchItem('${ssId}','${p.id}',\`${label.replace(/`/g, '')}\`)">${esc(label)}</div>`;
     });
-    if (filtered.length > 50) html += `<div class="ss-item ss-empty">+${filtered.length - 50} more...</div>`;
+    if (filtered.length > 50) html += `<div class="ss-item ss-empty">+${filtered.length - 50} more…</div>`;
   } else {
     html += `<div class="ss-item ss-empty">No patients found</div>`;
   }
-  list.innerHTML = html;
+  _ssGetPortal().innerHTML = html;
 }
 
 function selectSearchItem(ssId, value, label) {
   const wrap = document.getElementById(ssId);
   if (!wrap) return;
-  const input = wrap.querySelector('input[type="text"]');
+  const input  = wrap.querySelector('input[type="text"]');
   const hidden = wrap.querySelector('input[type="hidden"]');
-  input.value = value ? label : '';
+  input.value  = value ? label : '';
   hidden.value = value;
-  wrap.classList.remove('open');
+  _ssClose();
   if (wrap._onSelect) wrap._onSelect();
 }
 
 function setSearchSelectValue(ssId, value, label) {
   const wrap = document.getElementById(ssId);
   if (!wrap) return;
-  const input = wrap.querySelector('input[type="text"]');
-  const hidden = wrap.querySelector('input[type="hidden"]');
-  input.value = label || '';
-  hidden.value = value || '';
+  wrap.querySelector('input[type="text"]').value  = label || '';
+  wrap.querySelector('input[type="hidden"]').value = value || '';
 }
 
 // ════════════════════════════════════

@@ -3296,6 +3296,7 @@ async function loadEBSWorkflow() {
     ebsRenderP2();
     ebsRenderP3();
     document.getElementById('ebs-date-label').textContent = date;
+    ebsPrewarmOCR(); // start worker init now so it's ready before screenshot is pasted
     // Restore last EBS phase
     const savedPhase = localStorage.getItem('ct_ebs_phase');
     if (savedPhase && ['p1','p2','p3','p4'].includes(savedPhase)) showEBSPhase(savedPhase);
@@ -3502,29 +3503,45 @@ function ebsRenderBrief() {
 
 // OCR validation after screenshot upload
 let _tesseractWorker = null;
+let _tesseractWorkerPromise = null;  // single in-flight init promise
+
+// Kick off worker initialization in background — safe to call multiple times
+function ebsPrewarmOCR() {
+  if (_tesseractWorker || _tesseractWorkerPromise) return;
+  if (typeof Tesseract === 'undefined') return;
+  // OEM 3 = default (auto), fastest initialization; logger suppressed
+  _tesseractWorkerPromise = Tesseract.createWorker('eng', 3, { logger: () => {} })
+    .then(w => { _tesseractWorker = w; })
+    .catch(e => {
+      console.warn('OCR worker init failed:', e);
+      _tesseractWorkerPromise = null; // allow retry
+    });
+}
+
 async function ebsRunOCR(base64, mimeType, rec) {
   const panel = document.getElementById('ebs-ss-ocr-panel');
   if (!panel) return;
   panel.style.display = '';
-  panel.innerHTML = '<div style="font-size:12px;color:var(--ink3)">🔍 Scanning… <span style="color:var(--ink3);font-size:11px">(or just click ✅ Pass / 🛑 Fail above)</span></div>';
-
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('timeout')), 20000)
-  );
 
   try {
     if (typeof Tesseract === 'undefined') throw new Error('not loaded');
 
     if (!_tesseractWorker) {
-      _tesseractWorker = await Promise.race([
-        Tesseract.createWorker('eng', 1, { logger: () => {} }),
-        timeout
-      ]);
+      ebsPrewarmOCR(); // start if not started yet
+      panel.innerHTML = '<div style="font-size:12px;color:var(--ink3)">⏳ Loading OCR engine… <span style="font-size:11px">(or click ✅ Pass / 🛑 Fail above)</span></div>';
+      // Wait for init — 45s; this is a one-time cost
+      const initTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('init_timeout')), 45000));
+      await Promise.race([_tesseractWorkerPromise, initTimeout]);
+      if (!_tesseractWorker) throw new Error('timeout');
     }
 
+    panel.innerHTML = '<div style="font-size:12px;color:var(--ink3)">🔍 Scanning… <span style="font-size:11px">(or click ✅ Pass / 🛑 Fail above)</span></div>';
+
+    // Recognition — 30s
+    const recTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000));
     const { data: { text } } = await Promise.race([
       _tesseractWorker.recognize(`data:${mimeType};base64,${base64}`),
-      timeout
+      recTimeout
     ]);
     const extracted = text.toUpperCase().replace(/\s+/g, ' ');
 
@@ -3583,11 +3600,19 @@ async function ebsRunOCR(base64, mimeType, rec) {
     }
   } catch(e) {
     console.error('OCR error:', e);
-    // Kill hung worker so it doesn't block future attempts
-    if (e.message === 'timeout' || e.message?.includes('timeout')) {
-      try { _tesseractWorker?.terminate(); } catch {}
-      _tesseractWorker = null;
-      panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR timed out — verify manually using ✅ Pass / 🛑 Fail.</div>`;
+    const isTimeout = e.message === 'timeout' || e.message === 'init_timeout' || e.message?.includes('timeout');
+    if (isTimeout) {
+      if (e.message === 'init_timeout') {
+        // Worker never finished initializing — reset promise so next attempt retries
+        _tesseractWorkerPromise = null;
+        panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR engine took too long to load — verify manually using ✅ Pass / 🛑 Fail.</div>`;
+      } else {
+        // Recognition timed out — kill worker so next attempt gets a fresh one
+        try { _tesseractWorker?.terminate(); } catch {}
+        _tesseractWorker = null;
+        _tesseractWorkerPromise = null;
+        panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR scan timed out — verify manually using ✅ Pass / 🛑 Fail.</div>`;
+      }
     } else {
       panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR unavailable — verify manually. (${e.message})</div>`;
     }
@@ -3672,6 +3697,7 @@ function showEBSPhase(phase) {
     document.getElementById('ebs-ptab-' + p).classList.toggle('active', p === phase);
   });
   localStorage.setItem('ct_ebs_phase', phase);
+  if (phase === 'p2') ebsPrewarmOCR(); // start worker early so it's ready when screenshot is pasted
   if (phase === 'p4') ebsLoadScreenshotLog();
 }
 

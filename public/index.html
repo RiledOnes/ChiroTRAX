@@ -1622,6 +1622,7 @@
                     <th>Verified By</th>
                     <th>Uploaded</th>
                     <th>Notes</th>
+                    <th style="width:90px"></th>
                   </tr>
                 </thead>
                 <tbody id="ebs-ss-log-tbody">
@@ -3929,7 +3930,7 @@ async function ebsLoadScreenshotLog() {
 function ebsRenderScreenshotLog(rows) {
   const tbody = document.getElementById('ebs-ss-log-tbody');
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="icon">📷</div><p>No screenshots for this date.</p><small>Upload screenshots in Phase 2.</small></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="icon">📷</div><p>No screenshots for this date.</p><small>Upload screenshots in Phase 2.</small></div></td></tr>`;
     return;
   }
   const statusHtml = s => {
@@ -3948,12 +3949,63 @@ function ebsRenderScreenshotLog(rows) {
       <td style="font-size:12px;color:var(--ink3)">${esc(r.verified_by||'—')}</td>
       <td style="font-size:12px;color:var(--ink3)">${r.created_at ? new Date(r.created_at).toLocaleString() : '—'}</td>
       <td style="font-size:12px;color:var(--ink2);max-width:200px;white-space:pre-wrap">${esc(r.mismatch_notes||'')}</td>
+      <td><button class="btn btn-xs btn-ghost" style="font-size:11px;white-space:nowrap" onclick="ebsAddCorrection('${esc(r.intake_id||'')}','${esc(r.service_date||'')}','${esc(r.patient_code||'')}','${esc(r.id)}')">+ Screenshot</button></td>
     </tr>`
   ).join('');
 }
 
 function ebsViewScreenshot(url, intakeId) {
   window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+// Add a correction screenshot to an already-verified record from the Phase 4 log
+function ebsAddCorrection(intakeId, serviceDate, patientCode, originalId) {
+  // Reuse a single hidden input — create once, reuse
+  let inp = document.getElementById('_ebs-log-correction-input');
+  if (!inp) {
+    inp = document.createElement('input');
+    inp.type = 'file';
+    inp.id = '_ebs-log-correction-input';
+    inp.accept = 'image/jpeg,image/png';
+    inp.style.display = 'none';
+    document.body.appendChild(inp);
+  }
+  // Remove any prior listener before adding a fresh one
+  inp.onchange = null;
+  inp.value = '';
+  inp.onchange = async () => {
+    const file = inp.files[0];
+    if (!file) return;
+    if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.toLowerCase().endsWith('.heic')) {
+      toast('HEIC not supported — convert to JPG or PNG first.', 'error'); return;
+    }
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      toast('JPG or PNG only.', 'error'); return;
+    }
+    if (file.size > 10 * 1024 * 1024) { toast('Image too large — max 10 MB.', 'error'); return; }
+    try {
+      const base64 = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = e => res(e.target.result.split(',')[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+      toast('Uploading correction…');
+      await api('POST', '/api/ebs-screenshots/correction', {
+        base64,
+        mimeType: file.type,
+        intake_id: intakeId,
+        service_date: serviceDate,
+        patient_code: patientCode || null,
+        correction_of: originalId,
+        mismatch_notes: 'Manual replacement from screenshot log'
+      });
+      toast('Correction screenshot uploaded ✅', 'success');
+      ebsLoadScreenshotLog();
+    } catch(e) { toast('Upload failed: ' + e.message, 'error'); }
+    inp.value = '';
+  };
+  inp.click();
 }
 
 function badge(val, type) {

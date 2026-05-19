@@ -1500,6 +1500,72 @@ app.post('/api/reports/run', async (req, res) => {
         });
       }
 
+      case 'attendance': {
+        const aFrom = filters.from;
+        const aTo = filters.to;
+        if (!aFrom || !aTo) return res.status(400).json({ error: 'Date range required for attendance report' });
+
+        const [schedRes, irRes] = await Promise.all([
+          supabase.from('office_schedule').select('*').gte('office_date', aFrom).lte('office_date', aTo).order('office_date'),
+          supabase.from('intake_records')
+            .select('id, service_date, patient_name, patient_code, patient_id, workflow_status, manipulation_type')
+            .gte('service_date', aFrom).lte('service_date', aTo)
+            .order('service_date', { ascending: true })
+        ]);
+        if (schedRes.error) return dbError(res, schedRes.error);
+        if (irRes.error) return dbError(res, irRes.error);
+
+        const schedMap = {};
+        (schedRes.data || []).forEach(s => { schedMap[s.office_date] = s; });
+        const visitsByDate = {};
+        (irRes.data || []).forEach(v => {
+          if (!visitsByDate[v.service_date]) visitsByDate[v.service_date] = [];
+          visitsByDate[v.service_date].push(v);
+        });
+
+        const allDays = [];
+        const cur = new Date(aFrom + 'T12:00:00Z');
+        const endDate = new Date(aTo + 'T12:00:00Z');
+        while (cur <= endDate) {
+          const dateStr = cur.toISOString().split('T')[0];
+          const sched = schedMap[dateStr];
+          allDays.push({
+            date: dateStr,
+            is_open: sched ? sched.is_open : null,
+            note: sched?.note || '',
+            visits: visitsByDate[dateStr] || [],
+            count: (visitsByDate[dateStr] || []).length
+          });
+          cur.setUTCDate(cur.getUTCDate() + 1);
+        }
+
+        const monthMap = {};
+        allDays.forEach(day => {
+          const month = day.date.substring(0, 7);
+          if (!monthMap[month]) monthMap[month] = [];
+          monthMap[month].push(day);
+        });
+
+        const allVisits = irRes.data || [];
+        const activeDays = allDays.filter(d => d.is_open !== false && d.count > 0);
+        const groups = Object.entries(monthMap).map(([month, days]) => ({
+          label: new Date(month + '-15').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          month,
+          days,
+          records: days.flatMap(d => d.visits)
+        }));
+
+        const summary = {
+          total_records: allVisits.length,
+          total_days: allDays.filter(d => d.count > 0).length,
+          open_days: allDays.filter(d => d.is_open !== false).length,
+          closed_days: allDays.filter(d => d.is_open === false).length,
+          avg_daily: activeDays.length ? (allVisits.length / activeDays.length).toFixed(1) : '0'
+        };
+
+        return res.json({ summary, groups, calendar: true });
+      }
+
       default:
         return res.status(400).json({ error: `Unknown report_type: ${report_type}` });
     }
@@ -1724,6 +1790,11 @@ app.get('/api/ebs-screenshots/intake/:intake_id', requireAuth, async (req, res) 
   }));
 
   res.json(rows);
+});
+
+// Intake Images viewer page (auth handled client-side via sessionStorage token)
+app.get('/intake-images', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'intake-images.html'));
 });
 
 // SPA fallback — serve index.html for non-API routes

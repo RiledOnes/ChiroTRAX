@@ -972,6 +972,24 @@
     .tool-group:not(.collapsed) .tool-group-header span:first-child::before { content: '▼ '; }
     .tool-group .tool-group-header span:first-child { display: inline; }
 
+    /* ---- REPORT BUILDER EXTRAS ---- */
+    .rb-col-chip { padding: 3px 10px; border-radius: 12px; font-size: 11px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--ink3); transition: all 0.15s; user-select: none; }
+    .rb-col-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    /* Attendance calendar */
+    .att-month { margin-bottom: 20px; }
+    .att-month-title { font-weight: 700; font-size: 14px; margin-bottom: 8px; color: var(--ink); }
+    .att-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .att-day-hdr { font-size: 10px; color: var(--ink3); text-align: center; padding: 2px 0; font-weight: 600; }
+    .att-day { min-height: 58px; border-radius: 6px; padding: 4px 6px; font-size: 11px; background: var(--surface2); border: 1px solid transparent; }
+    .att-day.closed { background: rgba(220,38,38,0.07); border-color: rgba(220,38,38,0.15); }
+    .att-day.empty { background: transparent; border-color: transparent; }
+    .att-day.has-visits { border-color: rgba(67,160,71,0.3); background: rgba(67,160,71,0.05); }
+    .att-day-num { font-size: 10px; color: var(--ink3); line-height: 1.4; }
+    .att-day-count { font-size: 20px; font-weight: 700; color: var(--ink); line-height: 1.1; }
+    .att-day-names { font-size: 9px; color: var(--ink3); margin-top: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .att-day-note { font-size: 9px; color: var(--warn); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .att-closed-label { font-size: 9px; color: var(--danger); font-weight: 700; margin-top: 2px; }
+
     /* ---- EBS WORKFLOW ---- */
     .ebs-metrics-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 10px; }
     .ebs-metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; }
@@ -1145,6 +1163,9 @@
       <div class="nav-item" data-page="daily" onclick="showPage('daily', this)">
         <span class="icon">📋</span> Daily Intake
       </div>
+      <a class="nav-item" href="/intake-images" style="text-decoration:none;color:inherit">
+        <span class="icon">🖼️</span> Intake Images
+      </a>
       <div class="nav-item" data-page="patients" onclick="showPage('patients', this)">
         <span class="icon">👤</span> Patients
       </div>
@@ -2031,6 +2052,11 @@
           <div style="font-weight:600;font-size:13px">Monthly Report</div>
           <div style="font-size:11px;color:var(--ink3)">Full month overview + billing</div>
         </div>
+        <div class="rb-type-card" data-type="attendance" onclick="selectReportType('attendance',this)">
+          <div style="font-size:20px;margin-bottom:4px">📆</div>
+          <div style="font-weight:600;font-size:13px">Attendance</div>
+          <div style="font-size:11px;color:var(--ink3)">Calendar view with office schedule</div>
+        </div>
       </div>
 
       <!-- Filters bar -->
@@ -2092,6 +2118,12 @@
             <button class="btn btn-ghost btn-sm" onclick="setToolRange(365)" style="font-size:11px;padding:4px 8px">1yr</button>
           </div>
         </div>
+      </div>
+
+      <!-- Column visibility toggles -->
+      <div id="rb-col-toggles" style="display:none;margin-bottom:12px;padding:10px 14px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+        <span style="font-size:11px;color:var(--ink3);margin-right:8px">Columns:</span>
+        <div id="rb-col-chips" style="display:inline-flex;gap:6px;flex-wrap:wrap"></div>
       </div>
 
       <!-- Breadcrumb for drill-down -->
@@ -3928,29 +3960,90 @@ async function populatePatientSelects() {
   });
 }
 
-function openSearchSelect(ssId) {
+// ════════════════════════════════════
+// SEARCH-SELECT (portal pattern)
+// — dropdown rendered in <body> to escape ancestor overflow:hidden
+// ════════════════════════════════════
+let _ssPortal = null;
+let _ssActiveId = null;
+let _ssCloseListeners = [];
+
+function _ssGetPortal() {
+  if (!_ssPortal) {
+    _ssPortal = document.createElement('div');
+    _ssPortal.id = 'ss-portal';
+    _ssPortal.style.cssText = [
+      'display:none', 'position:fixed', 'z-index:9999',
+      'background:var(--surface)', 'border:1px solid var(--border)',
+      'border-radius:0 0 8px 8px', 'box-shadow:0 4px 12px rgba(0,0,0,0.18)',
+      'max-height:220px', 'overflow-y:auto', 'min-width:200px'
+    ].join(';');
+    document.body.appendChild(_ssPortal);
+  }
+  return _ssPortal;
+}
+
+function _ssPosition(ssId) {
   const wrap = document.getElementById(ssId);
   if (!wrap) return;
-  wrap.classList.add('open');
-  filterSearchSelect(ssId);
-  // Close on outside click
+  const input = wrap.querySelector('input[type="text"]');
+  const rect = input.getBoundingClientRect();
+  const portal = _ssGetPortal();
+  portal.style.top    = (rect.bottom + 1) + 'px';
+  portal.style.left   = rect.left + 'px';
+  portal.style.width  = rect.width + 'px';
+}
+
+function _ssClose() {
+  const portal = _ssGetPortal();
+  portal.style.display = 'none';
+  _ssActiveId = null;
+  _ssCloseListeners.forEach(fn => {
+    document.removeEventListener('mousedown', fn);
+    document.removeEventListener('scroll', fn, true);
+    window.removeEventListener('resize', fn);
+  });
+  _ssCloseListeners = [];
+}
+
+function openSearchSelect(ssId) {
+  if (_ssActiveId && _ssActiveId !== ssId) _ssClose();
+  _ssActiveId = ssId;
+  const portal = _ssGetPortal();
+  portal.style.display = 'block';
+  _ssPosition(ssId);
+  _ssRenderItems(ssId);
+
   setTimeout(() => {
-    const close = (e) => { if (!wrap.contains(e.target)) { wrap.classList.remove('open'); document.removeEventListener('mousedown', close); } };
+    const close = (e) => {
+      const wrap = document.getElementById(ssId);
+      if (wrap?.contains(e.target) || portal.contains(e.target)) return;
+      _ssClose();
+    };
+    const reposition = () => {
+      if (_ssActiveId === ssId) _ssPosition(ssId);
+    };
     document.addEventListener('mousedown', close);
+    document.addEventListener('scroll', _ssClose, true);
+    window.addEventListener('resize', reposition);
+    _ssCloseListeners = [close, reposition];
   }, 0);
 }
 
 function filterSearchSelect(ssId) {
+  if (_ssActiveId === ssId) _ssRenderItems(ssId);
+}
+
+function _ssRenderItems(ssId) {
   const wrap = document.getElementById(ssId);
   if (!wrap) return;
   const input = wrap.querySelector('input[type="text"]');
-  const list = wrap.querySelector('.ss-list');
-  const q = (input.value || '').toLowerCase();
+  const q = (input?.value || '').toLowerCase();
   const patients = wrap._patients || allPatients;
 
   let html = '';
   if (wrap._allowEmpty) {
-    html += `<div class="ss-item" onclick="selectSearchItem('${ssId}','','${wrap._emptyLabel || 'All Patients'}')">${wrap._emptyLabel || 'All Patients'}</div>`;
+    html += `<div class="ss-item" onmousedown="selectSearchItem('${ssId}','','${wrap._emptyLabel || 'All Patients'}')">${wrap._emptyLabel || 'All Patients'}</div>`;
   }
   const filtered = patients.filter(p =>
     p.first_name.toLowerCase().includes(q) ||
@@ -3960,33 +4053,31 @@ function filterSearchSelect(ssId) {
   if (filtered.length) {
     filtered.slice(0, 50).forEach(p => {
       const label = `${p.patient_code} — ${p.last_name}, ${p.first_name}`;
-      html += `<div class="ss-item" onclick="selectSearchItem('${ssId}','${p.id}',\`${label.replace(/`/g, '')}\`)">${esc(label)}</div>`;
+      html += `<div class="ss-item" onmousedown="selectSearchItem('${ssId}','${p.id}',\`${label.replace(/`/g, '')}\`)">${esc(label)}</div>`;
     });
-    if (filtered.length > 50) html += `<div class="ss-item ss-empty">+${filtered.length - 50} more...</div>`;
+    if (filtered.length > 50) html += `<div class="ss-item ss-empty">+${filtered.length - 50} more…</div>`;
   } else {
     html += `<div class="ss-item ss-empty">No patients found</div>`;
   }
-  list.innerHTML = html;
+  _ssGetPortal().innerHTML = html;
 }
 
 function selectSearchItem(ssId, value, label) {
   const wrap = document.getElementById(ssId);
   if (!wrap) return;
-  const input = wrap.querySelector('input[type="text"]');
+  const input  = wrap.querySelector('input[type="text"]');
   const hidden = wrap.querySelector('input[type="hidden"]');
-  input.value = value ? label : '';
+  input.value  = value ? label : '';
   hidden.value = value;
-  wrap.classList.remove('open');
+  _ssClose();
   if (wrap._onSelect) wrap._onSelect();
 }
 
 function setSearchSelectValue(ssId, value, label) {
   const wrap = document.getElementById(ssId);
   if (!wrap) return;
-  const input = wrap.querySelector('input[type="text"]');
-  const hidden = wrap.querySelector('input[type="hidden"]');
-  input.value = label || '';
-  hidden.value = value || '';
+  wrap.querySelector('input[type="text"]').value  = label || '';
+  wrap.querySelector('input[type="hidden"]').value = value || '';
 }
 
 // ════════════════════════════════════
@@ -6038,9 +6129,17 @@ function renderToolReport(result, reportType, groupBy) {
     return;
   }
 
+  // Attendance calendar gets its own renderer
+  if (result.calendar) {
+    renderAttendanceCalendar(result, container);
+    renderColToggles([], reportType);
+    return;
+  }
+
   // Monthly summary gets a custom layout
   if (reportType === 'monthly_summary') {
     renderMonthlyReport(result, container);
+    renderColToggles(getReportColumns(reportType), reportType);
     return;
   }
 
@@ -6067,6 +6166,12 @@ function renderToolReport(result, reportType, groupBy) {
   }
   html += `</div>`;
 
+  // Resolve visible columns once (outside loop)
+  const allCols = getReportColumns(reportType);
+  const visible = rbVisibleCols[reportType];
+  const cols = visible ? allCols.filter(c => visible.has(c.label)) : allCols;
+  renderColToggles(allCols, reportType);
+
   // Groups
   result.groups.forEach((g, gi) => {
     const sub = g.subtotals || {};
@@ -6083,15 +6188,14 @@ function renderToolReport(result, reportType, groupBy) {
     // Records table
     html += `<div class="tool-group-body" style="margin-bottom:12px">`;
     if (g.records && g.records.length) {
-      html += `<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr>`;
-      const cols = getReportColumns(reportType);
-      cols.forEach(c => { html += `<th style="padding:4px 8px;text-align:${c.align || 'left'};font-size:11px;color:var(--ink3);border-bottom:1px solid var(--border)">${c.label}</th>`; });
+      html += `<table style="width:100%;font-size:12px;border-collapse:collapse;table-layout:fixed"><thead><tr>`;
+      cols.forEach(c => { html += `<th style="position:relative;padding:4px 8px;text-align:${c.align || 'left'};font-size:11px;color:var(--ink3);border-bottom:1px solid var(--border);overflow:hidden;white-space:nowrap">${c.label}<div class="col-resizer"></div></th>`; });
       html += `</tr></thead><tbody>`;
       g.records.forEach(r => {
         html += `<tr>`;
         cols.forEach(c => {
           const val = c.render ? c.render(r) : (r[c.key] ?? '—');
-          html += `<td style="padding:3px 8px;border-bottom:1px solid var(--surface3);text-align:${c.align || 'left'};font-size:12px">${val}</td>`;
+          html += `<td style="padding:3px 8px;border-bottom:1px solid var(--surface3);text-align:${c.align || 'left'};font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${val}</td>`;
         });
         html += `</tr>`;
       });
@@ -6101,6 +6205,7 @@ function renderToolReport(result, reportType, groupBy) {
   });
 
   container.innerHTML = html;
+  setupColumnResize(container);
 }
 
 function getReportColumns(type) {
@@ -6109,7 +6214,7 @@ function getReportColumns(type) {
   const dx = (r) => { const c = Array.isArray(r.diagnosis_codes) ? r.diagnosis_codes.join(', ') : (r.diagnosis_codes || ''); return r.diagnosis_category ? r.diagnosis_category + ': ' + c : c || '—'; };
 
   const base = [
-    { key: 'service_date', label: 'Date' },
+    { key: 'service_date', label: 'DOS' },
     { key: 'patient_name', label: 'Patient' },
     { key: 'patient_code', label: 'Code' }
   ];
@@ -6141,7 +6246,7 @@ function getReportColumns(type) {
       ];
     case 'payment_summary':
       return [
-        { key: 'service_date', label: 'Date' },
+        { key: 'service_date', label: 'DOS' },
         { key: 'patient_last_name', label: 'Patient', render: r => [r.patient_last_name, r.patient_first_name].filter(Boolean).join(', ') || '—' },
         { key: 'insurance_name', label: 'Insurance' },
         { key: 'charge', label: 'Charged', align: 'right', render: r => money(r.charge) },
@@ -6161,7 +6266,7 @@ function getReportColumns(type) {
         { key: 'changed_at', label: 'Changed At', render: r => r.changed_at ? new Date(r.changed_at).toLocaleString() : '—' },
         { key: 'intake_id', label: 'Intake ID' },
         { key: 'patient_name', label: 'Patient' },
-        { key: 'service_date', label: 'Svc Date' },
+        { key: 'service_date', label: 'DOS' },
         { key: 'previous_status', label: 'From', render: r => sl(r.previous_status) },
         { key: 'new_status', label: 'To', render: r => sl(r.new_status) },
         { key: 'changed_by', label: 'By' }
@@ -6170,7 +6275,7 @@ function getReportColumns(type) {
       return [
         { key: 'patient_name', label: 'Patient' },
         { key: 'patient_code', label: 'Code' },
-        { key: 'service_date', label: 'Date' },
+        { key: 'service_date', label: 'DOS' },
         { key: 'on_intake', label: 'On Intake', render: r => '<span style="color:#16a34a;font-weight:700">✓</span>' },
         { key: 'in_charge_capture', label: 'Charge Capture', render: r =>
           `<span class="recon-toggle" onclick="toggleReconField('${r.id}','in_charge_capture',${!r.in_charge_capture},this)" style="cursor:pointer;font-weight:700;color:${r.in_charge_capture ? '#16a34a' : '#dc2626'}">${r.in_charge_capture ? '✓' : '✗'}</span>` },
@@ -6200,15 +6305,129 @@ function toggleAllGroups() {
   groups.forEach(g => { allCollapsed ? g.classList.remove('collapsed') : g.classList.add('collapsed'); });
 }
 
+// ─── Column visibility toggles ───────────────────────────────────────────────
+let rbVisibleCols = {};
+
+function renderColToggles(allCols, type) {
+  const panel = document.getElementById('rb-col-toggles');
+  const chips = document.getElementById('rb-col-chips');
+  if (!allCols || !allCols.length) { panel.style.display = 'none'; return; }
+  if (!rbVisibleCols[type]) rbVisibleCols[type] = new Set(allCols.map(c => c.label));
+  panel.style.display = '';
+  chips.innerHTML = allCols.map(c => {
+    const active = rbVisibleCols[type].has(c.label);
+    return `<div class="rb-col-chip${active ? ' active' : ''}" onmousedown="event.preventDefault()" onclick="toggleReportCol('${esc(type)}','${c.label.replace(/'/g,"\\'").replace(/"/g,'&quot;')}',this)">${esc(c.label)}</div>`;
+  }).join('');
+}
+
+function toggleReportCol(type, label, el) {
+  if (!rbVisibleCols[type]) rbVisibleCols[type] = new Set(getReportColumns(type).map(c => c.label));
+  if (rbVisibleCols[type].has(label)) {
+    if (rbVisibleCols[type].size <= 1) return;
+    rbVisibleCols[type].delete(label);
+    el.classList.remove('active');
+  } else {
+    rbVisibleCols[type].add(label);
+    el.classList.add('active');
+  }
+  if (lastToolReport) renderToolReport(lastToolReport, rbCurrentType, document.getElementById('tool-group-by')?.value || 'none');
+}
+
+// ─── Column resize ────────────────────────────────────────────────────────────
+function setupColumnResize(container) {
+  container.querySelectorAll('th').forEach(th => {
+    const handle = th.querySelector('.col-resizer');
+    if (!handle) return;
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = th.offsetWidth;
+      const onMove = mv => {
+        const w = Math.max(40, startW + mv.clientX - startX);
+        th.style.width = w + 'px';
+        th.style.minWidth = w + 'px';
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        handle.classList.remove('resizing');
+      };
+      handle.classList.add('resizing');
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+}
+
+// ─── Attendance calendar renderer ────────────────────────────────────────────
+function renderAttendanceCalendar(result, container) {
+  const s = result.summary || {};
+  let html = `<div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 0;border-bottom:2px solid var(--border);margin-bottom:16px;font-size:13px">`;
+  html += `<div><strong>${s.total_records || 0}</strong> <span style="color:var(--ink3)">visits</span></div>`;
+  html += `<div><strong>${s.total_days || 0}</strong> <span style="color:var(--ink3)">active days</span></div>`;
+  if (s.open_days != null) html += `<div><strong>${s.open_days}</strong> <span style="color:var(--ink3)">scheduled open days</span></div>`;
+  if (s.closed_days) html += `<div style="color:var(--danger)"><strong>${s.closed_days}</strong> <span style="color:var(--ink3)">closed days</span></div>`;
+  if (s.avg_daily && s.avg_daily !== '0') html += `<div><strong>${s.avg_daily}</strong> <span style="color:var(--ink3)">avg visits/active day</span></div>`;
+  html += `</div>`;
+
+  const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  (result.groups || []).forEach(g => {
+    html += `<div class="att-month">`;
+    html += `<div class="att-month-title">${esc(g.label)}</div>`;
+    html += `<div class="att-grid">`;
+    DOW.forEach(d => { html += `<div class="att-day-hdr">${d}</div>`; });
+
+    if (g.days && g.days.length) {
+      // Pad to align first day to correct column
+      const firstDow = new Date(g.days[0].date + 'T12:00:00').getDay();
+      for (let i = 0; i < firstDow; i++) html += `<div class="att-day empty"></div>`;
+
+      g.days.forEach(day => {
+        const dayNum = new Date(day.date + 'T12:00:00').getDate();
+        const isClosed = day.is_open === false;
+        const hasVisits = day.count > 0;
+        let cls = 'att-day';
+        if (isClosed) cls += ' closed';
+        else if (hasVisits) cls += ' has-visits';
+
+        const nameList = (day.visits || []).slice(0, 3).map(v => {
+          const nm = v.patient_name || '';
+          return nm.split(',')[0] || nm;
+        }).join(', ');
+        const extra = (day.visits || []).length > 3 ? ` +${day.visits.length - 3}` : '';
+        const titleTip = day.note ? `${day.date}: ${day.note}` : day.date;
+
+        html += `<div class="${cls}" title="${esc(titleTip)}">`;
+        html += `<div class="att-day-num">${dayNum}</div>`;
+        if (isClosed) {
+          html += `<div class="att-closed-label">CLOSED</div>`;
+          if (day.note) html += `<div class="att-day-note">${esc(day.note)}</div>`;
+        } else if (hasVisits) {
+          html += `<div class="att-day-count">${day.count}</div>`;
+          if (nameList) html += `<div class="att-day-names">${esc(nameList)}${extra ? `<em>${esc(extra)}</em>` : ''}</div>`;
+        }
+        html += `</div>`;
+      });
+    }
+    html += `</div></div>`;
+  });
+
+  container.innerHTML = html;
+}
+
 function exportToolCSV() {
   if (!lastToolReport || !lastToolReport.groups) { toast('No report to export', 'error'); return; }
   const reportType = rbCurrentType || 'patient_visits';
-  const cols = getReportColumns(reportType);
+  const allCols = getReportColumns(reportType);
+  const visible = rbVisibleCols[reportType];
+  const cols = visible ? allCols.filter(c => visible.has(c.label)) : allCols;
+  // Strip HTML tags for clean CSV values
+  const stripHtml = v => String(v).replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#39;/g,"'").replace(/&quot;/g,'"');
   let csv = cols.map(c => c.label).join(',') + ',Group\n';
   lastToolReport.groups.forEach(g => {
     (g.records || []).forEach(r => {
       csv += cols.map(c => {
-        const val = c.render ? c.render(r) : (r[c.key] ?? '');
+        const val = c.render ? stripHtml(c.render(r)) : (r[c.key] ?? '');
         return '"' + String(val).replace(/"/g, '""') + '"';
       }).join(',') + ',"' + (g.label || '') + '"\n';
     });
@@ -6520,18 +6739,19 @@ function selectReportType(type, el) {
     patient_visits: 'patient', claims_by_diagnosis: 'diagnosis_category',
     outstanding_claims: 'workflow_status', payment_summary: 'month',
     daily_intake: 'service_date', denials: 'patient', status_activity: 'service_date',
-    reconciliation: 'patient',
-    monthly_summary: 'service_date'
+    reconciliation: 'patient', monthly_summary: 'service_date', attendance: 'none'
   };
   gb.value = defaults[type] || 'none';
-  // Auto-set date range for monthly report
-  if (type === 'monthly_summary') {
+  // Auto-set date range for month-scoped reports
+  if (type === 'monthly_summary' || type === 'attendance') {
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     document.getElementById('tool-from').value = firstDay.toISOString().split('T')[0];
     document.getElementById('tool-to').value = lastDay.toISOString().split('T')[0];
   }
+  // Reset col toggles for new type
+  renderColToggles(type === 'attendance' ? [] : getReportColumns(type), type);
 }
 
 function setToolRange(days) {

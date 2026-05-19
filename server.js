@@ -1792,6 +1792,11 @@ app.get('/api/ebs-screenshots/intake/:intake_id', requireAuth, async (req, res) 
   res.json(rows);
 });
 
+// Intake Images viewer page (auth handled client-side via sessionStorage token)
+app.get('/intake-images', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'intake-images.html'));
+});
+
 // SPA fallback — serve index.html for non-API routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

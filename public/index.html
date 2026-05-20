@@ -1069,7 +1069,6 @@
     .ss-log-thumb { width: 56px; height: 40px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 1px solid var(--border); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
@@ -3297,7 +3296,6 @@ async function loadEBSWorkflow() {
     ebsRenderP2();
     ebsRenderP3();
     document.getElementById('ebs-date-label').textContent = date;
-    ebsPrewarmOCR(); // start worker init now so it's ready before screenshot is pasted
     // Restore last EBS phase
     const savedPhase = localStorage.getItem('ct_ebs_phase');
     if (savedPhase && ['p1','p2','p3','p4'].includes(savedPhase)) showEBSPhase(savedPhase);
@@ -3502,93 +3500,20 @@ function ebsRenderBrief() {
   document.getElementById('ebs-p2-actions').style.display = 'flex';
 }
 
-// OCR validation after screenshot upload
-let _tesseractWorker = null;
-let _tesseractWorkerPromise = null;  // single in-flight init promise
-
-// Kick off worker initialization in background — safe to call multiple times
-function ebsPrewarmOCR() {
-  if (_tesseractWorker || _tesseractWorkerPromise) return;
-  if (typeof Tesseract === 'undefined') return;
-  // OEM 3 = default (auto), fastest initialization; logger suppressed
-  _tesseractWorkerPromise = Tesseract.createWorker('eng', 3, { logger: () => {} })
-    .then(w => { _tesseractWorker = w; })
-    .catch(e => {
-      console.warn('OCR worker init failed:', e);
-      _tesseractWorkerPromise = null; // allow retry
-    });
-}
-
+// OCR validation — server-side via Claude Haiku vision
 async function ebsRunOCR(base64, mimeType, rec) {
   const panel = document.getElementById('ebs-ss-ocr-panel');
   if (!panel) return;
   panel.style.display = '';
+  panel.innerHTML = '<div style="font-size:12px;color:var(--ink3)">🔍 Checking… <span style="font-size:11px">(or click ✅ Pass / 🛑 Fail above)</span></div>';
 
   try {
-    if (typeof Tesseract === 'undefined') throw new Error('not loaded');
+    const result = await api('POST', '/api/ebs-screenshots/ocr', { base64, mimeType, record: rec });
+    const checks = result.checks || [];
+    const allPass = result.all_pass ?? checks.every(c => c.found);
 
-    if (!_tesseractWorker) {
-      ebsPrewarmOCR(); // start if not started yet
-      panel.innerHTML = '<div style="font-size:12px;color:var(--ink3)">⏳ Loading OCR engine… <span style="font-size:11px">(or click ✅ Pass / 🛑 Fail above)</span></div>';
-      // Wait for init — 45s; this is a one-time cost
-      const initTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('init_timeout')), 45000));
-      await Promise.race([_tesseractWorkerPromise, initTimeout]);
-      if (!_tesseractWorker) throw new Error('timeout');
-    }
-
-    panel.innerHTML = '<div style="font-size:12px;color:var(--ink3)">🔍 Scanning… <span style="font-size:11px">(or click ✅ Pass / 🛑 Fail above)</span></div>';
-
-    // Recognition — 30s
-    const recTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000));
-    const { data: { text } } = await Promise.race([
-      _tesseractWorker.recognize(`data:${mimeType};base64,${base64}`),
-      recTimeout
-    ]);
-    const extracted = text.toUpperCase().replace(/\s+/g, ' ');
-
-    const checks = [];
-
-    // Patient name — title bar shows LASTNAME,FIRSTNAME
-    if (rec.patient_name) {
-      // Handle "First Last" or "Last, First" → extract last name
-      const nameParts = rec.patient_name.includes(',')
-        ? rec.patient_name.split(',')[0].trim()          // "D'Orazio, Anthony" → "D'Orazio"
-        : rec.patient_name.trim().split(/\s+/).pop();    // "Anthony D'Orazio" → "D'Orazio"
-      const lastName = nameParts.toUpperCase().replace(/[^A-Z0-9']/g, '');
-      if (lastName.length > 1) {
-        checks.push({ label: `Name: ${nameParts}`, found: extracted.replace(/[^A-Z0-9']/g, '').includes(lastName) });
-      }
-    }
-
-    // Service date — EBS shows MM/DD/YYYY (e.g. 05/07/2026)
-    if (rec.service_date) {
-      const [y, m, d] = rec.service_date.split('-');
-      const fmts = [`${m}/${d}/${y}`, `${parseInt(m)}/${parseInt(d)}/${y}`,
-                    `${m}/${d}/${y.slice(2)}`, `${parseInt(m)}/${parseInt(d)}/${y.slice(2)}`];
-      checks.push({ label: `Date ${rec.service_date}`, found: fmts.some(f => extracted.includes(f)) });
-    }
-
-    // CPT codes — visible in the right-side CPT table
-    const cpts = [rec.manipulation_type === 'E1' ? '98940' : '98941'];
-    if (rec.therapeutic_exercises > 0) cpts.push('97110');
-    if (rec.a2) cpts.push('99204');
-    else if (rec.re3) cpts.push('99213');
-    for (const cpt of cpts) {
-      checks.push({ label: `CPT ${cpt}`, found: extracted.includes(cpt) });
-    }
-
-    // Diagnosis codes — visible in the ICD9 column of the Diag table
-    const dxCodes = Array.isArray(rec.diagnosis_codes) ? rec.diagnosis_codes : [];
-    for (const code of dxCodes) {
-      // Normalise: remove trailing zeros on decimal (M54.50 → M54.5 also valid in OCR)
-      const codeUpper = code.toUpperCase();
-      const codeAlt   = codeUpper.replace(/\.?0+$/, ''); // M54.50 → M54.5
-      checks.push({ label: code, found: extracted.includes(codeUpper) || extracted.includes(codeAlt) });
-    }
-
-    const allPass = checks.every(c => c.found);
     const checkHtml = checks.map(c =>
-      `<span style="margin-right:10px;font-size:12px;color:${c.found?'var(--accent2)':'var(--danger)'}">${c.found?'✅':'❌'} ${esc(c.label)}</span>`
+      `<span style="margin-right:10px;font-size:12px;color:${c.found ? 'var(--accent2)' : 'var(--danger)'}">${c.found ? '✅' : '❌'} ${esc(c.label)}${c.note ? ' <span style="font-size:10px;color:var(--ink3)">(' + esc(c.note) + ')</span>' : ''}</span>`
     ).join('');
 
     panel.innerHTML = `
@@ -3601,22 +3526,7 @@ async function ebsRunOCR(base64, mimeType, rec) {
     }
   } catch(e) {
     console.error('OCR error:', e);
-    const isTimeout = e.message === 'timeout' || e.message === 'init_timeout' || e.message?.includes('timeout');
-    if (isTimeout) {
-      if (e.message === 'init_timeout') {
-        // Worker never finished initializing — reset promise so next attempt retries
-        _tesseractWorkerPromise = null;
-        panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR engine took too long to load — verify manually using ✅ Pass / 🛑 Fail.</div>`;
-      } else {
-        // Recognition timed out — kill worker so next attempt gets a fresh one
-        try { _tesseractWorker?.terminate(); } catch {}
-        _tesseractWorker = null;
-        _tesseractWorkerPromise = null;
-        panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR scan timed out — verify manually using ✅ Pass / 🛑 Fail.</div>`;
-      }
-    } else {
-      panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR unavailable — verify manually. (${e.message})</div>`;
-    }
+    panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR unavailable — verify manually using ✅ Pass / 🛑 Fail.</div>`;
   }
 }
 
@@ -3698,7 +3608,6 @@ function showEBSPhase(phase) {
     document.getElementById('ebs-ptab-' + p).classList.toggle('active', p === phase);
   });
   localStorage.setItem('ct_ebs_phase', phase);
-  if (phase === 'p2') ebsPrewarmOCR(); // start worker early so it's ready when screenshot is pasted
   if (phase === 'p4') ebsLoadScreenshotLog();
 }
 

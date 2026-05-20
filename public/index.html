@@ -1622,6 +1622,7 @@
                     <th>Verified By</th>
                     <th>Uploaded</th>
                     <th>Notes</th>
+                    <th style="width:90px"></th>
                   </tr>
                 </thead>
                 <tbody id="ebs-ss-log-tbody">
@@ -3296,6 +3297,7 @@ async function loadEBSWorkflow() {
     ebsRenderP2();
     ebsRenderP3();
     document.getElementById('ebs-date-label').textContent = date;
+    ebsPrewarmOCR(); // start worker init now so it's ready before screenshot is pasted
     // Restore last EBS phase
     const savedPhase = localStorage.getItem('ct_ebs_phase');
     if (savedPhase && ['p1','p2','p3','p4'].includes(savedPhase)) showEBSPhase(savedPhase);
@@ -3502,29 +3504,45 @@ function ebsRenderBrief() {
 
 // OCR validation after screenshot upload
 let _tesseractWorker = null;
+let _tesseractWorkerPromise = null;  // single in-flight init promise
+
+// Kick off worker initialization in background — safe to call multiple times
+function ebsPrewarmOCR() {
+  if (_tesseractWorker || _tesseractWorkerPromise) return;
+  if (typeof Tesseract === 'undefined') return;
+  // OEM 3 = default (auto), fastest initialization; logger suppressed
+  _tesseractWorkerPromise = Tesseract.createWorker('eng', 3, { logger: () => {} })
+    .then(w => { _tesseractWorker = w; })
+    .catch(e => {
+      console.warn('OCR worker init failed:', e);
+      _tesseractWorkerPromise = null; // allow retry
+    });
+}
+
 async function ebsRunOCR(base64, mimeType, rec) {
   const panel = document.getElementById('ebs-ss-ocr-panel');
   if (!panel) return;
   panel.style.display = '';
-  panel.innerHTML = '<div style="font-size:12px;color:var(--ink3)">🔍 Scanning… <span style="color:var(--ink3);font-size:11px">(or just click ✅ Pass / 🛑 Fail above)</span></div>';
-
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('timeout')), 20000)
-  );
 
   try {
     if (typeof Tesseract === 'undefined') throw new Error('not loaded');
 
     if (!_tesseractWorker) {
-      _tesseractWorker = await Promise.race([
-        Tesseract.createWorker('eng', 1, { logger: () => {} }),
-        timeout
-      ]);
+      ebsPrewarmOCR(); // start if not started yet
+      panel.innerHTML = '<div style="font-size:12px;color:var(--ink3)">⏳ Loading OCR engine… <span style="font-size:11px">(or click ✅ Pass / 🛑 Fail above)</span></div>';
+      // Wait for init — 45s; this is a one-time cost
+      const initTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('init_timeout')), 45000));
+      await Promise.race([_tesseractWorkerPromise, initTimeout]);
+      if (!_tesseractWorker) throw new Error('timeout');
     }
 
+    panel.innerHTML = '<div style="font-size:12px;color:var(--ink3)">🔍 Scanning… <span style="font-size:11px">(or click ✅ Pass / 🛑 Fail above)</span></div>';
+
+    // Recognition — 30s
+    const recTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000));
     const { data: { text } } = await Promise.race([
       _tesseractWorker.recognize(`data:${mimeType};base64,${base64}`),
-      timeout
+      recTimeout
     ]);
     const extracted = text.toUpperCase().replace(/\s+/g, ' ');
 
@@ -3583,11 +3601,19 @@ async function ebsRunOCR(base64, mimeType, rec) {
     }
   } catch(e) {
     console.error('OCR error:', e);
-    // Kill hung worker so it doesn't block future attempts
-    if (e.message === 'timeout' || e.message?.includes('timeout')) {
-      try { _tesseractWorker?.terminate(); } catch {}
-      _tesseractWorker = null;
-      panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR timed out — verify manually using ✅ Pass / 🛑 Fail.</div>`;
+    const isTimeout = e.message === 'timeout' || e.message === 'init_timeout' || e.message?.includes('timeout');
+    if (isTimeout) {
+      if (e.message === 'init_timeout') {
+        // Worker never finished initializing — reset promise so next attempt retries
+        _tesseractWorkerPromise = null;
+        panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR engine took too long to load — verify manually using ✅ Pass / 🛑 Fail.</div>`;
+      } else {
+        // Recognition timed out — kill worker so next attempt gets a fresh one
+        try { _tesseractWorker?.terminate(); } catch {}
+        _tesseractWorker = null;
+        _tesseractWorkerPromise = null;
+        panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR scan timed out — verify manually using ✅ Pass / 🛑 Fail.</div>`;
+      }
     } else {
       panel.innerHTML = `<div style="font-size:12px;color:var(--ink3)">OCR unavailable — verify manually. (${e.message})</div>`;
     }
@@ -3672,6 +3698,7 @@ function showEBSPhase(phase) {
     document.getElementById('ebs-ptab-' + p).classList.toggle('active', p === phase);
   });
   localStorage.setItem('ct_ebs_phase', phase);
+  if (phase === 'p2') ebsPrewarmOCR(); // start worker early so it's ready when screenshot is pasted
   if (phase === 'p4') ebsLoadScreenshotLog();
 }
 
@@ -3903,7 +3930,7 @@ async function ebsLoadScreenshotLog() {
 function ebsRenderScreenshotLog(rows) {
   const tbody = document.getElementById('ebs-ss-log-tbody');
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="icon">📷</div><p>No screenshots for this date.</p><small>Upload screenshots in Phase 2.</small></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="icon">📷</div><p>No screenshots for this date.</p><small>Upload screenshots in Phase 2.</small></div></td></tr>`;
     return;
   }
   const statusHtml = s => {
@@ -3922,12 +3949,63 @@ function ebsRenderScreenshotLog(rows) {
       <td style="font-size:12px;color:var(--ink3)">${esc(r.verified_by||'—')}</td>
       <td style="font-size:12px;color:var(--ink3)">${r.created_at ? new Date(r.created_at).toLocaleString() : '—'}</td>
       <td style="font-size:12px;color:var(--ink2);max-width:200px;white-space:pre-wrap">${esc(r.mismatch_notes||'')}</td>
+      <td><button class="btn btn-xs btn-ghost" style="font-size:11px;white-space:nowrap" onclick="ebsAddCorrection('${esc(r.intake_id||'')}','${esc(r.service_date||'')}','${esc(r.patient_code||'')}','${esc(r.id)}')">+ Screenshot</button></td>
     </tr>`
   ).join('');
 }
 
 function ebsViewScreenshot(url, intakeId) {
   window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+// Add a correction screenshot to an already-verified record from the Phase 4 log
+function ebsAddCorrection(intakeId, serviceDate, patientCode, originalId) {
+  // Reuse a single hidden input — create once, reuse
+  let inp = document.getElementById('_ebs-log-correction-input');
+  if (!inp) {
+    inp = document.createElement('input');
+    inp.type = 'file';
+    inp.id = '_ebs-log-correction-input';
+    inp.accept = 'image/jpeg,image/png';
+    inp.style.display = 'none';
+    document.body.appendChild(inp);
+  }
+  // Remove any prior listener before adding a fresh one
+  inp.onchange = null;
+  inp.value = '';
+  inp.onchange = async () => {
+    const file = inp.files[0];
+    if (!file) return;
+    if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.toLowerCase().endsWith('.heic')) {
+      toast('HEIC not supported — convert to JPG or PNG first.', 'error'); return;
+    }
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      toast('JPG or PNG only.', 'error'); return;
+    }
+    if (file.size > 10 * 1024 * 1024) { toast('Image too large — max 10 MB.', 'error'); return; }
+    try {
+      const base64 = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = e => res(e.target.result.split(',')[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+      toast('Uploading correction…');
+      await api('POST', '/api/ebs-screenshots/correction', {
+        base64,
+        mimeType: file.type,
+        intake_id: intakeId,
+        service_date: serviceDate,
+        patient_code: patientCode || null,
+        correction_of: originalId,
+        mismatch_notes: 'Manual replacement from screenshot log'
+      });
+      toast('Correction screenshot uploaded ✅', 'success');
+      ebsLoadScreenshotLog();
+    } catch(e) { toast('Upload failed: ' + e.message, 'error'); }
+    inp.value = '';
+  };
+  inp.click();
 }
 
 function badge(val, type) {

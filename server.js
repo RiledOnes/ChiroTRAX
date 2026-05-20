@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const { createClient } = require('@supabase/supabase-js');
+const Anthropic = require('@anthropic-ai/sdk');
 const path = require('path');
 
 const app = express();
@@ -63,6 +64,10 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 );
+
+const anthropic = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
 
 // ============================================
 // SESSION MANAGEMENT (DB-backed for serverless)
@@ -1593,6 +1598,69 @@ app.get('/api/intake/:id/status-history', async (req, res) => {
 // ============================================
 // EBS SCREENSHOT ROUTES
 // ============================================
+
+// POST /api/ebs-screenshots/ocr — validate screenshot fields via Claude vision
+app.post('/api/ebs-screenshots/ocr', requireAuth, async (req, res) => {
+  if (!anthropic) return res.status(503).json({ error: 'OCR not configured — set ANTHROPIC_API_KEY' });
+
+  const { base64, mimeType, record } = req.body;
+  if (!base64 || !mimeType || !record) return res.status(400).json({ error: 'base64, mimeType, record required' });
+  if (!['image/jpeg', 'image/png'].includes(mimeType)) return res.status(400).json({ error: 'JPG or PNG only' });
+
+  // Build the list of fields to check so Claude knows exactly what to look for
+  const fields = [];
+  if (record.patient_name) {
+    const lastName = record.patient_name.includes(',')
+      ? record.patient_name.split(',')[0].trim()
+      : record.patient_name.trim().split(/\s+/).pop();
+    fields.push(`Patient last name: ${lastName}`);
+  }
+  if (record.service_date) fields.push(`Service date: ${record.service_date} (may appear as MM/DD/YYYY)`);
+  const cpts = [];
+  if (record.manipulation_type === 'E1') cpts.push('98940'); else if (record.manipulation_type) cpts.push('98941');
+  if (record.therapeutic_exercises > 0) cpts.push('97110');
+  if (record.a2) cpts.push('99204');
+  else if (record.re3) cpts.push('99213');
+  if (cpts.length) fields.push(`CPT codes: ${cpts.join(', ')}`);
+  const dxCodes = Array.isArray(record.diagnosis_codes) ? record.diagnosis_codes : [];
+  if (dxCodes.length) fields.push(`Diagnosis codes: ${dxCodes.join(', ')}`);
+
+  const prompt = `You are validating an EBS (Electronic Billing System) screenshot for a chiropractic office.
+
+Look at this screenshot and check whether each of the following fields is visible and matches:
+${fields.map((f, i) => `${i + 1}. ${f}`).join('\n')}
+
+Respond with ONLY valid JSON in this exact format (no markdown, no explanation):
+{
+  "checks": [
+    {"label": "<field description>", "found": true|false, "note": "<optional short note if not found>"}
+  ],
+  "all_pass": true|false
+}`;
+
+  try {
+    const msg = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+          { type: 'text', text: prompt }
+        ]
+      }]
+    });
+
+    const raw = msg.content[0]?.text?.trim() || '{}';
+    // Strip any accidental markdown fences
+    const json = raw.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/,'').trim();
+    const result = JSON.parse(json);
+    res.json(result);
+  } catch (e) {
+    console.error('OCR via Claude failed:', e);
+    res.status(500).json({ error: 'OCR failed: ' + e.message });
+  }
+});
 
 // POST /api/ebs-screenshots/upload
 app.post('/api/ebs-screenshots/upload', requireAuth, async (req, res) => {

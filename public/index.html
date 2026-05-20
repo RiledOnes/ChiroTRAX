@@ -5303,16 +5303,18 @@ async function exportDailyPDF() {
 
       .body { display: flex; gap: 6px; flex: 1; min-height: 0; overflow: hidden; }
       .col-left  { width: 82mm; flex-shrink: 0; display: flex; flex-direction: column; gap: 5px; overflow: hidden; }
-      .col-right { flex: 1; display: block; height: 100%; overflow: hidden; }
+      /* col-right is a flex column — visits section is fixed, cap fills the rest */
+      .col-right { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 
       .notes-box { font-size: 7.5px; line-height: 1.45; color: #3a4a5a; flex-shrink: 0; }
       .intake-img-wrap { flex: 1 1 auto; min-height: 0; overflow: hidden; }
       .intake-img-wrap img { width: 100%; height: 100%; object-fit: contain; object-position: top center; display: block; }
       .img-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: #c5d0dc; font-size: 8px; border: 0.5px solid #e4e8ee; border-radius: 3px; }
 
-      .sec-lbl { font-size: 8px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: #8a96a3; margin-bottom: 4px; display: block; flex-shrink: 0; }
+      .sec-lbl { font-size: 8px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: #8a96a3; margin-bottom: 3px; display: block; flex: 0 0 auto; }
 
-      .visits-wrap { height: 43%; overflow: hidden; }
+      /* visits section: fixed 38% of col-right height, will not grow or shrink */
+      .visits-wrap { flex: 0 0 38%; min-height: 0; overflow: hidden; }
       table.vt { table-layout: fixed; border-collapse: collapse; font-size: 8px; width: 100%; }
       table.vt col.c-id  { width: 11%; }
       table.vt col.c-pn  { width: 8%; }
@@ -5323,8 +5325,8 @@ async function exportDailyPDF() {
       table.vt col.c-dx  { width: 27%; }
       table.vt col.c-bll { width: 8%; }
       table.vt col.c-st  { width: 10%; }
-      table.vt th { font-size: 6.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; color: #8a96a3; border-bottom: 0.5px solid #d4dae2; padding: 0 3px 3px; text-align: left; white-space: nowrap; }
-      table.vt td { padding: 2px 3px; border-bottom: 0.5px solid #f0f2f5; vertical-align: middle; overflow: hidden; }
+      table.vt th { font-size: 6.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; color: #8a96a3; border-bottom: 0.5px solid #d4dae2; padding: 0 3px 2px; text-align: left; white-space: nowrap; }
+      table.vt td { padding: 1px 3px; border-bottom: 0.5px solid #f0f2f5; vertical-align: middle; overflow: hidden; }
       table.vt tbody tr:nth-child(odd) td { background: #fafbfc; }
       .td-id  { font-family: 'DM Mono', monospace; font-size: 7px; color: #8a96a3; white-space: nowrap; }
       .td-pn  { font-family: 'DM Mono', monospace; font-size: 7.5px; color: #5a6a7a; white-space: nowrap; }
@@ -5333,8 +5335,9 @@ async function exportDailyPDF() {
       .dx-lbl { font-size: 7px; font-weight: 500; color: #5a6a7a; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
       .dx-cod { font-family: 'DM Mono', monospace; font-size: 6.5px; color: #8a96a3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 
-      .cap-section { height: 55%; margin-top: 4px; overflow: hidden; display: flex; flex-direction: column; }
-      .cap-section img { flex: 1; min-height: 0; width: 100%; object-fit: contain; object-position: top left; display: block; }
+      /* cap-section fills all space left after visits-wrap — image scales to fit */
+      .cap-section { flex: 1 1 auto; min-height: 0; margin-top: 4px; overflow: hidden; display: flex; flex-direction: column; }
+      .cap-section img { flex: 1 1 auto; min-height: 0; width: 100%; object-fit: contain; object-position: top left; display: block; }
       .cap-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: #c5d0dc; font-size: 8px; border: 0.5px solid #e4e8ee; border-radius: 3px; }
     </style></head><body>`;
 
